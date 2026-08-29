@@ -1,7 +1,11 @@
 "use client";
 
 import { ATTENDANCE_STATUS } from "@/lib/logic/attendance-reconciliation";
-import { generateSlotKey, normalizeCourseCode } from "@/lib/utils";
+import {
+  generateSlotKey,
+  normalizeCourseCode,
+  normalizeSession,
+} from "@/lib/utils";
 import { useAttendanceSettings } from "@/providers/attendance-settings";
 import { AttendanceReport, Course, TrackAttendance } from "@/types";
 import { BarChart3 } from "lucide-react";
@@ -276,7 +280,8 @@ function processOfficialData(
 
             let sessionName = sessionData.session;
             if (!sessionName || sessionName === "null") {
-              if (!isNaN(parseInt(sessionKey)) && parseInt(sessionKey) < 20) {
+              const skNum = parseInt(normalizeSession(sessionKey), 10);
+              if (!isNaN(skNum) && skNum < 20) {
                 sessionName = sessionKey;
               } else {
                 sessionName = String(index + 1);

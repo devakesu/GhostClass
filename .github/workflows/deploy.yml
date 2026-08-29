@@ -108,12 +108,19 @@ jobs:
           NEXT_PUBLIC_BACKEND_URL: ${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}
           CF_PROXY_SECRET: ${{ env.CF_PROXY_SECRET || secrets.CF_PROXY_SECRET }}
         run: |
-          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ] || [ -z "${CF_WORKER_NAME}" ] || [ -z "${NEXT_PUBLIC_BACKEND_URL}" ] || [ -z "${CF_PROXY_SECRET}" ]; then
+          if [ -z "${CLOUDFLARE_API_TOKEN}" ] || [ -z "${CLOUDFLARE_ACCOUNT_ID}" ] || [ -z "${CF_WORKER_NAME}" ] || [ -z "${NEXT_PUBLIC_BACKEND_URL}" ]; then
             echo "::warning::Skipping Cloudflare deploy because required credentials/vars are missing."
-            echo "Required: secrets.CLOUDFLARE_API_TOKEN, secrets.CLOUDFLARE_ACCOUNT_ID, secrets.CF_PROXY_SECRET, vars.CF_WORKER_NAME, vars.NEXT_PUBLIC_BACKEND_URL"
+            echo "Required: secrets.CLOUDFLARE_API_TOKEN, secrets.CLOUDFLARE_ACCOUNT_ID, vars.CF_WORKER_NAME, vars.NEXT_PUBLIC_BACKEND_URL"
             echo "skip=true" >> "${GITHUB_OUTPUT}"
           else
             echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+          if [ -n "${CF_PROXY_SECRET}" ]; then
+            echo "has_secret=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has_secret=false" >> "${GITHUB_OUTPUT}"
+            echo "ℹ️ CF_PROXY_SECRET not provided in CI; keeping existing PROXY_SECRET in Cloudflare Worker."
           fi
 
       - name: Install Wrangler
@@ -121,7 +128,7 @@ jobs:
         run: npm ci --prefix workers
 
       - name: Update Cloudflare Worker secret (PROXY_SECRET)
-        if: steps.validate-cf.outputs.skip != 'true'
+        if: steps.validate-cf.outputs.skip != 'true' && steps.validate-cf.outputs.has_secret == 'true'
         env:
           CLOUDFLARE_API_TOKEN: ${{ env.CLOUDFLARE_API_TOKEN || secrets.CLOUDFLARE_API_TOKEN }}
           CLOUDFLARE_ACCOUNT_ID: ${{ env.CLOUDFLARE_ACCOUNT_ID || secrets.CLOUDFLARE_ACCOUNT_ID }}
@@ -129,6 +136,11 @@ jobs:
           CF_PROXY_SECRET: ${{ env.CF_PROXY_SECRET || secrets.CF_PROXY_SECRET }}
         run: |
           set -euo pipefail
+          set +x
+
+          # Explicitly mask secret in runner logs
+          echo "::add-mask::${CF_PROXY_SECRET}"
+
           printf "%s" "${CF_PROXY_SECRET}" | ./workers/node_modules/.bin/wrangler secret put PROXY_SECRET --name "${CF_WORKER_NAME}"
 
       - name: Deploy Cloudflare Worker
@@ -196,12 +208,19 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY || secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_SECONDARY_SECRET: ${{ env.AWS_SECONDARY_SECRET || secrets.AWS_SECONDARY_SECRET }}
         run: |
-          if [ -z "${AWS_REGION}" ] || [ -z "${AWS_LAMBDA_FUNCTION_NAME}" ] || [ -z "${NEXT_PUBLIC_BACKEND_URL}" ] || [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ] || [ -z "${AWS_SECONDARY_SECRET}" ]; then
+          if [ -z "${AWS_REGION}" ] || [ -z "${AWS_LAMBDA_FUNCTION_NAME}" ] || [ -z "${NEXT_PUBLIC_BACKEND_URL}" ] || [ -z "${AWS_ACCESS_KEY_ID}" ] || [ -z "${AWS_SECRET_ACCESS_KEY}" ]; then
             echo "::warning::Skipping AWS deploy because required credentials/vars are missing."
-            echo "Required: vars.AWS_REGION, vars.AWS_LAMBDA_FUNCTION_NAME, vars.NEXT_PUBLIC_BACKEND_URL, secrets.AWS_ACCESS_KEY_ID, secrets.AWS_SECRET_ACCESS_KEY, secrets.AWS_SECONDARY_SECRET"
+            echo "Required: vars.AWS_REGION, vars.AWS_LAMBDA_FUNCTION_NAME, vars.NEXT_PUBLIC_BACKEND_URL, secrets.AWS_ACCESS_KEY_ID, secrets.AWS_SECRET_ACCESS_KEY"
             echo "skip=true" >> "${GITHUB_OUTPUT}"
           else
             echo "skip=false" >> "${GITHUB_OUTPUT}"
+          fi
+
+          if [ -n "${AWS_SECONDARY_SECRET}" ]; then
+            echo "has_secret=true" >> "${GITHUB_OUTPUT}"
+          else
+            echo "has_secret=false" >> "${GITHUB_OUTPUT}"
+            echo "ℹ️ AWS_SECONDARY_SECRET not provided in CI; keeping existing PROXY_SECRET in Lambda configuration."
           fi
 
       - name: Configure AWS credentials
@@ -220,6 +239,11 @@ jobs:
           AWS_SECONDARY_SECRET: ${{ env.AWS_SECONDARY_SECRET || secrets.AWS_SECONDARY_SECRET }}
         run: |
           set -euo pipefail
+          set +x
+
+          if [ -n "${AWS_SECONDARY_SECRET:-}" ]; then
+            echo "::add-mask::${AWS_SECONDARY_SECRET}"
+          fi
 
           CURRENT_VARS_JSON=$(aws lambda get-function-configuration \
             --function-name "${AWS_LAMBDA_FUNCTION_NAME}" \
@@ -228,8 +252,8 @@ jobs:
 
           MERGED_VARS_JSON=$(jq -c \
             --arg upstream "${NEXT_PUBLIC_BACKEND_URL}" \
-            --arg secret "${AWS_SECONDARY_SECRET}" \
-            '. // {} | .EZYGO_API_URL = $upstream | .PROXY_SECRET = $secret | { Variables: . }' \
+            --arg secret "${AWS_SECONDARY_SECRET:-}" \
+            '. // {} | .EZYGO_API_URL = $upstream | (if $secret != "" then .PROXY_SECRET = $secret else . end) | { Variables: . }' \
             <<< "${CURRENT_VARS_JSON}")
 
           aws lambda update-function-configuration \

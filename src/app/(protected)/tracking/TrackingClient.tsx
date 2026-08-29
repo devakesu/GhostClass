@@ -36,8 +36,6 @@ import {
   formatSessionName,
   generateSlotKey,
   getSessionNumber,
-  normalizeSession,
-  normalizeToISODate,
   redact,
 } from "@/lib/utils";
 import { createClient } from "@/lib/supabase/client";
@@ -160,27 +158,13 @@ const parseDateValue = (dateStr: string) => {
 
 function getCorrectionStatusText(
   trackingItem: TrackAttendance,
-  attendanceData: AttendanceDataPayload,
   officialSessionsMap: Map<string, AttendanceSessionItem>,
   userLabel: string,
 ): string {
-  let sessionToUse = trackingItem.session;
-  const sessions = attendanceData?.sessions;
-
-  if (
-    sessions && Object.prototype.hasOwnProperty.call(sessions, sessionToUse)
-  ) {
-    const resolvedSession = Reflect.get(sessions, sessionToUse);
-    const normalized = normalizeSession(resolvedSession?.name || "");
-    if (!isNaN(parseInt(normalized, 10))) {
-      sessionToUse = normalized;
-    }
-  }
-
   const itemKey = generateSlotKey(
     trackingItem.course,
     trackingItem.date,
-    sessionToUse,
+    trackingItem.session,
   );
   const officialSession = officialSessionsMap.get(itemKey);
   let officialLabel = "Absent";
@@ -197,14 +181,12 @@ function getCorrectionStatusText(
 
 function TrackingRecordCard({
   trackingItem,
-  attendanceData,
   officialSessionsMap,
   deleteId,
   setDeleteConfirmOpen,
   getResolvedSessionName,
 }: {
   trackingItem: TrackAttendance;
-  attendanceData: AttendanceDataPayload;
   officialSessionsMap: Map<string, AttendanceSessionItem>;
   deleteId: string;
   setDeleteConfirmOpen: (id: string | null) => void;
@@ -230,7 +212,6 @@ function TrackingRecordCard({
   if (isCorrection) {
     statusText = getCorrectionStatusText(
       trackingItem,
-      attendanceData,
       officialSessionsMap,
       userLabel,
     );
@@ -330,7 +311,6 @@ function CourseSectionCard({
   expandedCourses,
   recordsPerCourseInitial,
   getStatusKey,
-  attendanceData,
   officialSessionsMap,
   deleteId,
   setDeleteConfirmOpen,
@@ -346,7 +326,6 @@ function CourseSectionCard({
   expandedCourses: Set<string>;
   recordsPerCourseInitial: number;
   getStatusKey: (att: AttendanceCode) => StatusKey;
-  attendanceData?: AttendanceDataPayload;
   officialSessionsMap: Map<string, AttendanceSessionItem>;
   deleteId: string;
   setDeleteConfirmOpen: (id: string | null) => void;
@@ -450,7 +429,6 @@ function CourseSectionCard({
                   <TrackingRecordCard
                     key={`${trackingItem.auth_user_id}-${trackingItem.session}-${trackingItem.course}-${trackingItem.date}`}
                     trackingItem={trackingItem}
-                    attendanceData={attendanceData}
                     officialSessionsMap={officialSessionsMap}
                     deleteId={deleteId}
                     setDeleteConfirmOpen={setDeleteConfirmOpen}
@@ -558,37 +536,12 @@ function groupAndSortTrackingData(
       const dateA = parseDateValue(a.date);
       const dateB = parseDateValue(b.date);
       if (dateA !== dateB) return dateB - dateA;
-      return getSessionNumber(a.session) - getSessionNumber(b.session);
+      const sA = getSessionNumber(a.session);
+      const sB = getSessionNumber(b.session);
+      if (sA !== sB) return sA - sB;
+      return a.session.localeCompare(b.session);
     });
   });
-  return map;
-}
-
-function buildSessionIndexMap(
-  attendanceData: AttendanceDataPayload,
-): Map<string, number> {
-  const map = new Map<string, number>();
-  if (!attendanceData?.studentAttendanceData) return map;
-
-  Object.entries(attendanceData.studentAttendanceData).forEach(
-    ([dateKey, dateData]) => {
-      const isoDate = normalizeToISODate(dateKey);
-      Object.entries(dateData).forEach(([sessionKey, sessionData], index) => {
-        const ordinal = index + 1;
-        map.set(
-          `${isoDate}|${String(sessionKey).trim().toLowerCase()}`,
-          ordinal,
-        );
-
-        if (sessionData?.session) {
-          map.set(
-            `${isoDate}|${String(sessionData.session).trim().toLowerCase()}`,
-            ordinal,
-          );
-        }
-      });
-    },
-  );
   return map;
 }
 
@@ -598,27 +551,14 @@ function buildOfficialSessionsMap(
   const map = new Map<string, AttendanceSessionItem>();
   if (!attendanceData?.studentAttendanceData) return map;
 
-  const sessionsObj = attendanceData?.sessions;
-
   Object.entries(attendanceData.studentAttendanceData).forEach(
     ([dateStr, dateData]) => {
       Object.entries(dateData).forEach(([sessionKey, session], index) => {
         if (!session.course) return;
 
         let rawSession = getOfficialSessionRaw(session, sessionKey);
-        const isLargeNumeric = !isNaN(parseInt(String(rawSession))) &&
-          parseInt(String(rawSession)) > 20;
-
-        if (
-          sessionsObj &&
-          Object.prototype.hasOwnProperty.call(sessionsObj, rawSession)
-        ) {
-          const resolved = Reflect.get(sessionsObj, rawSession);
-          const normalized = normalizeSession(resolved?.name || "");
-          if (!isNaN(parseInt(normalized, 10))) {
-            rawSession = normalized;
-          }
-        } else if (isLargeNumeric) {
+        const sNum = parseInt(String(rawSession), 10);
+        if (!isNaN(sNum) && sNum > 20) {
           rawSession = String(index + 1);
         }
 
@@ -630,32 +570,53 @@ function buildOfficialSessionsMap(
   return map;
 }
 
+function findSessionIndex(
+  studentAttendanceData:
+    | Record<string, Record<string, AttendanceSessionItem>>
+    | undefined,
+  dateStr: string | undefined,
+  sessionValue: string,
+): string | null {
+  if (!studentAttendanceData || !dateStr) return null;
+  const normDate = normalizeDate(dateStr);
+  if (!Object.prototype.hasOwnProperty.call(studentAttendanceData, normDate)) {
+    return null;
+  }
+  // eslint-disable-next-line security/detect-object-injection
+  const daySessions = studentAttendanceData[normDate];
+  if (!daySessions) return null;
+
+  let idx = 0;
+  for (const key of Object.keys(daySessions)) {
+    if (key === sessionValue) {
+      return String(idx + 1);
+    }
+    idx++;
+  }
+  return null;
+}
+
 function resolveSessionName(
   sessionValue: string,
-  dateStr: string | undefined,
+  dateStr?: string,
   attendanceData?: AttendanceDataPayload,
-  sessionIndexMap: Map<string, number> = new Map(),
 ): string {
-  const sessions = attendanceData?.sessions;
-  if (
-    sessions && Object.prototype.hasOwnProperty.call(sessions, sessionValue)
-  ) {
-    const resolved = Reflect.get(sessions, sessionValue);
-    return typeof resolved?.name === "string"
-      ? resolved.name
-      : String(sessionValue);
-  }
+  if (!sessionValue) return "";
+  let sessionToDisplay = String(sessionValue);
 
-  if (dateStr && sessionIndexMap.size > 0) {
-    const index = sessionIndexMap.get(
-      `${normalizeToISODate(dateStr)}|${
-        String(sessionValue).trim().toLowerCase()
-      }`,
+  const sNum = parseInt(sessionToDisplay, 10);
+  if (!isNaN(sNum) && sNum > 20) {
+    const mappedIndex = findSessionIndex(
+      attendanceData?.studentAttendanceData,
+      dateStr,
+      sessionValue,
     );
-    if (index) return formatSessionName(String(index));
+    if (mappedIndex) {
+      sessionToDisplay = mappedIndex;
+    }
   }
 
-  return formatSessionName(sessionValue);
+  return formatSessionName(sessionToDisplay);
 }
 
 function buildActiveCourseMeta(
@@ -1115,7 +1076,6 @@ function CourseListContainer({
   expandedCourses,
   recordsPerCourseInitial,
   getStatusKey,
-  attendanceData,
   officialSessionsMap,
   deleteId,
   setDeleteConfirmOpen,
@@ -1135,7 +1095,6 @@ function CourseListContainer({
   expandedCourses: Set<string>;
   recordsPerCourseInitial: number;
   getStatusKey: (att: AttendanceCode) => StatusKey;
-  attendanceData: AttendanceDataPayload;
   officialSessionsMap: Map<string, AttendanceSessionItem>;
   deleteId: string;
   setDeleteConfirmOpen: (id: string | null) => void;
@@ -1178,7 +1137,6 @@ function CourseListContainer({
                 expandedCourses={expandedCourses}
                 recordsPerCourseInitial={recordsPerCourseInitial}
                 getStatusKey={getStatusKey}
-                attendanceData={attendanceData}
                 officialSessionsMap={officialSessionsMap}
                 deleteId={deleteId}
                 setDeleteConfirmOpen={setDeleteConfirmOpen}
@@ -1463,21 +1421,11 @@ export default function TrackingClient() {
     attendanceData,
   });
 
-  /** Pre-calculate session indices for all official records to ensure consistent display */
-  const sessionIndexMap = useMemo(() => buildSessionIndexMap(attendanceData), [
-    attendanceData,
-  ]);
-
-  /** Resolve session name using available registries and pre-calculated indices */
+  /** Resolve session name using available registries and official session data */
   const getResolvedSessionName = useCallback(
     (sessionValue: string, dateStr?: string): string =>
-      resolveSessionName(
-        sessionValue,
-        dateStr,
-        attendanceData,
-        sessionIndexMap,
-      ),
-    [attendanceData, sessionIndexMap],
+      resolveSessionName(sessionValue, dateStr, attendanceData),
+    [attendanceData],
   );
 
   // --- AUTO SYNC ---
@@ -1832,7 +1780,6 @@ export default function TrackingClient() {
             expandedCourses={expandedCourses}
             recordsPerCourseInitial={recordsPerCourseInitial}
             getStatusKey={getStatusKey}
-            attendanceData={attendanceData as AttendanceDataPayload}
             officialSessionsMap={officialSessionsMap as Map<
               string,
               AttendanceSessionItem

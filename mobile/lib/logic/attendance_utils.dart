@@ -255,6 +255,38 @@ int getSessionNumber(String name) {
   return 999;
 }
 
+/// Parses a date string or DateTime into milliseconds since epoch for sorting and comparisons.
+int parseDateValue(dynamic dateStr) {
+  if (dateStr == null) return 0;
+  if (dateStr is DateTime) return dateStr.millisecondsSinceEpoch;
+  final norm = normalizeDate(dateStr);
+  if (norm.length == 8 && RegExp(r'^\d{8}$').hasMatch(norm)) {
+    final y = int.tryParse(norm.substring(0, 4));
+    final m = int.tryParse(norm.substring(4, 6));
+    final d = int.tryParse(norm.substring(6, 8));
+    if (y != null && m != null && d != null) {
+      return DateTime.utc(y, m, d).millisecondsSinceEpoch;
+    }
+  }
+  return DateTime.tryParse(dateStr.toString())?.millisecondsSinceEpoch ?? 0;
+}
+
+/// Compares two tracking records by descending order of date (newest first),
+/// then ascending order of sessions (earliest session first) on the same date.
+int compareTrackingRecords(TrackingRecord a, TrackingRecord b) {
+  final dateA = parseDateValue(a.date);
+  final dateB = parseDateValue(b.date);
+  if (dateA != dateB) {
+    return dateB.compareTo(dateA);
+  }
+  final sessionA = getSessionNumber(a.session);
+  final sessionB = getSessionNumber(b.session);
+  if (sessionA != sessionB) {
+    return sessionA.compareTo(sessionB);
+  }
+  return a.session.compareTo(b.session);
+}
+
 /// Resolves the human-readable display name for a course.
 /// Handles the priority: High-fidelity merged name -> Official Report name -> Fallback ID.
 String resolveCourseDisplayName({

@@ -709,5 +709,158 @@ describe("TrackingClient", () => {
         expect(screen.getByText(/duty leave record/)).toBeInTheDocument();
       });
     });
+
+    it("correctly renders session numbers and roman numerals as hour numbers matching mobile", async () => {
+      const records = [
+        {
+          id: 287,
+          auth_user_id: "c511176b-567b-4b1d-89a9-9c0da2939ff3",
+          course: "PBCST304",
+          date: "2026-07-27",
+          session: "VI",
+          semester: "even",
+          year: "2024-25",
+          status: "correction",
+          attendance: "225",
+          remarks: "Illuminati Geopolitics Quiz",
+        },
+        {
+          id: 293,
+          auth_user_id: "c511176b-567b-4b1d-89a9-9c0da2939ff3",
+          course: "GAMAT301",
+          date: "2026-07-28",
+          session: "II",
+          semester: "even",
+          year: "2024-25",
+          status: "extra",
+          attendance: "225",
+          remarks: "ReLang NSDC",
+        },
+        {
+          id: 329,
+          auth_user_id: "c511176b-567b-4b1d-89a9-9c0da2939ff3",
+          course: "GAMAT301",
+          date: "2026-07-28",
+          session: "1",
+          semester: "even",
+          year: "2024-25",
+          status: "correction",
+          attendance: "225",
+          remarks: "ReLang NSDC",
+        },
+        {
+          id: 357,
+          auth_user_id: "c511176b-567b-4b1d-89a9-9c0da2939ff3",
+          course: "GAMAT301",
+          date: "2026-07-29",
+          session: "2",
+          semester: "even",
+          year: "2024-25",
+          status: "correction",
+          attendance: "225",
+          remarks: "YiYuva Hot Take 2.0",
+        },
+        {
+          id: 358,
+          auth_user_id: "c511176b-567b-4b1d-89a9-9c0da2939ff3",
+          course: "PBCST304",
+          date: "2026-07-29",
+          session: "III",
+          semester: "even",
+          year: "2024-25",
+          status: "extra",
+          attendance: "225",
+          remarks: "YiYuva Hot Take 2.0",
+        },
+      ];
+
+      vi.mocked(useTrackingData).mockReturnValue({
+        data: records as any,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn().mockResolvedValue({ data: records, isLoading: false, error: null }),
+      } as any);
+      vi.mocked(useTrackingCount).mockReturnValue({
+        data: 5,
+        isLoading: false,
+        refetch: vi.fn().mockResolvedValue({ data: 5, isLoading: false }),
+      } as any);
+
+      render(<TrackingClient />);
+
+      // Verify each record is formatted as expected
+      expect(await screen.findByText("6th Hour")).toBeInTheDocument();
+      expect(screen.getByText("1st Hour")).toBeInTheDocument();
+      expect(screen.getByText("3rd Hour")).toBeInTheDocument();
+      // '2nd Hour' appears twice (once for 'II', once for '2')
+      const secondHours = screen.getAllByText("2nd Hour");
+      expect(secondHours).toHaveLength(2);
+    });
+
+    it("sorts records for a course in descending order of date and ascending order of sessions", async () => {
+      const records = [
+        {
+          id: 1,
+          auth_user_id: "c511176b-567b-4b1d-89a9-9c0da2939ff3",
+          course: "CS101",
+          date: "2024-09-04",
+          session: "1st Hour",
+          semester: "even",
+          year: "2024-25",
+          status: "extra",
+          attendance: "110",
+          remarks: "Older date",
+        },
+        {
+          id: 2,
+          auth_user_id: "c511176b-567b-4b1d-89a9-9c0da2939ff3",
+          course: "CS101",
+          date: "2024-09-05",
+          session: "2nd Hour",
+          semester: "even",
+          year: "2024-25",
+          status: "extra",
+          attendance: "110",
+          remarks: "Newer date later session",
+        },
+        {
+          id: 3,
+          auth_user_id: "c511176b-567b-4b1d-89a9-9c0da2939ff3",
+          course: "CS101",
+          date: "2024-09-05",
+          session: "1st Hour",
+          semester: "even",
+          year: "2024-25",
+          status: "extra",
+          attendance: "110",
+          remarks: "Newer date earlier session",
+        },
+      ];
+
+      vi.mocked(useTrackingData).mockReturnValue({
+        data: records as any,
+        isLoading: false,
+        error: null,
+        refetch: vi.fn().mockResolvedValue({ data: records, isLoading: false, error: null }),
+      } as any);
+      vi.mocked(useTrackingCount).mockReturnValue({
+        data: 3,
+        isLoading: false,
+        refetch: vi.fn().mockResolvedValue({ data: 3, isLoading: false }),
+      } as any);
+
+      render(<TrackingClient />);
+
+      // Wait for items to be rendered
+      expect(await screen.findByText("Newer date earlier session")).toBeInTheDocument();
+
+      // Check the DOM order of remarks
+      const remarkElements = screen.getAllByText(/Older date|Newer date/);
+      expect(remarkElements.map((el) => el.textContent)).toEqual([
+        "Newer date earlier session",
+        "Newer date later session",
+        "Older date",
+      ]);
+    });
   });
 });

@@ -274,11 +274,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
             .read(supabaseClientProvider)
             .auth
             .refreshSession()
-            .timeout(
-              kDebugMode
-                  ? const Duration(seconds: 45)
-                  : const Duration(seconds: 30),
-            );
+            .timeout(AppConfig.defaultTimeout);
         return res.session?.accessToken;
       }
       return session.accessToken;

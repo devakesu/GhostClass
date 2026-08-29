@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
@@ -733,11 +732,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                         await Future.wait([
                           ref.read(dashboardProvider.future),
                           ref.read(trackingProvider.future),
-                        ]).timeout(
-                          kDebugMode
-                              ? const Duration(seconds: 45)
-                              : const Duration(seconds: 30),
-                        );
+                        ]).timeout(AppConfig.defaultTimeout);
                         AppLogger.i(
                           'NavigationShell: Outage recovery wait completed (or partial success).',
                         );

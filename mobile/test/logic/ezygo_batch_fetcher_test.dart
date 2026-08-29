@@ -268,16 +268,19 @@ void main() {
         );
       });
 
-      // Launch 4 distinct requests concurrently (limit is 3)
+      // Launch 7 distinct requests concurrently (limit is 5)
       final futures = Future.wait([
         fetcher.fetch(path: '/q1', token: 'token'),
         fetcher.fetch(path: '/q2', token: 'token'),
         fetcher.fetch(path: '/q3', token: 'token'),
         fetcher.fetch(path: '/q4', token: 'token'),
+        fetcher.fetch(path: '/q5', token: 'token'),
+        fetcher.fetch(path: '/q6', token: 'token'),
+        fetcher.fetch(path: '/q7', token: 'token'),
       ]);
 
       final results = await futures;
-      expect(results.length, 4);
+      expect(results.length, 7);
     });
 
     test(

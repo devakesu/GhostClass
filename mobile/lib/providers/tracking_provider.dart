@@ -148,10 +148,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     }
 
     for (final course in grouped.keys) {
-      grouped[course]!.sort((a, b) {
-        final cmp = b.date.compareTo(a.date);
-        return cmp != 0 ? cmp : b.session.compareTo(a.session);
-      });
+      grouped[course]!.sort(utils.compareTrackingRecords);
     }
 
     return TrackingState(
@@ -273,11 +270,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
 
         final list = List<TrackingRecord>.from(newGrouped[safeCourseId]!)
           ..add(newRecord)
-          ..sort((a, b) {
-            final cmp = b.date.compareTo(a.date);
-            if (cmp != 0) return cmp;
-            return b.session.compareTo(a.session);
-          });
+          ..sort(utils.compareTrackingRecords);
 
         newGrouped[safeCourseId] = list;
 
