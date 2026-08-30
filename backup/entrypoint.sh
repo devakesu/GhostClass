@@ -5,7 +5,7 @@ set -euo pipefail
 run_cmd() {
   if [ -n "${INFISICAL_TOKEN:-}" ] && [ -n "${INFISICAL_PROJECT_ID:-}" ]; then
     echo "🔑 Injecting runtime secrets via Infisical CLI..."
-    exec infisical run --projectId "${INFISICAL_PROJECT_ID}" --path /runtime --env "${INFISICAL_ENV:-prod}" -- "$@"
+    exec /usr/local/bin/infisical run --projectId "${INFISICAL_PROJECT_ID}" --path /runtime --env "${INFISICAL_ENV:-prod}" -- "$@"
   else
     exec "$@"
   fi
@@ -41,7 +41,7 @@ echo "=========================================================="
 if [ "${BACKUP_ON_STARTUP:-false}" = "true" ]; then
   echo "🚀 Running initial backup on container startup..."
   if [ -n "${INFISICAL_TOKEN:-}" ] && [ -n "${INFISICAL_PROJECT_ID:-}" ]; then
-    infisical run --projectId "${INFISICAL_PROJECT_ID}" --path /runtime --env "${INFISICAL_ENV:-prod}" -- /usr/local/bin/backup-db.sh || echo "⚠️ Startup backup failed, continuing daemon..."
+    /usr/local/bin/infisical run --projectId "${INFISICAL_PROJECT_ID}" --path /runtime --env "${INFISICAL_ENV:-prod}" -- /usr/local/bin/backup-db.sh || echo "⚠️ Startup backup failed, continuing daemon..."
   else
     /usr/local/bin/backup-db.sh || echo "⚠️ Startup backup failed, continuing daemon..."
   fi
@@ -59,12 +59,12 @@ fi
 # Generate crontab for supercronic
 CRONTAB_FILE="/tmp/crontab"
 if [ -n "${INFISICAL_TOKEN:-}" ] && [ -n "${INFISICAL_PROJECT_ID:-}" ]; then
-  echo "${CRON_SCHEDULE} infisical run --projectId ${INFISICAL_PROJECT_ID} --path /runtime --env ${INFISICAL_ENV:-prod} -- /usr/local/bin/backup-db.sh" > "${CRONTAB_FILE}"
+  echo "${CRON_SCHEDULE} /usr/local/bin/infisical run --projectId ${INFISICAL_PROJECT_ID} --path /runtime --env ${INFISICAL_ENV:-prod} -- /usr/local/bin/backup-db.sh" > "${CRONTAB_FILE}"
 else
   echo "${CRON_SCHEDULE} /usr/local/bin/backup-db.sh" > "${CRONTAB_FILE}"
 fi
 
 echo "🕒 Starting Supercronic daemon with schedule: '${CRON_SCHEDULE}'"
 echo "💡 You can also trigger backups manually at any time via: /usr/local/bin/backup-db.sh"
-exec supercronic "${CRONTAB_FILE}"
+exec /usr/local/bin/supercronic "${CRONTAB_FILE}"
 
