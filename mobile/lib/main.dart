@@ -82,7 +82,8 @@ void main() async {
 
   // Configure image cache memory limits to optimize bitmap memory usage
   PaintingBinding.instance.imageCache.maximumSize = 100;
-  PaintingBinding.instance.imageCache.maximumSizeBytes = 50 * 1024 * 1024; // 50MB
+  PaintingBinding.instance.imageCache.maximumSizeBytes =
+      50 * 1024 * 1024; // 50MB
 
   // Initialize Sentry early to capture all startup exceptions
   await SentryFlutter.init(

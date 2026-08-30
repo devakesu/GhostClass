@@ -169,6 +169,8 @@ jobs:
       - name: Build & push Docker image
         id: build-push
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           push: true
@@ -399,7 +401,7 @@ jobs:
   # Job 2: Build Database Backup Runner Docker Image
   # ────────────────────────────────────────────────────────────────────────────
   build-backup:
-    name: Build Backup Docker Image
+    name: Build Backup Runner Docker Image
     needs: guard
     runs-on: ubuntu-latest
     permissions:
@@ -469,9 +471,11 @@ jobs:
           fi
           echo "created=$TIMESTAMP" >> $GITHUB_OUTPUT
 
-      - name: Build & push Backup Docker image
+      - name: Build & push Backup Runner Docker image
         id: build-push-backup
         uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        env:
+          DOCKER_BUILD_RECORD_UPLOAD: false
         with:
           context: .
           file: backup/Dockerfile
@@ -492,29 +496,29 @@ jobs:
             org.opencontainers.image.version=${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
 
       # Attest build provenance for backup image
-      - name: Attest Build Provenance (Backup Image)
+      - name: Attest Build Provenance (Backup Runner Image)
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/ghostclass-backup
           subject-digest: ${{ steps.build-push-backup.outputs.digest }}
           push-to-registry: true
 
-      # Generate SBOM for Backup Image
-      - name: Generate SBOM (Backup Image)
+      # Generate SBOM for Backup Runner Image
+      - name: Generate SBOM (Backup Runner Image)
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
         with:
           image: ghcr.io/${{ github.repository_owner }}/ghostclass-backup@${{ steps.build-push-backup.outputs.digest }}
           format: cyclonedx-json
-          output-file: backup-sbom.json
+          output-file: ghostclass-backup-runner-sbom.json
 
-      # Attest SBOM for Backup Image
-      - name: Attest SBOM (Backup Image)
+      # Attest SBOM for Backup Runner Image
+      - name: Attest SBOM (Backup Runner Image)
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/ghostclass-backup
           subject-digest: ${{ steps.build-push-backup.outputs.digest }}
           predicate-type: "https://cyclonedx.org/bom"
-          predicate-path: backup-sbom.json
+          predicate-path: ghostclass-backup-runner-sbom.json
           push-to-registry: true
 
       # Sign backup image with cosign (keyless signing using OIDC)
@@ -529,82 +533,82 @@ jobs:
           set +x
           echo "${GH_TOKEN}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Sign backup image (keyless)
+      - name: Sign backup runner image (keyless)
         env:
           COSIGN_YES: "true"
           BACKUP_IMAGE_URI: ghcr.io/${{ github.repository_owner }}/ghostclass-backup@${{ steps.build-push-backup.outputs.digest }}
         run: |
           set -euo pipefail
 
-          echo "=== Cosign Backup Image Signing ==="
+          echo "=== Cosign Backup Runner Image Signing ==="
           VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
-          echo "Signing Backup Image: ${BACKUP_IMAGE_URI}"
+          echo "Signing Backup Runner Image: ${BACKUP_IMAGE_URI}"
           timeout 300 cosign sign \
             -a "repo=${{ github.repository }}" \
             -a "workflow=${{ github.workflow }}" \
             -a "ref=${{ github.ref }}" \
             -a "version=${VERSION}" \
             "${BACKUP_IMAGE_URI}" || {
-              echo "ERROR: Cosign backup image signing failed or timed out"
+              echo "ERROR: Cosign backup runner image signing failed or timed out"
               exit 1
             }
 
-          echo "✓ Backup container image signed successfully"
+          echo "✓ Backup runner container image signed successfully"
           cosign triangulate "${BACKUP_IMAGE_URI}"
 
-      - name: Verify backup image signature
+      - name: Verify backup runner image signature
         env:
           BACKUP_IMAGE_URI: ghcr.io/${{ github.repository_owner }}/ghostclass-backup@${{ steps.build-push-backup.outputs.digest }}
         run: |
           set -euo pipefail
 
-          echo "Verifying backup image signature..."
+          echo "Verifying backup runner image signature..."
           cosign verify \
             --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
             "${BACKUP_IMAGE_URI}"
 
-          echo "✓ Backup container image signature verified"
+          echo "✓ Backup runner container image signature verified"
 
       # Sign Backup SBOM file
-      - name: Sign Backup SBOM artifact
+      - name: Sign Backup Runner SBOM artifact
         run: |
           set -euo pipefail
 
-          echo "=== Signing Backup SBOM ==="
+          echo "=== Signing Backup Runner SBOM ==="
           timeout 60 cosign sign-blob --yes \
-            --bundle backup-sbom.json.bundle \
-            backup-sbom.json || {
-              echo "ERROR: Backup SBOM signing failed or timed out"
+            --bundle ghostclass-backup-runner-sbom.json.bundle \
+            ghostclass-backup-runner-sbom.json || {
+              echo "ERROR: Backup Runner SBOM signing failed or timed out"
               exit 1
             }
 
-          echo "✓ Backup SBOM signed successfully"
+          echo "✓ Backup Runner SBOM signed successfully"
 
       # Generate SHA256 checksums (after all backup artifacts are created)
-      - name: Generate backup checksums
+      - name: Generate backup runner checksums
         run: |
-          echo "# Backup Release Artifact Checksums" > backup-checksums.txt
-          echo "" >> backup-checksums.txt
-          echo "## Backup SBOM" >> backup-checksums.txt
-          sha256sum backup-sbom.json >> backup-checksums.txt
-          echo "" >> backup-checksums.txt
-          echo "## Backup Signature Bundle" >> backup-checksums.txt
-          sha256sum backup-sbom.json.bundle >> backup-checksums.txt
-          echo "" >> backup-checksums.txt
-          echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> backup-checksums.txt
-          echo "" >> backup-checksums.txt
-          cat backup-checksums.txt
+          echo "# Backup Runner Release Artifact Checksums" > ghostclass-backup-runner-checksums.txt
+          echo "" >> ghostclass-backup-runner-checksums.txt
+          echo "## Backup Runner SBOM" >> ghostclass-backup-runner-checksums.txt
+          sha256sum ghostclass-backup-runner-sbom.json >> ghostclass-backup-runner-checksums.txt
+          echo "" >> ghostclass-backup-runner-checksums.txt
+          echo "## Backup Runner Signature Bundle" >> ghostclass-backup-runner-checksums.txt
+          sha256sum ghostclass-backup-runner-sbom.json.bundle >> ghostclass-backup-runner-checksums.txt
+          echo "" >> ghostclass-backup-runner-checksums.txt
+          echo "Generated at: $(date -u +'%Y-%m-%d %H:%M:%S UTC')" >> ghostclass-backup-runner-checksums.txt
+          echo "" >> ghostclass-backup-runner-checksums.txt
+          cat ghostclass-backup-runner-checksums.txt
 
       # Upload artifacts for the release job
-      - name: Upload backup release artifacts
+      - name: Upload backup runner release artifacts
         uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
-          name: backup-release-artifacts
+          name: ghostclass-backup-runner-release-artifacts
           path: |
-            backup-sbom.json
-            backup-sbom.json.bundle
-            backup-checksums.txt
+            ghostclass-backup-runner-sbom.json
+            ghostclass-backup-runner-sbom.json.bundle
+            ghostclass-backup-runner-checksums.txt
 
   build-mobile:
     name: Build Flutter Android
@@ -1118,10 +1122,10 @@ jobs:
           name: web-release-artifacts
           path: ./artifacts/web
 
-      - name: Download backup artifacts
+      - name: Download backup runner artifacts
         uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
-          name: backup-release-artifacts
+          name: ghostclass-backup-runner-release-artifacts
           path: ./artifacts/backup
 
       - name: Download mobile APK artifact
@@ -1141,7 +1145,7 @@ jobs:
           echo "Downloaded artifacts:"
           find ./artifacts -maxdepth 2 -type f | sort
           echo ""
-          cat ./artifacts/web/web-checksums.txt ./artifacts/backup/backup-checksums.txt > ./artifacts/checksums.txt
+          cat ./artifacts/web/web-checksums.txt ./artifacts/backup/ghostclass-backup-runner-checksums.txt > ./artifacts/checksums.txt
           echo "Combined Checksums:"
           cat ./artifacts/checksums.txt
           echo ""
@@ -1235,8 +1239,8 @@ jobs:
 
           # Backup SBOM
           cosign verify-blob \\
-            --bundle backup-sbom.json.bundle \\
-            backup-sbom.json
+            --bundle ghostclass-backup-runner-sbom.json.bundle \\
+            ghostclass-backup-runner-sbom.json
           \`\`\`
 
           ## Verify Checksums
@@ -1248,7 +1252,7 @@ jobs:
           grep -E '^[0-9a-f]{64}  ' checksums.txt | sha256sum -c
 
           # Or verify individual files
-          sha256sum sbom.json sbom.json.bundle backup-sbom.json backup-sbom.json.bundle
+          sha256sum sbom.json sbom.json.bundle ghostclass-backup-runner-sbom.json ghostclass-backup-runner-sbom.json.bundle
           \`\`\`
 
           ## Verify Mobile APK
@@ -1393,8 +1397,8 @@ jobs:
             --notes-file ./artifacts/RELEASE_NOTES.md \
             ./artifacts/web/sbom.json \
             ./artifacts/web/sbom.json.bundle \
-            ./artifacts/backup/backup-sbom.json \
-            ./artifacts/backup/backup-sbom.json.bundle \
+            ./artifacts/backup/ghostclass-backup-runner-sbom.json \
+            ./artifacts/backup/ghostclass-backup-runner-sbom.json.bundle \
             ./artifacts/checksums.txt \
             ./artifacts/VERIFY.md \
             ./artifacts/web/provenance.intoto.jsonl \
