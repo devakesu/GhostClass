@@ -36,8 +36,8 @@ class EzygoBatchFetcher {
   // In-flight request map for deduplication
   final Map<String, Future<Response<dynamic>>> _inFlight = {};
 
-  // Rate limiting (parity with Next.js MAX_CONCURRENT = 3)
-  static const int _maxConcurrent = 3;
+  // Rate limiting (max 5 concurrent requests from mobile device)
+  static const int _maxConcurrent = 5;
   int _activeRequests = 0;
   final List<Completer<void>> _queue = [];
 
@@ -176,7 +176,7 @@ class EzygoBatchFetcher {
         );
         _releaseSlot(); // Immediate release as we will await the existing future
         slotAcquired = false;
-        return postSlotInFlight;
+        return await postSlotInFlight;
       }
 
       // 3.6 Per-endpoint Throttling

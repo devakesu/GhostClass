@@ -7,19 +7,30 @@ on:
   merge_group:
     branches: [main]
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
   FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: "true"
 
 permissions: {}
+
 jobs:
   guard:
     name: Build Guard
     runs-on: ubuntu-latest
+    timeout-minutes: 10
     permissions:
       contents: read
+
     steps:
       - name: Checkout
-        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v4.2.2
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+          fetch-depth: 0
+          persist-credentials: false
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@ed142fd0673e97e23eac54620cfb913e5ce36c25
@@ -30,11 +41,137 @@ jobs:
           exit-code: "1"
           severity: "CRITICAL,HIGH"
 
+      - name: Import GPG and SSH public keys
+        run: |
+          set -euo pipefail
+
+          # Initialize gnupg and ssh directories with strict permissions
+          mkdir -p -m 700 ~/.gnupg
+          mkdir -p -m 700 ~/.ssh
+          touch ~/.ssh/allowed_signers
+
+          # Configure Git to recognize SSH allowed signers
+          git config --global gpg.ssh.allowedSignersFile ~/.ssh/allowed_signers
+
+          # Candidate accounts to fetch GPG & SSH public keys for
+          CANDIDATES=(
+            "${{ github.actor }}"
+            "${{ github.repository_owner }}"
+            "${{ github.event.pull_request.user.login }}"
+            "web-flow"
+            "dependabot"
+          )
+
+          for user in "${CANDIDATES[@]}"; do
+            # Sanitize username (e.g., strip bot suffixes and whitespace)
+            clean_user=$(echo "$user" | sed -E 's/\[bot\]//g' | tr -d '[:space:]')
+            if [ -n "$clean_user" ]; then
+              echo "Importing GPG key for: $clean_user"
+              curl -fsSL --retry 3 --retry-connrefused --max-time 10 \
+                "https://github.com/${clean_user}.gpg" 2>/dev/null | gpg --batch --import 2>/dev/null || true
+
+              echo "Importing SSH keys for: $clean_user"
+              curl -fsSL --retry 3 --retry-connrefused --max-time 10 \
+                "https://github.com/${clean_user}.keys" 2>/dev/null | while IFS= read -r key || [ -n "$key" ]; do
+                  if [[ "$key" =~ ^(ssh-|ecdsa-|sk-) ]]; then
+                    echo "* $key" >> ~/.ssh/allowed_signers
+                  fi
+                done || true
+            fi
+          done
+
+          # Deduplicate allowed signers
+          if [ -f ~/.ssh/allowed_signers ]; then
+            sort -u ~/.ssh/allowed_signers -o ~/.ssh/allowed_signers
+          fi
+
+          # If the commit signature contains a GPG Key ID not yet in the keyring, attempt public keyserver lookup
+          KEY_ID=$(git log -1 --format='%GK' 2>/dev/null || true)
+          if [ -n "$KEY_ID" ]; then
+            echo "Attempting keyserver lookup for commit Key ID: $KEY_ID"
+            gpg --batch --keyserver keyserver.ubuntu.com --recv-keys "$KEY_ID" 2>/dev/null || \
+            gpg --batch --keyserver keys.openpgp.org --recv-keys "$KEY_ID" 2>/dev/null || true
+          fi
+
       - name: Verify commit is signed
         run: |
-          git log -1 --show-signature
+          set -euo pipefail
+
+          # Determine commits to verify
+          if [ "${{ github.event_name }}" = "pull_request" ] && git rev-parse --verify "origin/${{ github.base_ref }}" >/dev/null 2>&1; then
+            COMMITS=$(git rev-list "origin/${{ github.base_ref }}..HEAD")
+            if [ -z "$COMMITS" ]; then
+              COMMITS=$(git rev-parse HEAD)
+            fi
+          else
+            COMMITS=$(git rev-parse HEAD)
+          fi
+
+          echo "========================================================"
+          echo "Verifying signature(s) for commit(s):"
+          echo "$COMMITS"
+          echo "========================================================"
+
+          FAILED=0
+          for COMMIT_SHA in $COMMITS; do
+            echo "--------------------------------------------------------"
+            echo "Checking commit: $COMMIT_SHA"
+            git log -1 --show-signature "$COMMIT_SHA" || true
+
+            SIG_STATUS=$(git log -1 --format='%G?' "$COMMIT_SHA")
+            SIGNER=$(git log -1 --format='%GS' "$COMMIT_SHA" 2>/dev/null || echo "Unknown")
+            KEY_ID=$(git log -1 --format='%GK' "$COMMIT_SHA" 2>/dev/null || echo "Unknown")
+            FINGERPRINT=$(git log -1 --format='%GF' "$COMMIT_SHA" 2>/dev/null || echo "Unknown")
+
+            case "$SIG_STATUS" in
+              G|U)
+                echo "✓ Commit $COMMIT_SHA signature verified successfully."
+                echo "  Signature Status : $SIG_STATUS (G=Good, U=Good with untrusted/imported key)"
+                echo "  Signer           : $SIGNER"
+                echo "  Key / ID         : $KEY_ID"
+                echo "  Fingerprint      : $FINGERPRINT"
+                ;;
+              B)
+                echo "::error::Commit $COMMIT_SHA has a BAD / CORRUPTED signature (Status: 'B')."
+                FAILED=1
+                ;;
+              E)
+                echo "::error::Commit $COMMIT_SHA signature cannot be checked - missing public key or GPG/SSH error (Status: 'E', Key ID: '$KEY_ID'). Please ensure your GPG or SSH signing key is added to your GitHub account."
+                FAILED=1
+                ;;
+              N)
+                echo "::error::Commit $COMMIT_SHA is NOT signed (Status: 'N'). All commits to protected branches must be signed with a valid GPG or SSH key."
+                FAILED=1
+                ;;
+              X)
+                echo "::error::Commit $COMMIT_SHA signature was made by an EXPIRED key (Status: 'X', Key ID: '$KEY_ID')."
+                FAILED=1
+                ;;
+              Y)
+                echo "::error::Commit $COMMIT_SHA signature itself has EXPIRED (Status: 'Y', Key ID: '$KEY_ID')."
+                FAILED=1
+                ;;
+              R)
+                echo "::error::Commit $COMMIT_SHA signature was made by a REVOKED key (Status: 'R', Key ID: '$KEY_ID')."
+                FAILED=1
+                ;;
+              *)
+                echo "::error::Commit $COMMIT_SHA is not signed with a valid key (Status: '$SIG_STATUS', Key ID: '$KEY_ID')."
+                FAILED=1
+                ;;
+            esac
+          done
+
+          if [ "$FAILED" -ne 0 ]; then
+            echo "::error::One or more commits failed signature verification."
+            exit 1
+          fi
+          echo "========================================================"
+          echo "✓ All checked commit signatures verified successfully."
+          echo "========================================================"
 
       - name: Validate Dependabot config
         run: |
-          python3 -m pip install --require-hashes -r .github/requirements.txt
+          set -euo pipefail
+          python3 -m pip install --no-cache-dir --require-hashes -r .github/requirements.txt
           check-jsonschema --schemafile https://json.schemastore.org/dependabot-2.0.json .github/dependabot.yml

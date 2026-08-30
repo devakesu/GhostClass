@@ -2,7 +2,6 @@ import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/error_utils.dart';
@@ -156,11 +155,7 @@ class DioService {
             ? _appCheck.getLimitedUseToken()
             : _appCheck.getToken();
 
-        return await tokenFuture.timeout(
-          kDebugMode
-              ? const Duration(seconds: 45)
-              : const Duration(seconds: 30),
-        );
+        return await tokenFuture.timeout(AppConfig.defaultTimeout);
       } on Object catch (e, st) {
         lastError = e;
         final isTransient = _isTransientAppCheckFailure(e);
@@ -200,9 +195,7 @@ class DioService {
           isNew = true;
         }
         appCheckToken = await _limitedTokenFetchInFlight!.timeout(
-          kDebugMode
-              ? const Duration(seconds: 45)
-              : const Duration(seconds: 30),
+          AppConfig.defaultTimeout,
         );
         if (isNew) {
           AppLogger.safeUnawait(
@@ -229,9 +222,7 @@ class DioService {
           isNew = true;
         }
         appCheckToken = await _tokenFetchInFlight!.timeout(
-          kDebugMode
-              ? const Duration(seconds: 45)
-              : const Duration(seconds: 30),
+          AppConfig.defaultTimeout,
         );
         if (isNew) {
           AppLogger.safeUnawait(

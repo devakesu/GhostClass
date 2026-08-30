@@ -1,6 +1,6 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -82,11 +82,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             try {
               await ref
                   .read(dashboardProvider.future)
-                  .timeout(
-                    kDebugMode
-                        ? const Duration(seconds: 45)
-                        : const Duration(seconds: 30),
-                  );
+                  .timeout(AppConfig.defaultTimeout);
             } on Object catch (e, st) {
               AppLogger.e('DashboardScreen: Retry failed', e, st);
             }

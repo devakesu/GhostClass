@@ -70,3 +70,11 @@ supabase/
 workers/
 scripts/
 certificates/
+
+# Database Backups & Encryption Keys
+*.dump
+*.dump.zst*
+*.age
+*.key
+*age.identity
+*-pq*.txt

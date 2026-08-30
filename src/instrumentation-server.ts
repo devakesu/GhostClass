@@ -1,4 +1,11 @@
+import { EventEmitter } from "node:events";
 import * as Sentry from "@sentry/nextjs";
+
+// Next.js 16 + OpenTelemetry + Sentry HTTP auto-instrumentation attach
+// multiple 'close' listeners to ServerResponse during request lifecycles.
+// Raising the default limit prevents false-positive MaxListenersExceededWarning.
+EventEmitter.defaultMaxListeners = 20;
+
 
 /**
  * Sanitize commit SHA for use as a Sentry release name.

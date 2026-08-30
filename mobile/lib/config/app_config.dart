@@ -55,9 +55,9 @@ class AppConfig {
         : AppSecrets.ghostclassApiUrlProd,
   );
 
-  /// Default network timeout duration (45s debug / 30s release).
+  /// Default network timeout duration (45s debug / 25s release).
   static Duration get defaultTimeout =>
-      kDebugMode ? const Duration(seconds: 45) : const Duration(seconds: 30);
+      kDebugMode ? const Duration(seconds: 45) : const Duration(seconds: 25);
 
   /// The EzyGo authentication root.
   static String get ezygoAuthUrl => _d(AppSecrets.ezygoAuthUrl);
@@ -81,7 +81,7 @@ class AppConfig {
 
   /// Current application version (derived from Infisical compilation injection).
   static String get appVersion =>
-      const String.fromEnvironment('APP_VERSION', defaultValue: '4.5.7');
+      const String.fromEnvironment('APP_VERSION', defaultValue: '4.5.8');
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>

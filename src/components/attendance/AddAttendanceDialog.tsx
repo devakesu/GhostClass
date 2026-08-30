@@ -174,6 +174,28 @@ function computeSemesterBounds(
   }
 }
 
+function resolveSlotSessionName(
+  key: string,
+  slot: AttendanceSlot,
+  index: number,
+  attendanceData?: AttendanceReport,
+): string {
+  const normKey = normalizeSession(key);
+  const keyInt = parseInt(normKey, 10);
+  if (!isNaN(keyInt) && keyInt < 20) {
+    return key;
+  }
+  if (slot.session && slot.session !== "null") {
+    return String(slot.session);
+  }
+  // eslint-disable-next-line security/detect-object-injection
+  const sessionObj = attendanceData?.sessions?.[key];
+  if (sessionObj?.name) {
+    return sessionObj.name;
+  }
+  return String(index + 1);
+}
+
 function computeAutoSession(
   open: boolean,
   attendanceData: AttendanceReport | undefined,
@@ -198,15 +220,7 @@ function computeAutoSession(
         return;
       }
 
-      // eslint-disable-next-line security/detect-object-injection
-      let name = attendanceData.sessions?.[key]?.name;
-      if (!name && slot.session && slot.session !== "null") {
-        name = String(slot.session);
-      }
-      if (!name) {
-        const keyInt = parseInt(key);
-        name = !isNaN(keyInt) && keyInt < 20 ? key : String(index + 1);
-      }
+      const name = resolveSlotSessionName(key, slot, index, attendanceData);
       if (name) occupiedSessions.add(normalizeSession(name));
     });
   }
@@ -249,15 +263,7 @@ function computeBestCourse(
             return;
           }
 
-          // eslint-disable-next-line security/detect-object-injection
-          let name = attendanceData.sessions?.[key]?.name;
-          if (!name && slot.session && slot.session !== "null") {
-            name = String(slot.session);
-          }
-          if (!name) {
-            const keyInt = parseInt(key);
-            name = !isNaN(keyInt) && keyInt < 20 ? key : String(index + 1);
-          }
+          const name = resolveSlotSessionName(key, slot, index, attendanceData);
           if (name && normalizeSession(name) === target) {
             const cid = getCourseCodeById(String(slot.course));
             // eslint-disable-next-line security/detect-object-injection
@@ -306,19 +312,12 @@ function checkIfSessionBlocked(
         return false;
       }
 
-      // eslint-disable-next-line security/detect-object-injection
-      let effectiveName: string | undefined = attendanceData.sessions?.[key]
-        ?.name;
-
-      if (!effectiveName && slot.session && slot.session !== "null") {
-        effectiveName = String(slot.session);
-      }
-
-      if (!effectiveName) {
-        const keyInt = parseInt(key);
-        effectiveName = !isNaN(keyInt) && keyInt < 20 ? key : String(index + 1);
-      }
-
+      const effectiveName = resolveSlotSessionName(
+        key,
+        slot,
+        index,
+        attendanceData,
+      );
       if (effectiveName && normalizeSession(effectiveName) === targetSession) {
         return true;
       }

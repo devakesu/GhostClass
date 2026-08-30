@@ -48,6 +48,8 @@ jobs:
       attestations: write
     outputs:
       image_digest: ${{ steps.build-push.outputs.digest }}
+      backup_image_digest: ${{ steps.build-push-backup.outputs.digest }}
+      image_name: ${{ steps.prep.outputs.image_name }}
       platforms: ${{ steps.prep.outputs.platforms }}
     env:
       INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
@@ -78,20 +80,28 @@ jobs:
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
 
       - name: Synchronize workspace versions
+        env:
+          TARGET_VERSION: ${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION }}
         run: |
-          node scripts/sync-version.js "${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION }}"
+          node scripts/sync-version.js "${TARGET_VERSION}"
 
       - name: Prepare derived values
         id: prep
         env:
           REPO: ${{ github.repository }}
           REPO_OWNER: ${{ github.repository_owner }}
+          NEXT_PUBLIC_APP_DOMAIN: ${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}
+          ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK: ${{ env.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK || vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK }}
+          NEXT_PUBLIC_BACKEND_URL: ${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}
+          EVENT_NAME: ${{ github.event_name }}
+          BUILD_ARM64: ${{ github.event.inputs.build_arm64 }}
+          HEAD_COMMIT_TIMESTAMP: ${{ github.event.head_commit.timestamp }}
         run: |
           # Set APP_DOMAIN with validation; avoid silent localhost fallback for real releases
-          APP_DOMAIN="${{ env.NEXT_PUBLIC_APP_DOMAIN || vars.NEXT_PUBLIC_APP_DOMAIN }}"
+          APP_DOMAIN="${NEXT_PUBLIC_APP_DOMAIN:-}"
           if [ -z "$APP_DOMAIN" ] || [ "$APP_DOMAIN" = "null" ]; then
             # For non-push events, allow localhost fallback only with explicit opt-in
-            if [ "${{ env.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK || vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK }}" != "true" ]; then
+            if [ "${ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK:-}" != "true" ]; then
               echo "::warning::NEXT_PUBLIC_APP_DOMAIN (repo variable) is not configured. Falling back to APP_DOMAIN=localhost."
               echo "::warning::To explicitly allow this fallback without warnings, set vars.ALLOW_APP_DOMAIN_LOCALHOST_FALLBACK=true."
             fi
@@ -100,7 +110,7 @@ jobs:
           echo "APP_DOMAIN=${APP_DOMAIN}" >> $GITHUB_ENV
 
           # Derive BACKEND_URL if not set
-          BACKEND_URL="${{ env.NEXT_PUBLIC_BACKEND_URL || vars.NEXT_PUBLIC_BACKEND_URL }}"
+          BACKEND_URL="${NEXT_PUBLIC_BACKEND_URL:-}"
           if [ -z "$BACKEND_URL" ] || [ "$BACKEND_URL" = "null" ]; then
              if [ "$APP_DOMAIN" = "localhost" ]; then
                BACKEND_URL="http://localhost:3000"
@@ -119,11 +129,11 @@ jobs:
           # Determine build platforms
           # Default to amd64 for faster, more reliable release builds.
           # ARM64 remains available as an explicit manual opt-in.
-          if [ "${{ github.event_name }}" == "push" ]; then
+          if [ "${EVENT_NAME}" == "push" ]; then
             PLATFORMS="linux/amd64"
             echo "📦 Main push detected - building amd64 only"
-          elif [ "${{ github.event_name }}" == "workflow_dispatch" ]; then
-            if [ "${{ github.event.inputs.build_arm64 }}" == "true" ]; then
+          elif [ "${EVENT_NAME}" == "workflow_dispatch" ]; then
+            if [ "${BUILD_ARM64}" == "true" ]; then
               PLATFORMS="linux/amd64,linux/arm64"
               echo "📦 Manual dispatch with ARM64 enabled"
             else
@@ -142,7 +152,7 @@ jobs:
           echo "app_email=@${APP_DOMAIN}" >> $GITHUB_OUTPUT
           echo "legal_email=legal@${APP_DOMAIN}" >> $GITHUB_OUTPUT
           # Use a consistent timestamp for reproducibility
-          TIMESTAMP="${{ github.event.head_commit.timestamp }}"
+          TIMESTAMP="${HEAD_COMMIT_TIMESTAMP:-}"
           if [ -z "$TIMESTAMP" ] || [ "$TIMESTAMP" == "null" ]; then
             TIMESTAMP=$(date -u +'%Y-%m-%dT%H:%M:%SZ')
           fi
@@ -161,6 +171,7 @@ jobs:
           context: .
           push: true
           tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
             ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:latest
           secrets: |
@@ -212,12 +223,40 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.version=${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
 
-      # Attest build provenance
-      - name: Attest Build Provenance
+      # Build and push the Database Backup container image
+      - name: Build & push Backup Docker image
+        id: build-push-backup
+        uses: docker/build-push-action@53b7df96c91f9c12dcc8a07bcb9ccacbed38856a
+        with:
+          context: .
+          file: backup/Dockerfile
+          push: true
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/ghostclass-backup:${{ github.sha }}
+            ghcr.io/${{ github.repository_owner }}/ghostclass-backup:${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
+            ghcr.io/${{ github.repository_owner }}/ghostclass-backup:latest
+          platforms: ${{ steps.prep.outputs.platforms }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+          labels: |
+            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.source=${{ github.server_url }}/${{ github.repository }}
+            org.opencontainers.image.created=${{ steps.prep.outputs.created }}
+            org.opencontainers.image.version=${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
+
+      # Attest build provenance for web and backup images
+      - name: Attest Build Provenance (Web Image)
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest Build Provenance (Backup Image)
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/ghostclass-backup
+          subject-digest: ${{ steps.build-push-backup.outputs.digest }}
           push-to-registry: true
 
       # Download SLSA provenance attestation for OpenSSF Scorecard
@@ -271,16 +310,23 @@ jobs:
           echo "❌ Failed to download attestation after $MAX_ATTEMPTS attempts"
           exit 1
 
-      # Generate SBOM
-      - name: Generate SBOM
+      # Generate SBOM for Web & Backup Images
+      - name: Generate SBOM (Web Image)
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
         with:
           image: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}@${{ steps.build-push.outputs.digest }}
           format: cyclonedx-json
           output-file: sbom.json
 
-      # Attest SBOM
-      - name: Attest SBOM
+      - name: Generate SBOM (Backup Image)
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/ghostclass-backup@${{ steps.build-push-backup.outputs.digest }}
+          format: cyclonedx-json
+          output-file: backup-sbom.json
+
+      # Attest SBOMs
+      - name: Attest SBOM (Web Image)
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}
@@ -289,78 +335,126 @@ jobs:
           predicate-path: sbom.json
           push-to-registry: true
 
+      - name: Attest SBOM (Backup Image)
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/ghostclass-backup
+          subject-digest: ${{ steps.build-push-backup.outputs.digest }}
+          predicate-type: "https://cyclonedx.org/bom"
+          predicate-path: backup-sbom.json
+          push-to-registry: true
+
       # Sign image with cosign (keyless signing using OIDC)
       - name: Install cosign
         uses: sigstore/cosign-installer@6f9f17788090df1f26f669e9d70d6ae9567deba6
 
       - name: Authenticate cosign with registry
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "${{ secrets.GITHUB_TOKEN }}" | cosign login ghcr.io -u ${{ github.actor }} --password-stdin
+          set -euo pipefail
+          set +x
+          echo "${GH_TOKEN}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Sign image (keyless)
+      - name: Sign images (keyless)
         env:
           COSIGN_YES: "true"
           IMAGE_URI: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}@${{ steps.build-push.outputs.digest }}
+          BACKUP_IMAGE_URI: ghcr.io/${{ github.repository_owner }}/ghostclass-backup@${{ steps.build-push-backup.outputs.digest }}
         run: |
           set -euo pipefail
 
           echo "=== Cosign Image Signing ==="
-          echo "Image URI: ${IMAGE_URI}"
           VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
           echo "Version: ${VERSION}"
 
-          # Sign with timeout
+          # Sign Web Image
+          echo "Signing Web Image: ${IMAGE_URI}"
           timeout 300 cosign sign \
             -a "repo=${{ github.repository }}" \
             -a "workflow=${{ github.workflow }}" \
             -a "ref=${{ github.ref }}" \
             -a "version=${VERSION}" \
             "${IMAGE_URI}" || {
-              echo "ERROR: Cosign image signing failed or timed out"
+              echo "ERROR: Cosign web image signing failed or timed out"
               exit 1
             }
 
-          echo "✓ Image signed successfully"
-          cosign triangulate "${IMAGE_URI}"
+          # Sign Backup Image
+          echo "Signing Backup Image: ${BACKUP_IMAGE_URI}"
+          timeout 300 cosign sign \
+            -a "repo=${{ github.repository }}" \
+            -a "workflow=${{ github.workflow }}" \
+            -a "ref=${{ github.ref }}" \
+            -a "version=${VERSION}" \
+            "${BACKUP_IMAGE_URI}" || {
+              echo "ERROR: Cosign backup image signing failed or timed out"
+              exit 1
+            }
 
-      - name: Verify image signature
+          echo "✓ All container images signed successfully"
+          cosign triangulate "${IMAGE_URI}"
+          cosign triangulate "${BACKUP_IMAGE_URI}"
+
+      - name: Verify image signatures
         env:
           IMAGE_URI: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}@${{ steps.build-push.outputs.digest }}
+          BACKUP_IMAGE_URI: ghcr.io/${{ github.repository_owner }}/ghostclass-backup@${{ steps.build-push-backup.outputs.digest }}
         run: |
           set -euo pipefail
 
+          echo "Verifying web image signature..."
           cosign verify \
             --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
             "${IMAGE_URI}"
 
-          echo "✓ Image signature verified"
+          echo "Verifying backup image signature..."
+          cosign verify \
+            --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            "${BACKUP_IMAGE_URI}"
 
-      # Sign SBOM file
-      - name: Sign SBOM artifact
+          echo "✓ All container image signatures verified"
+
+      # Sign SBOM files
+      - name: Sign SBOM artifacts
         run: |
           set -euo pipefail
 
-          echo "=== Signing SBOM ==="
+          echo "=== Signing SBOMs ==="
           timeout 60 cosign sign-blob --yes \
             --bundle sbom.json.bundle \
             sbom.json || {
-              echo "ERROR: SBOM signing failed or timed out"
+              echo "ERROR: Web SBOM signing failed or timed out"
               exit 1
             }
 
-          echo "✓ SBOM signed successfully"
+          timeout 60 cosign sign-blob --yes \
+            --bundle backup-sbom.json.bundle \
+            backup-sbom.json || {
+              echo "ERROR: Backup SBOM signing failed or timed out"
+              exit 1
+            }
+
+          echo "✓ All SBOMs signed successfully"
 
       # Generate SHA256 checksums (after all artifacts are created)
       - name: Generate checksums
         run: |
           echo "# Release Artifact Checksums" > checksums.txt
           echo "" >> checksums.txt
-          echo "## SBOM" >> checksums.txt
+          echo "## Web SBOM" >> checksums.txt
           sha256sum sbom.json >> checksums.txt
           echo "" >> checksums.txt
-          echo "## Signature Bundle" >> checksums.txt
+          echo "## Web Signature Bundle" >> checksums.txt
           sha256sum sbom.json.bundle >> checksums.txt
+          echo "" >> checksums.txt
+          echo "## Backup SBOM" >> checksums.txt
+          sha256sum backup-sbom.json >> checksums.txt
+          echo "" >> checksums.txt
+          echo "## Backup Signature Bundle" >> checksums.txt
+          sha256sum backup-sbom.json.bundle >> checksums.txt
           echo "" >> checksums.txt
           echo "## SLSA Provenance Attestation" >> checksums.txt
           sha256sum provenance.intoto.jsonl >> checksums.txt
@@ -377,6 +471,8 @@ jobs:
           path: |
             sbom.json
             sbom.json.bundle
+            backup-sbom.json
+            backup-sbom.json.bundle
             checksums.txt
             provenance.intoto.jsonl
 
@@ -398,8 +494,8 @@ jobs:
       - name: Download Gradle Wrapper
         run: |
           mkdir -p mobile/android/gradle/wrapper
-          curl -fSL -o mobile/android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v8.14.0/gradle/wrapper/gradle-wrapper.jar
-          echo "7d3a4ac4de1c32b59bc6a4eb8ecb8e612ccd0cf1ae1e99f66902da64df296172  mobile/android/gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
+          curl -fSL -o mobile/android/gradle/wrapper/gradle-wrapper.jar https://raw.githubusercontent.com/gradle/gradle/v9.6.1/gradle/wrapper/gradle-wrapper.jar
+          echo "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  mobile/android/gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
 
       - name: Set up Java
         uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
@@ -425,8 +521,10 @@ jobs:
         continue-on-error: true # Gracefully fallback to GitHub native sync variables if action credentials aren't populated yet
 
       - name: Synchronize workspace versions
+        env:
+          TARGET_VERSION: ${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION }}
         run: |
-          node scripts/sync-version.js "${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION }}"
+          node scripts/sync-version.js "${TARGET_VERSION}"
 
       - name: Prepare mobile release paths
         id: mobile-prep
@@ -474,12 +572,14 @@ jobs:
           ANDROID_KEY_PASSWORD: ${{ secrets.ANDROID_KEY_PASSWORD }}
         run: |
           set -euo pipefail
+          set +x
 
           : "${ANDROID_KEYSTORE_BASE64:?ANDROID_KEYSTORE_BASE64 secret is required}"
           : "${ANDROID_KEYSTORE_PASSWORD:?ANDROID_KEYSTORE_PASSWORD secret is required}"
           : "${ANDROID_KEY_ALIAS:?ANDROID_KEY_ALIAS secret is required}"
           : "${ANDROID_KEY_PASSWORD:?ANDROID_KEY_PASSWORD secret is required}"
 
+          [ -n "$ANDROID_KEYSTORE_BASE64" ] && echo "::add-mask::$ANDROID_KEYSTORE_BASE64"
           [ -n "$ANDROID_KEYSTORE_PASSWORD" ] && echo "::add-mask::$ANDROID_KEYSTORE_PASSWORD"
           [ -n "$ANDROID_KEY_ALIAS" ] && echo "::add-mask::$ANDROID_KEY_ALIAS"
           [ -n "$ANDROID_KEY_PASSWORD" ] && echo "::add-mask::$ANDROID_KEY_PASSWORD"
@@ -502,8 +602,11 @@ jobs:
           GOOGLE_SERVICES_JSON_BASE64: ${{ env.GOOGLE_SERVICES_JSON_BASE64 || secrets.GOOGLE_SERVICES_JSON_BASE64 }}
         run: |
           set -euo pipefail
+          set +x
 
           : "${GOOGLE_SERVICES_JSON_BASE64:?GOOGLE_SERVICES_JSON_BASE64 environment variable or secret is required}"
+
+          [ -n "$GOOGLE_SERVICES_JSON_BASE64" ] && echo "::add-mask::$GOOGLE_SERVICES_JSON_BASE64"
 
           mkdir -p app
           printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
@@ -815,8 +918,13 @@ jobs:
           AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           AWS_REGION: ${{ vars.AWS_REGION || 'ap-south-1' }}
           AWS_S3_PRIVATE_BUCKET: ${{ secrets.AWS_S3_PRIVATE_BUCKET || vars.AWS_S3_PRIVATE_BUCKET }}
+          BUILD_NAME: ${{ steps.mobile-prep.outputs.build_name }}
         run: |
           set -euo pipefail
+          set +x
+
+          [ -n "$AWS_SECRET_ACCESS_KEY" ] && echo "::add-mask::$AWS_SECRET_ACCESS_KEY"
+          [ -n "$AWS_ACCESS_KEY_ID" ] && echo "::add-mask::$AWS_ACCESS_KEY_ID"
 
           if [ -z "${AWS_S3_PRIVATE_BUCKET:-}" ]; then
             echo "::warning::AWS_S3_PRIVATE_BUCKET is not configured. Internal artifacts (.aab, mapping.txt) will not be archived to cloud storage."
@@ -824,9 +932,9 @@ jobs:
             exit 0
           fi
 
-          echo "Uploading private internal release assets to s3://${AWS_S3_PRIVATE_BUCKET}/releases/v${{ steps.mobile-prep.outputs.build_name }}/"
+          echo "Uploading private internal release assets to s3://${AWS_S3_PRIVATE_BUCKET}/releases/v${BUILD_NAME}/"
 
-          aws s3 cp . "s3://${AWS_S3_PRIVATE_BUCKET}/releases/v${{ steps.mobile-prep.outputs.build_name }}/" --recursive
+          aws s3 cp . "s3://${AWS_S3_PRIVATE_BUCKET}/releases/v${BUILD_NAME}/" --recursive
 
           echo "✓ Internal artifacts securely archived to private S3 bucket"
 
@@ -860,8 +968,10 @@ jobs:
 
       - name: Determine release version
         id: version
+        env:
+          APP_VERSION: ${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
         run: |
-          VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
+          VERSION="${APP_VERSION}"
           if [[ "${VERSION}" != v* ]]; then
             VERSION_TAG="v${VERSION}"
           else
@@ -922,9 +1032,11 @@ jobs:
           PLATFORMS: ${{ needs.build-and-release.outputs.platforms }}
           VERSION_TAG: ${{ steps.version.outputs.version_tag }}
           DIGEST: ${{ needs.build-and-release.outputs.image_digest }}
+          BACKUP_DIGEST: ${{ needs.build-and-release.outputs.backup_image_digest }}
           VERSION: ${{ steps.version.outputs.version }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
           # Derive image name from repository name
           IMAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
@@ -939,21 +1051,38 @@ jobs:
 
           ## Verify Docker Image Signature
 
-          Using cosign (keyless verification):
+          Using cosign with immutable digest (Recommended):
+
+          \`\`\`bash
+          # Web Image
+          cosign verify \\
+            --certificate-identity-regexp="^https://github.com/${REPOSITORY}" \\
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
+            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST}
+
+          # Backup Image
+          cosign verify \\
+            --certificate-identity-regexp="^https://github.com/${REPOSITORY}" \\
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
+            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup@${BACKUP_DIGEST}
+          \`\`\`
+
+          Using cosign by immutable commit hash or version tag:
 
           \`\`\`bash
           cosign verify \\
             --certificate-identity-regexp="^https://github.com/${REPOSITORY}" \\
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
-            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}
+            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${COMMIT_SHA}
           \`\`\`
 
           ## Verify Build Attestation
 
-          Using GitHub CLI:
+          Using GitHub CLI with immutable digest (Recommended):
 
           \`\`\`bash
-          gh attestation verify oci://ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG} --owner ${REPOSITORY_OWNER}
+          gh attestation verify oci://ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST} --owner ${REPOSITORY_OWNER}
+          gh attestation verify oci://ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup@${BACKUP_DIGEST} --owner ${REPOSITORY_OWNER}
           \`\`\`
 
           ## Verify SBOM Signature
@@ -961,9 +1090,15 @@ jobs:
           Using cosign:
 
           \`\`\`bash
+          # Web SBOM
           cosign verify-blob \\
             --bundle sbom.json.bundle \\
             sbom.json
+
+          # Backup SBOM
+          cosign verify-blob \\
+            --bundle backup-sbom.json.bundle \\
+            backup-sbom.json
           \`\`\`
 
           ## Verify Checksums
@@ -975,7 +1110,7 @@ jobs:
           grep -E '^[0-9a-f]{64}  ' checksums.txt | sha256sum -c
 
           # Or verify individual files
-          sha256sum sbom.json sbom.json.bundle
+          sha256sum sbom.json sbom.json.bundle backup-sbom.json backup-sbom.json.bundle
           \`\`\`
 
           ## Verify Mobile APK
@@ -987,16 +1122,19 @@ jobs:
 
           ## Image Information
 
-          - **Image**: \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}\`
-          - **Digest**: \`${DIGEST}\`
+          - **Image (Digest)**: \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST}\`
+          - **Image (Commit SHA)**: \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${COMMIT_SHA}\`
+          - **Backup Image (Digest)**: \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup@${BACKUP_DIGEST}\`
           - **Platforms**: \`${PLATFORM_LIST}\`
           - **Version**: \`${VERSION}\`
 
-          ## Additional Tags
+          ## Additional Version Tags
 
-          This release is also available under the following tags:
+          This release is also available under mutable semantic tags:
+          - \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}\`
           - \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:latest\`
-          - \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION}\`
+          - \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup:${VERSION_TAG}\`
+          - \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup:latest\`
 
           ## Learn More
 
@@ -1008,16 +1146,21 @@ jobs:
       - name: Create GitHub Release
         env:
           DIGEST: ${{ needs.build-and-release.outputs.image_digest }}
+          BACKUP_DIGEST: ${{ needs.build-and-release.outputs.backup_image_digest }}
           VERSION_TAG: ${{ steps.version.outputs.version_tag }}
+          VERSION_RAW: ${{ steps.version.outputs.version }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
           SERVER_URL: ${{ github.server_url }}
           CHANGELOG_TEXT: ${{ steps.prev_version.outputs.changelog_text }}
           PLATFORMS: ${{ needs.build-and-release.outputs.platforms }}
           ANDROID_PACKAGE_NAME: ${{ env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME || vars.NEXT_PUBLIC_ANDROID_PACKAGE_NAME || 'com.devakesu.apps.ghostclass' }}
+          COMMIT_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          IMAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
+          set -euo pipefail
+
+          IMAGE_NAME=$(echo "$REPOSITORY" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
           PLATFORM_LIST=$(echo "${PLATFORMS}" | sed 's/linux\///g; s/,/, /g')
           PLAY_STORE_URL="https://play.google.com/store/apps/details?id=${ANDROID_PACKAGE_NAME}"
 
@@ -1027,10 +1170,8 @@ jobs:
             PLATFORM_DESC="Docker image (${PLATFORM_LIST})"
           fi
 
-          gh release create "${VERSION_TAG}" \
-            --title "Release ${VERSION_TAG}" \
-            --latest \
-            --notes "## Release ${VERSION_TAG}
+          cat > ./artifacts/RELEASE_NOTES.md << EOF
+          ## Release ${VERSION_TAG}
 
           This release includes:
           - 🐳 ${PLATFORM_DESC}
@@ -1050,11 +1191,38 @@ jobs:
 
           ### Docker Images
 
+          #### Pull by Immutable Content Hash (Recommended)
+
           \`\`\`bash
-          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}
+          # Web App
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST}
+
+          # Database Backup Service
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup@${BACKUP_DIGEST}
           \`\`\`
 
-          **Image Digest**: \`${DIGEST}\`
+          #### Pull by Immutable Commit SHA
+
+          \`\`\`bash
+          # Web App
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${COMMIT_SHA}
+
+          # Database Backup Service
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup:${COMMIT_SHA}
+          \`\`\`
+
+          #### Pull by Version Tag
+
+          \`\`\`bash
+          # Web App
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}
+
+          # Database Backup Service
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup:${VERSION_TAG}
+          \`\`\`
+
+          **Image Digest**: \`${DIGEST}\`  
+          **Commit SHA**: \`${COMMIT_SHA}\`
 
           ### Verification
 
@@ -1063,26 +1231,148 @@ jobs:
           ### Quick Verification
 
           \`\`\`bash
-          # Verify image signature
+          # Verify image signature by digest
           cosign verify \\
-            --certificate-identity-regexp=\"^https://github.com/${REPOSITORY}\" \\
-            --certificate-oidc-issuer=\"https://token.actions.githubusercontent.com\" \\
-            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}
+            --certificate-identity-regexp="^https://github.com/${REPOSITORY}" \\
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
+            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST}
 
           # Verify attestation
-          gh attestation verify oci://ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG} --owner ${REPOSITORY_OWNER}
+          gh attestation verify oci://ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST} --owner ${REPOSITORY_OWNER}
           \`\`\`
 
           ---
 
-          **Full Changelog**: ${SERVER_URL}/${REPOSITORY}/compare/${CHANGELOG_TEXT}" \
+          **Full Changelog**: ${SERVER_URL}/${REPOSITORY}/compare/${CHANGELOG_TEXT}
+          EOF
+
+          # Remove leading indentation from here-doc
+          sed -i 's/^[[:space:]]\{10\}//' ./artifacts/RELEASE_NOTES.md
+
+          gh release create "${VERSION_TAG}" \
+            --title "Release ${VERSION_TAG}" \
+            --latest \
+            --notes-file ./artifacts/RELEASE_NOTES.md \
             ./artifacts/web/sbom.json \
             ./artifacts/web/sbom.json.bundle \
+            ./artifacts/web/backup-sbom.json \
+            ./artifacts/web/backup-sbom.json.bundle \
             ./artifacts/web/checksums.txt \
             ./artifacts/VERIFY.md \
             ./artifacts/web/provenance.intoto.jsonl \
-            ./artifacts/mobile/ghostclass-android-v${{ steps.version.outputs.version }}.apk \
+            ./artifacts/mobile/ghostclass-android-v${VERSION_RAW}.apk \
             ./artifacts/mobile/mobile-sbom.json \
             ./artifacts/mobile/mobile-checksums.txt \
             ./artifacts/mobile/mobile-provenance.intoto.jsonl \
             --draft=false
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Deploy to Coolify with Immutable Cryptographic Digest
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-coolify:
+    name: Deploy to Coolify
+    needs: [build-and-release, create-github-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID || '' }}
+      INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Fetch CI secrets from Infisical
+        if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''
+        uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
+        with:
+          client-id: ${{ env.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ env.INFISICAL_CLIENT_SECRET }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
+          env-slug: "prod"
+          secret-path: "/ci"
+        continue-on-error: true
+
+      - name: Deploy image to Coolify with immutable digest
+        env:
+          COOLIFY_BASE_URL: ${{ env.COOLIFY_BASE_URL || secrets.COOLIFY_BASE_URL || '' }}
+          COOLIFY_APP_ID: ${{ env.COOLIFY_APP_ID || secrets.COOLIFY_APP_ID || '' }}
+          COOLIFY_API_TOKEN: ${{ env.COOLIFY_API_TOKEN || secrets.COOLIFY_API_TOKEN || '' }}
+          IMAGE_DIGEST: ${{ needs.build-and-release.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.build-and-release.outputs.image_name || 'ghostclass' }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          if [ -z "${COOLIFY_BASE_URL}" ] || [ -z "${COOLIFY_APP_ID}" ] || [ -z "${COOLIFY_API_TOKEN}" ]; then
+            echo "ℹ️ Coolify deployment credentials (COOLIFY_BASE_URL, COOLIFY_APP_ID, COOLIFY_API_TOKEN) are not fully configured."
+            echo "ℹ️ Skipping Coolify deployment."
+            exit 0
+          fi
+
+          [ -n "$COOLIFY_API_TOKEN" ] && echo "::add-mask::$COOLIFY_API_TOKEN"
+          [ -n "$COOLIFY_BASE_URL" ] && echo "::add-mask::$COOLIFY_BASE_URL"
+          [ -n "$COOLIFY_APP_ID" ] && echo "::add-mask::$COOLIFY_APP_ID"
+
+          REPO_NAME="${IMAGE_NAME}"
+          COMMIT_SHA="${{ github.sha }}"
+          REPO_OWNER_LOWER=$(echo "${REPO_OWNER}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_REPO="ghcr.io/${REPO_OWNER_LOWER}/${REPO_NAME}"
+          echo "Updating Coolify application (${COOLIFY_APP_ID}) to immutable hash: ${IMAGE_REPO}:${COMMIT_SHA}"
+
+          # 1. Update application image repository and immutable commit hash tag
+          echo "Updating Coolify application image..."
+          curl --fail-with-body --silent --show-error -X PATCH \
+            "${COOLIFY_BASE_URL}/api/v1/applications/${COOLIFY_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"docker_registry_image_name\": \"${IMAGE_REPO}\", \"docker_registry_image_tag\": \"${COMMIT_SHA}\"}"
+
+          echo "✓ Coolify application image reference updated"
+
+          # 2. Trigger deployment
+          echo "Triggering Coolify deployment..."
+          curl --fail-with-body --silent --show-error -X POST \
+            "${COOLIFY_BASE_URL}/api/v1/deploy?uuid=${COOLIFY_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}"
+
+          echo "✓ Coolify application deployment triggered successfully"
+
+      - name: Trigger Coolify backup deployment (optional)
+        env:
+          COOLIFY_BASE_URL: ${{ env.COOLIFY_BASE_URL || secrets.COOLIFY_BASE_URL || '' }}
+          COOLIFY_BACKUP_APP_ID: ${{ env.COOLIFY_BACKUP_APP_ID || secrets.COOLIFY_BACKUP_APP_ID || vars.COOLIFY_BACKUP_APP_ID || '' }}
+          COOLIFY_API_TOKEN: ${{ env.COOLIFY_API_TOKEN || secrets.COOLIFY_API_TOKEN || '' }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          if [ -z "${COOLIFY_BASE_URL}" ] || [ -z "${COOLIFY_BACKUP_APP_ID}" ] || [ -z "${COOLIFY_API_TOKEN}" ]; then
+            echo "ℹ️ COOLIFY_BACKUP_APP_ID or credentials not configured. Skipping backup service deployment."
+            exit 0
+          fi
+
+          [ -n "$COOLIFY_API_TOKEN" ] && echo "::add-mask::$COOLIFY_API_TOKEN"
+          [ -n "$COOLIFY_BASE_URL" ] && echo "::add-mask::$COOLIFY_BASE_URL"
+          [ -n "$COOLIFY_BACKUP_APP_ID" ] && echo "::add-mask::$COOLIFY_BACKUP_APP_ID"
+
+          COMMIT_SHA="${{ github.sha }}"
+          REPO_OWNER_LOWER=$(echo "${REPO_OWNER}" | tr '[:upper:]' '[:lower:]')
+          BACKUP_IMAGE_REPO="ghcr.io/${REPO_OWNER_LOWER}/ghostclass-backup"
+
+          echo "Updating Coolify backup service (${COOLIFY_BACKUP_APP_ID}) to immutable hash: ${BACKUP_IMAGE_REPO}:${COMMIT_SHA}"
+
+          curl --fail-with-body --silent --show-error -X PATCH \
+            "${COOLIFY_BASE_URL}/api/v1/applications/${COOLIFY_BACKUP_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"docker_registry_image_name\": \"${BACKUP_IMAGE_REPO}\", \"docker_registry_image_tag\": \"${COMMIT_SHA}\"}"
+
+          echo "Deploying backup service to Coolify (${COOLIFY_BACKUP_APP_ID})"
+          curl --fail-with-body --silent --show-error -X POST \
+            "${COOLIFY_BASE_URL}/api/v1/deploy?uuid=${COOLIFY_BACKUP_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}"
+
+          echo "✓ Backup service deployment triggered successfully"

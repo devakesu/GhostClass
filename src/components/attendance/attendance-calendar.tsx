@@ -167,12 +167,15 @@ function normalizeTrackerRecords(
   return trackingData.map((item) => {
     const t = item as TrackerRecord;
     let sessionToUse = String(t.session);
-    // eslint-disable-next-line security/detect-object-injection
-    const resolvedSession = attendanceData?.sessions?.[sessionToUse];
-    if (resolvedSession?.name) {
-      const normalized = normalizeSession(resolvedSession.name);
-      if (!isNaN(parseInt(normalized, 10))) {
-        sessionToUse = normalized;
+    const sNum = parseInt(sessionToUse, 10);
+    if (!isNaN(sNum) && sNum > 20) {
+      // eslint-disable-next-line security/detect-object-injection
+      const resolvedSession = attendanceData?.sessions?.[sessionToUse];
+      if (resolvedSession?.name) {
+        const normalized = normalizeSession(resolvedSession.name);
+        if (!isNaN(parseInt(normalized, 10))) {
+          sessionToUse = normalized;
+        }
       }
     }
     return {
@@ -255,7 +258,7 @@ function resolveSessionName(
   index: number,
   attendanceData: AttendanceReport,
 ): string {
-  const isNumericId = (s: string) => !isNaN(parseInt(s)) && parseInt(s) > 20;
+  const isNumericId = (s: string) => !isNaN(parseInt(s, 10)) && parseInt(s, 10) > 20;
 
   if (
     !sessionNameStr ||
@@ -275,23 +278,15 @@ function resolveSessionName(
       }
       return resolved;
     }
-    if (!isNaN(parseInt(sessionKey)) && parseInt(sessionKey) < 20) {
+    const keyNorm = normalizeSession(sessionKey);
+    const keyInt = parseInt(keyNorm, 10);
+    if (!isNaN(keyInt) && keyInt < 20) {
       return sessionKey;
     }
     return String(index + 1);
   }
 
-  // eslint-disable-next-line security/detect-object-injection
-  const regSession = attendanceData.sessions?.[sessionNameStr];
-  if (regSession) {
-    const resolved = regSession.name;
-    const normalized = normalizeSession(resolved);
-    if (!isNaN(parseInt(normalized, 10))) {
-      return normalized;
-    }
-    return resolved;
-  }
-  return sessionNameStr || "1";
+  return sessionNameStr;
 }
 
 function computeRawEvents(

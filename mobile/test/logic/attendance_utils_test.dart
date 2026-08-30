@@ -272,4 +272,127 @@ void main() {
       expect(result.requiredToAttend, 0);
     });
   });
+
+  group('Attendance Utils - parseDateValue', () {
+    test('handles DateTime instance', () {
+      final dt = DateTime.utc(2024, 9, 5);
+      expect(parseDateValue(dt), dt.millisecondsSinceEpoch);
+    });
+
+    test('handles YYYY-MM-DD string', () {
+      expect(
+        parseDateValue('2024-09-05'),
+        DateTime.utc(2024, 9, 5).millisecondsSinceEpoch,
+      );
+    });
+
+    test('handles DD-MM-YYYY string', () {
+      expect(
+        parseDateValue('05-09-2024'),
+        DateTime.utc(2024, 9, 5).millisecondsSinceEpoch,
+      );
+    });
+
+    test('handles DD/MM/YYYY string', () {
+      expect(
+        parseDateValue('05/09/2024'),
+        DateTime.utc(2024, 9, 5).millisecondsSinceEpoch,
+      );
+    });
+
+    test('handles YYYYMMDD string', () {
+      expect(
+        parseDateValue('20240905'),
+        DateTime.utc(2024, 9, 5).millisecondsSinceEpoch,
+      );
+    });
+
+    test('handles null and invalid date strings gracefully', () {
+      expect(parseDateValue(null), 0);
+      expect(parseDateValue('invalid-date'), 0);
+    });
+  });
+
+  group('Attendance Utils - compareTrackingRecords', () {
+    test(
+      'sorts first by descending date, then by ascending session for same date',
+      () {
+        const r1 = TrackingRecord(
+          id: 1,
+          course: 'CS101',
+          date: '2024-09-04',
+          session: '1st Hour',
+          attendance: 110,
+          status: 'extra',
+          semester: '1',
+          year: '2024-25',
+        );
+        const r2 = TrackingRecord(
+          id: 2,
+          course: 'CS101',
+          date: '2024-09-05',
+          session: '2nd Hour',
+          attendance: 110,
+          status: 'extra',
+          semester: '1',
+          year: '2024-25',
+        );
+        const r3 = TrackingRecord(
+          id: 3,
+          course: 'CS101',
+          date: '2024-09-05',
+          session: '1st Hour',
+          attendance: 110,
+          status: 'extra',
+          semester: '1',
+          year: '2024-25',
+        );
+        const r4 = TrackingRecord(
+          id: 4,
+          course: 'CS101',
+          date: '2024-09-03',
+          session: 'Session 3',
+          attendance: 110,
+          status: 'extra',
+          semester: '1',
+          year: '2024-25',
+        );
+
+        final list = [r1, r2, r3, r4]..sort(compareTrackingRecords);
+
+        // Expected order:
+        // 1. 2024-09-05 (1st Hour - r3)
+        // 2. 2024-09-05 (2nd Hour - r2)
+        // 3. 2024-09-04 (1st Hour - r1)
+        // 4. 2024-09-03 (Session 3 - r4)
+        expect(list.map((r) => r.id).toList(), [3, 2, 1, 4]);
+      },
+    );
+
+    test('tie-breaks on session string when session numbers are identical', () {
+      const rA = TrackingRecord(
+        id: 10,
+        course: 'CS101',
+        date: '2024-09-05',
+        session: 'Lab A',
+        attendance: 110,
+        status: 'extra',
+        semester: '1',
+        year: '2024-25',
+      );
+      const rB = TrackingRecord(
+        id: 11,
+        course: 'CS101',
+        date: '2024-09-05',
+        session: 'Lab B',
+        attendance: 110,
+        status: 'extra',
+        semester: '1',
+        year: '2024-25',
+      );
+
+      final list = [rB, rA]..sort(compareTrackingRecords);
+      expect(list.map((r) => r.id).toList(), [10, 11]);
+    });
+  });
 }

@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
@@ -104,11 +103,7 @@ class SessionHealingService extends Notifier<void> {
           );
           syncRes = await api
               .syncMobileAuth(supabaseToken)
-              .timeout(
-                kDebugMode
-                    ? const Duration(seconds: 45)
-                    : const Duration(seconds: 30),
-              );
+              .timeout(AppConfig.defaultTimeout);
         } on Object catch (e, st) {
           AppLogger.e(
             'AuthNotifier [HEAL-$healAttemptId]: syncMobileAuth retry failed',
