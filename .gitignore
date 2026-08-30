@@ -111,3 +111,14 @@ certificates/
 # App Secrets
 /mobile/lib/config/app_secrets.dart
 /mobile/firebase.json
+
+# Database Backups & Encryption Keys
+*.dump
+*.dump.zst*
+*.age
+*.key
+*age.identity
+*-pq*.txt
+
+# Local CLI configuration
+.infisical.json

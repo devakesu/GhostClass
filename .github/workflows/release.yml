@@ -48,6 +48,7 @@ jobs:
       attestations: write
     outputs:
       image_digest: ${{ steps.build-push.outputs.digest }}
+      image_name: ${{ steps.prep.outputs.image_name }}
       platforms: ${{ steps.prep.outputs.platforms }}
     env:
       INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID }}
@@ -169,6 +170,7 @@ jobs:
           context: .
           push: true
           tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
             ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}:latest
           secrets: |
@@ -229,6 +231,7 @@ jobs:
           file: backup/Dockerfile
           push: true
           tags: |
+            ghcr.io/${{ github.repository_owner }}/ghostclass-backup:${{ github.sha }}
             ghcr.io/${{ github.repository_owner }}/ghostclass-backup:${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
             ghcr.io/${{ github.repository_owner }}/ghostclass-backup:latest
           platforms: ${{ steps.prep.outputs.platforms }}
@@ -1142,3 +1145,114 @@ jobs:
             ./artifacts/mobile/mobile-checksums.txt \
             ./artifacts/mobile/mobile-provenance.intoto.jsonl \
             --draft=false
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # Deploy to Coolify with Immutable Cryptographic Digest
+  # ────────────────────────────────────────────────────────────────────────────
+  deploy-coolify:
+    name: Deploy to Coolify
+    needs: [build-and-release, create-github-release]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      INFISICAL_CLIENT_ID: ${{ secrets.INFISICAL_CLIENT_ID || '' }}
+      INFISICAL_CLIENT_SECRET: ${{ secrets.INFISICAL_CLIENT_SECRET || '' }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Fetch CI secrets from Infisical
+        if: env.INFISICAL_CLIENT_ID != '' && env.INFISICAL_CLIENT_SECRET != ''
+        uses: infisical/secrets-action@77ab1f4ccd183a543cb5b42435fbd181189f4995
+        with:
+          client-id: ${{ env.INFISICAL_CLIENT_ID }}
+          client-secret: ${{ env.INFISICAL_CLIENT_SECRET }}
+          project-slug: ${{ secrets.INFISICAL_PROJECT_SLUG || secrets.INFISICAL_PROJECT_ID }}
+          env-slug: "prod"
+          secret-path: "/ci"
+        continue-on-error: true
+
+      - name: Deploy image to Coolify with immutable digest
+        env:
+          COOLIFY_BASE_URL: ${{ env.COOLIFY_BASE_URL || secrets.COOLIFY_BASE_URL || '' }}
+          COOLIFY_APP_ID: ${{ env.COOLIFY_APP_ID || secrets.COOLIFY_APP_ID || '' }}
+          COOLIFY_API_TOKEN: ${{ env.COOLIFY_API_TOKEN || secrets.COOLIFY_API_TOKEN || '' }}
+          IMAGE_DIGEST: ${{ needs.build-and-release.outputs.image_digest }}
+          IMAGE_NAME: ${{ needs.build-and-release.outputs.image_name || 'ghostclass' }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          if [ -z "${COOLIFY_BASE_URL}" ] || [ -z "${COOLIFY_APP_ID}" ] || [ -z "${COOLIFY_API_TOKEN}" ]; then
+            echo "ℹ️ Coolify deployment credentials (COOLIFY_BASE_URL, COOLIFY_APP_ID, COOLIFY_API_TOKEN) are not fully configured."
+            echo "ℹ️ Skipping Coolify deployment."
+            exit 0
+          fi
+
+          [ -n "$COOLIFY_API_TOKEN" ] && echo "::add-mask::$COOLIFY_API_TOKEN"
+          [ -n "$COOLIFY_BASE_URL" ] && echo "::add-mask::$COOLIFY_BASE_URL"
+          [ -n "$COOLIFY_APP_ID" ] && echo "::add-mask::$COOLIFY_APP_ID"
+
+          REPO_NAME="${IMAGE_NAME}"
+          COMMIT_SHA="${{ github.sha }}"
+          REPO_OWNER_LOWER=$(echo "${REPO_OWNER}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_REPO="ghcr.io/${REPO_OWNER_LOWER}/${REPO_NAME}"
+          echo "Updating Coolify application (${COOLIFY_APP_ID}) to immutable hash: ${IMAGE_REPO}:${COMMIT_SHA}"
+
+          # 1. Update application image repository and immutable commit hash tag
+          echo "Updating Coolify application image..."
+          curl --fail-with-body --silent --show-error -X PATCH \
+            "${COOLIFY_BASE_URL}/api/v1/applications/${COOLIFY_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"docker_registry_image_name\": \"${IMAGE_REPO}\", \"docker_registry_image_tag\": \"${COMMIT_SHA}\"}"
+
+          echo "✓ Coolify application image reference updated"
+
+          # 2. Trigger deployment
+          echo "Triggering Coolify deployment..."
+          curl --fail-with-body --silent --show-error -X POST \
+            "${COOLIFY_BASE_URL}/api/v1/deploy?uuid=${COOLIFY_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}"
+
+          echo "✓ Coolify application deployment triggered successfully"
+
+      - name: Trigger Coolify backup deployment (optional)
+        env:
+          COOLIFY_BASE_URL: ${{ env.COOLIFY_BASE_URL || secrets.COOLIFY_BASE_URL || '' }}
+          COOLIFY_BACKUP_APP_ID: ${{ env.COOLIFY_BACKUP_APP_ID || secrets.COOLIFY_BACKUP_APP_ID || vars.COOLIFY_BACKUP_APP_ID || '' }}
+          COOLIFY_API_TOKEN: ${{ env.COOLIFY_API_TOKEN || secrets.COOLIFY_API_TOKEN || '' }}
+          REPO_OWNER: ${{ github.repository_owner }}
+        run: |
+          set -euo pipefail
+          set +x
+
+          if [ -z "${COOLIFY_BASE_URL}" ] || [ -z "${COOLIFY_BACKUP_APP_ID}" ] || [ -z "${COOLIFY_API_TOKEN}" ]; then
+            echo "ℹ️ COOLIFY_BACKUP_APP_ID or credentials not configured. Skipping backup service deployment."
+            exit 0
+          fi
+
+          [ -n "$COOLIFY_API_TOKEN" ] && echo "::add-mask::$COOLIFY_API_TOKEN"
+          [ -n "$COOLIFY_BASE_URL" ] && echo "::add-mask::$COOLIFY_BASE_URL"
+          [ -n "$COOLIFY_BACKUP_APP_ID" ] && echo "::add-mask::$COOLIFY_BACKUP_APP_ID"
+
+          COMMIT_SHA="${{ github.sha }}"
+          REPO_OWNER_LOWER=$(echo "${REPO_OWNER}" | tr '[:upper:]' '[:lower:]')
+          BACKUP_IMAGE_REPO="ghcr.io/${REPO_OWNER_LOWER}/ghostclass-backup"
+
+          echo "Updating Coolify backup service (${COOLIFY_BACKUP_APP_ID}) to immutable hash: ${BACKUP_IMAGE_REPO}:${COMMIT_SHA}"
+
+          curl --fail-with-body --silent --show-error -X PATCH \
+            "${COOLIFY_BASE_URL}/api/v1/applications/${COOLIFY_BACKUP_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"docker_registry_image_name\": \"${BACKUP_IMAGE_REPO}\", \"docker_registry_image_tag\": \"${COMMIT_SHA}\"}"
+
+          echo "Deploying backup service to Coolify (${COOLIFY_BACKUP_APP_ID})"
+          curl --fail-with-body --silent --show-error -X POST \
+            "${COOLIFY_BASE_URL}/api/v1/deploy?uuid=${COOLIFY_BACKUP_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}"
+
+          echo "✓ Backup service deployment triggered successfully"

@@ -351,23 +351,41 @@ cosign verify \
 
 ### Deployment Integration (Coolify)
 
-Add signature verification to your deployment script:
+GhostClass workflows pass the exact, immutable cryptographic image digest (`ghcr.io/devakesu/ghostclass@sha256:...`) directly to Coolify's API on every release.
+
+#### 1. Pre-Deployment Signature Verification Hook
+
+In Coolify (**Applications** → **GhostClass** → **Advanced / Custom Commands**), add the following to the **Pre-Deployment Command** hook:
 
 ```bash
-#!/bin/bash
+# Execute pre-deployment Cosign verification against GitHub Actions OIDC identity
+bash scripts/coolify-pre-deploy-verify.sh
+```
+
+Or execute directly with inline environment variables:
+
+```bash
+#!/usr/bin/env bash
 set -euo pipefail
 
-IMAGE="ghcr.io/devakesu/ghostclass:latest"
+IMAGE="${COOLIFY_CONTAINER_IMAGE:-ghcr.io/devakesu/ghostclass:latest}"
 
-echo "Verifying image signature..."
+echo "Verifying image signature for ${IMAGE}..."
 cosign verify \
-  --certificate-identity-regexp="^https://github.com/devakesu/GhostClass/.github/workflows/" \
+  --certificate-identity-regexp="^https://github.com/devakesu/GhostClass/\.github/workflows/" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
   "${IMAGE}"
 
-echo "✓ Signature verified - deploying..."
-docker pull "${IMAGE}"
+echo "✓ Signature verified - proceeding with deployment."
 ```
+
+#### 2. Automated Immutable Digest Deployment (GitHub Actions)
+
+On every release, `.github/workflows/release.yml` automatically:
+
+1. Builds, signs, and attests the container image.
+2. Updates the Coolify application image via `PATCH /api/v1/applications/${COOLIFY_APP_ID}` with the immutable `ghcr.io/devakesu/ghostclass:<github.sha>` reference.
+3. Triggers the deployment via `POST /api/v1/deploy?uuid=${COOLIFY_APP_ID}`.
 
 ### GitHub Attestations
 

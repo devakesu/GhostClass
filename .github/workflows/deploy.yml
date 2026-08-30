@@ -2,6 +2,17 @@ name: Deploy
 
 on:
   workflow_dispatch:
+    inputs:
+      image_digest:
+        description: "Exact immutable image digest to deploy (e.g. sha256:...)"
+        required: false
+        type: string
+        default: ""
+      image_tag:
+        description: "Image tag to deploy if digest is unset (defaults to version/latest)"
+        required: false
+        type: string
+        default: ""
 
 permissions: {}
 
@@ -393,6 +404,9 @@ jobs:
           COOLIFY_BASE_URL: ${{ env.COOLIFY_BASE_URL || secrets.COOLIFY_BASE_URL }}
           COOLIFY_APP_ID: ${{ env.COOLIFY_APP_ID || secrets.COOLIFY_APP_ID }}
           COOLIFY_API_TOKEN: ${{ env.COOLIFY_API_TOKEN || secrets.COOLIFY_API_TOKEN }}
+          INPUT_DIGEST: ${{ github.event.inputs.image_digest || '' }}
+          INPUT_TAG: ${{ github.event.inputs.image_tag || '' }}
+          REPO_OWNER: ${{ github.repository_owner }}
         run: |
           set -euo pipefail
           set +x
@@ -406,12 +420,27 @@ jobs:
           [ -n "$COOLIFY_BASE_URL" ] && echo "::add-mask::$COOLIFY_BASE_URL"
           [ -n "$COOLIFY_APP_ID" ] && echo "::add-mask::$COOLIFY_APP_ID"
 
+          REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
           VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
-          echo "Deploying version ${VERSION} to Coolify"
-          echo "Note: Ensure Coolify is configured to pull the versioned tag (e.g., ${VERSION})"
 
-          curl --fail-with-body --silent --show-error \
-            "$COOLIFY_BASE_URL/api/v1/deploy?uuid=$COOLIFY_APP_ID" \
+          TARGET_TAG="${INPUT_TAG:-${{ github.sha }}}"
+
+          REPO_OWNER_LOWER=$(echo "${REPO_OWNER}" | tr '[:upper:]' '[:lower:]')
+          IMAGE_REPO="ghcr.io/${REPO_OWNER_LOWER}/${REPO_NAME}"
+          echo "Updating Coolify application to image: ${IMAGE_REPO}:${TARGET_TAG}"
+
+          # 1. Update application image reference to the exact repository and tag
+          curl --fail-with-body --silent --show-error -X PATCH \
+            "${COOLIFY_BASE_URL}/api/v1/applications/${COOLIFY_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"docker_registry_image_name\": \"${IMAGE_REPO}\", \"docker_registry_image_tag\": \"${TARGET_TAG}\"}"
+
+          echo "✓ Coolify application image reference updated"
+
+          # 2. Trigger deployment
+          curl --fail-with-body --silent --show-error -X POST \
+            "${COOLIFY_BASE_URL}/api/v1/deploy?uuid=$COOLIFY_APP_ID" \
             -H "Authorization: Bearer $COOLIFY_API_TOKEN"
 
           echo "✓ Deployment triggered successfully"
