@@ -52,9 +52,18 @@ log_info "      GhostClass Automated PostgreSQL Backup Pipeline     "
 log_info "=========================================================="
 
 # ------------------------------------------------------------------------------
+# 0. Dynamic Secret Injection via Infisical (if configured & credentials not yet in env)
+# ------------------------------------------------------------------------------
+if [ -z "${SUPABASE_DB_URL:-}" ] && [ -n "${INFISICAL_TOKEN:-}" ] && [ -n "${INFISICAL_PROJECT_ID:-}" ]; then
+  log_info "🔑 Injecting runtime secrets from Infisical (/runtime)..."
+  exec infisical run --projectId "${INFISICAL_PROJECT_ID}" --path /runtime --env "${INFISICAL_ENV:-prod}" -- "$0" "$@"
+fi
+
+# ------------------------------------------------------------------------------
 # 1. Environment Validation
 # ------------------------------------------------------------------------------
 ERRORS=0
+
 
 if [ -z "${SUPABASE_DB_URL:-}" ]; then
   log_err "Missing SUPABASE_DB_URL. Must be a valid PostgreSQL connection URI (e.g. postgresql://postgres:[password]@...)"
