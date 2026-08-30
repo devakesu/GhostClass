@@ -48,6 +48,7 @@ jobs:
       attestations: write
     outputs:
       image_digest: ${{ steps.build-push.outputs.digest }}
+      backup_image_digest: ${{ steps.build-push-backup.outputs.digest }}
       image_name: ${{ steps.prep.outputs.image_name }}
       platforms: ${{ steps.prep.outputs.platforms }}
     env:
@@ -243,12 +244,19 @@ jobs:
             org.opencontainers.image.created=${{ steps.prep.outputs.created }}
             org.opencontainers.image.version=${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}
 
-      # Attest build provenance
-      - name: Attest Build Provenance
+      # Attest build provenance for web and backup images
+      - name: Attest Build Provenance (Web Image)
         uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
+          push-to-registry: true
+
+      - name: Attest Build Provenance (Backup Image)
+        uses: actions/attest-build-provenance@0f67c3f4856b2e3261c31976d6725780e5e4c373
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/ghostclass-backup
+          subject-digest: ${{ steps.build-push-backup.outputs.digest }}
           push-to-registry: true
 
       # Download SLSA provenance attestation for OpenSSF Scorecard
@@ -302,22 +310,38 @@ jobs:
           echo "❌ Failed to download attestation after $MAX_ATTEMPTS attempts"
           exit 1
 
-      # Generate SBOM
-      - name: Generate SBOM
+      # Generate SBOM for Web & Backup Images
+      - name: Generate SBOM (Web Image)
         uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
         with:
           image: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}@${{ steps.build-push.outputs.digest }}
           format: cyclonedx-json
           output-file: sbom.json
 
-      # Attest SBOM
-      - name: Attest SBOM
+      - name: Generate SBOM (Backup Image)
+        uses: anchore/sbom-action@e22c389904149dbc22b58101806040fa8d37a610
+        with:
+          image: ghcr.io/${{ github.repository_owner }}/ghostclass-backup@${{ steps.build-push-backup.outputs.digest }}
+          format: cyclonedx-json
+          output-file: backup-sbom.json
+
+      # Attest SBOMs
+      - name: Attest SBOM (Web Image)
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
         with:
           subject-name: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}
           subject-digest: ${{ steps.build-push.outputs.digest }}
           predicate-type: "https://cyclonedx.org/bom"
           predicate-path: sbom.json
+          push-to-registry: true
+
+      - name: Attest SBOM (Backup Image)
+        uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6
+        with:
+          subject-name: ghcr.io/${{ github.repository_owner }}/ghostclass-backup
+          subject-digest: ${{ steps.build-push-backup.outputs.digest }}
+          predicate-type: "https://cyclonedx.org/bom"
+          predicate-path: backup-sbom.json
           push-to-registry: true
 
       # Sign image with cosign (keyless signing using OIDC)
@@ -332,70 +356,105 @@ jobs:
           set +x
           echo "${GH_TOKEN}" | cosign login ghcr.io -u "${{ github.actor }}" --password-stdin
 
-      - name: Sign image (keyless)
+      - name: Sign images (keyless)
         env:
           COSIGN_YES: "true"
           IMAGE_URI: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}@${{ steps.build-push.outputs.digest }}
+          BACKUP_IMAGE_URI: ghcr.io/${{ github.repository_owner }}/ghostclass-backup@${{ steps.build-push-backup.outputs.digest }}
         run: |
           set -euo pipefail
 
           echo "=== Cosign Image Signing ==="
-          echo "Image URI: ${IMAGE_URI}"
           VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
           echo "Version: ${VERSION}"
 
-          # Sign with timeout
+          # Sign Web Image
+          echo "Signing Web Image: ${IMAGE_URI}"
           timeout 300 cosign sign \
             -a "repo=${{ github.repository }}" \
             -a "workflow=${{ github.workflow }}" \
             -a "ref=${{ github.ref }}" \
             -a "version=${VERSION}" \
             "${IMAGE_URI}" || {
-              echo "ERROR: Cosign image signing failed or timed out"
+              echo "ERROR: Cosign web image signing failed or timed out"
               exit 1
             }
 
-          echo "✓ Image signed successfully"
-          cosign triangulate "${IMAGE_URI}"
+          # Sign Backup Image
+          echo "Signing Backup Image: ${BACKUP_IMAGE_URI}"
+          timeout 300 cosign sign \
+            -a "repo=${{ github.repository }}" \
+            -a "workflow=${{ github.workflow }}" \
+            -a "ref=${{ github.ref }}" \
+            -a "version=${VERSION}" \
+            "${BACKUP_IMAGE_URI}" || {
+              echo "ERROR: Cosign backup image signing failed or timed out"
+              exit 1
+            }
 
-      - name: Verify image signature
+          echo "✓ All container images signed successfully"
+          cosign triangulate "${IMAGE_URI}"
+          cosign triangulate "${BACKUP_IMAGE_URI}"
+
+      - name: Verify image signatures
         env:
           IMAGE_URI: ghcr.io/${{ github.repository_owner }}/${{ steps.prep.outputs.image_name }}@${{ steps.build-push.outputs.digest }}
+          BACKUP_IMAGE_URI: ghcr.io/${{ github.repository_owner }}/ghostclass-backup@${{ steps.build-push-backup.outputs.digest }}
         run: |
           set -euo pipefail
 
+          echo "Verifying web image signature..."
           cosign verify \
             --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/" \
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
             "${IMAGE_URI}"
 
-          echo "✓ Image signature verified"
+          echo "Verifying backup image signature..."
+          cosign verify \
+            --certificate-identity-regexp="^https://github.com/${{ github.repository }}/.github/workflows/" \
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+            "${BACKUP_IMAGE_URI}"
 
-      # Sign SBOM file
-      - name: Sign SBOM artifact
+          echo "✓ All container image signatures verified"
+
+      # Sign SBOM files
+      - name: Sign SBOM artifacts
         run: |
           set -euo pipefail
 
-          echo "=== Signing SBOM ==="
+          echo "=== Signing SBOMs ==="
           timeout 60 cosign sign-blob --yes \
             --bundle sbom.json.bundle \
             sbom.json || {
-              echo "ERROR: SBOM signing failed or timed out"
+              echo "ERROR: Web SBOM signing failed or timed out"
               exit 1
             }
 
-          echo "✓ SBOM signed successfully"
+          timeout 60 cosign sign-blob --yes \
+            --bundle backup-sbom.json.bundle \
+            backup-sbom.json || {
+              echo "ERROR: Backup SBOM signing failed or timed out"
+              exit 1
+            }
+
+          echo "✓ All SBOMs signed successfully"
 
       # Generate SHA256 checksums (after all artifacts are created)
       - name: Generate checksums
         run: |
           echo "# Release Artifact Checksums" > checksums.txt
           echo "" >> checksums.txt
-          echo "## SBOM" >> checksums.txt
+          echo "## Web SBOM" >> checksums.txt
           sha256sum sbom.json >> checksums.txt
           echo "" >> checksums.txt
-          echo "## Signature Bundle" >> checksums.txt
+          echo "## Web Signature Bundle" >> checksums.txt
           sha256sum sbom.json.bundle >> checksums.txt
+          echo "" >> checksums.txt
+          echo "## Backup SBOM" >> checksums.txt
+          sha256sum backup-sbom.json >> checksums.txt
+          echo "" >> checksums.txt
+          echo "## Backup Signature Bundle" >> checksums.txt
+          sha256sum backup-sbom.json.bundle >> checksums.txt
           echo "" >> checksums.txt
           echo "## SLSA Provenance Attestation" >> checksums.txt
           sha256sum provenance.intoto.jsonl >> checksums.txt
@@ -412,6 +471,8 @@ jobs:
           path: |
             sbom.json
             sbom.json.bundle
+            backup-sbom.json
+            backup-sbom.json.bundle
             checksums.txt
             provenance.intoto.jsonl
 
@@ -971,9 +1032,11 @@ jobs:
           PLATFORMS: ${{ needs.build-and-release.outputs.platforms }}
           VERSION_TAG: ${{ steps.version.outputs.version_tag }}
           DIGEST: ${{ needs.build-and-release.outputs.image_digest }}
+          BACKUP_DIGEST: ${{ needs.build-and-release.outputs.backup_image_digest }}
           VERSION: ${{ steps.version.outputs.version }}
           REPOSITORY: ${{ github.repository }}
           REPOSITORY_OWNER: ${{ github.repository_owner }}
+          COMMIT_SHA: ${{ github.sha }}
         run: |
           # Derive image name from repository name
           IMAGE_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
@@ -988,21 +1051,38 @@ jobs:
 
           ## Verify Docker Image Signature
 
-          Using cosign (keyless verification):
+          Using cosign with immutable digest (Recommended):
+
+          \`\`\`bash
+          # Web Image
+          cosign verify \\
+            --certificate-identity-regexp="^https://github.com/${REPOSITORY}" \\
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
+            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST}
+
+          # Backup Image
+          cosign verify \\
+            --certificate-identity-regexp="^https://github.com/${REPOSITORY}" \\
+            --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
+            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup@${BACKUP_DIGEST}
+          \`\`\`
+
+          Using cosign by immutable commit hash or version tag:
 
           \`\`\`bash
           cosign verify \\
             --certificate-identity-regexp="^https://github.com/${REPOSITORY}" \\
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
-            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}
+            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${COMMIT_SHA}
           \`\`\`
 
           ## Verify Build Attestation
 
-          Using GitHub CLI:
+          Using GitHub CLI with immutable digest (Recommended):
 
           \`\`\`bash
-          gh attestation verify oci://ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG} --owner ${REPOSITORY_OWNER}
+          gh attestation verify oci://ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST} --owner ${REPOSITORY_OWNER}
+          gh attestation verify oci://ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup@${BACKUP_DIGEST} --owner ${REPOSITORY_OWNER}
           \`\`\`
 
           ## Verify SBOM Signature
@@ -1010,9 +1090,15 @@ jobs:
           Using cosign:
 
           \`\`\`bash
+          # Web SBOM
           cosign verify-blob \\
             --bundle sbom.json.bundle \\
             sbom.json
+
+          # Backup SBOM
+          cosign verify-blob \\
+            --bundle backup-sbom.json.bundle \\
+            backup-sbom.json
           \`\`\`
 
           ## Verify Checksums
@@ -1024,7 +1110,7 @@ jobs:
           grep -E '^[0-9a-f]{64}  ' checksums.txt | sha256sum -c
 
           # Or verify individual files
-          sha256sum sbom.json sbom.json.bundle
+          sha256sum sbom.json sbom.json.bundle backup-sbom.json backup-sbom.json.bundle
           \`\`\`
 
           ## Verify Mobile APK
@@ -1036,16 +1122,19 @@ jobs:
 
           ## Image Information
 
-          - **Image**: \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}\`
-          - **Digest**: \`${DIGEST}\`
+          - **Image (Digest)**: \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST}\`
+          - **Image (Commit SHA)**: \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${COMMIT_SHA}\`
+          - **Backup Image (Digest)**: \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup@${BACKUP_DIGEST}\`
           - **Platforms**: \`${PLATFORM_LIST}\`
           - **Version**: \`${VERSION}\`
 
-          ## Additional Tags
+          ## Additional Version Tags
 
-          This release is also available under the following tags:
+          This release is also available under mutable semantic tags:
+          - \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}\`
           - \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:latest\`
-          - \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION}\`
+          - \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup:${VERSION_TAG}\`
+          - \`ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup:latest\`
 
           ## Learn More
 
@@ -1057,6 +1146,7 @@ jobs:
       - name: Create GitHub Release
         env:
           DIGEST: ${{ needs.build-and-release.outputs.image_digest }}
+          BACKUP_DIGEST: ${{ needs.build-and-release.outputs.backup_image_digest }}
           VERSION_TAG: ${{ steps.version.outputs.version_tag }}
           VERSION_RAW: ${{ steps.version.outputs.version }}
           REPOSITORY: ${{ github.repository }}
@@ -1065,6 +1155,7 @@ jobs:
           CHANGELOG_TEXT: ${{ steps.prev_version.outputs.changelog_text }}
           PLATFORMS: ${{ needs.build-and-release.outputs.platforms }}
           ANDROID_PACKAGE_NAME: ${{ env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME || vars.NEXT_PUBLIC_ANDROID_PACKAGE_NAME || 'com.devakesu.apps.ghostclass' }}
+          COMMIT_SHA: ${{ github.sha }}
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           set -euo pipefail
@@ -1100,11 +1191,38 @@ jobs:
 
           ### Docker Images
 
+          #### Pull by Immutable Content Hash (Recommended)
+
           \`\`\`bash
-          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}
+          # Web App
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST}
+
+          # Database Backup Service
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup@${BACKUP_DIGEST}
           \`\`\`
 
-          **Image Digest**: \`${DIGEST}\`
+          #### Pull by Immutable Commit SHA
+
+          \`\`\`bash
+          # Web App
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${COMMIT_SHA}
+
+          # Database Backup Service
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup:${COMMIT_SHA}
+          \`\`\`
+
+          #### Pull by Version Tag
+
+          \`\`\`bash
+          # Web App
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}
+
+          # Database Backup Service
+          docker pull ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}-backup:${VERSION_TAG}
+          \`\`\`
+
+          **Image Digest**: \`${DIGEST}\`  
+          **Commit SHA**: \`${COMMIT_SHA}\`
 
           ### Verification
 
@@ -1113,14 +1231,14 @@ jobs:
           ### Quick Verification
 
           \`\`\`bash
-          # Verify image signature
+          # Verify image signature by digest
           cosign verify \\
             --certificate-identity-regexp="^https://github.com/${REPOSITORY}" \\
             --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \\
-            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG}
+            ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST}
 
           # Verify attestation
-          gh attestation verify oci://ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}:${VERSION_TAG} --owner ${REPOSITORY_OWNER}
+          gh attestation verify oci://ghcr.io/${REPOSITORY_OWNER}/${IMAGE_NAME}@${DIGEST} --owner ${REPOSITORY_OWNER}
           \`\`\`
 
           ---
@@ -1137,6 +1255,8 @@ jobs:
             --notes-file ./artifacts/RELEASE_NOTES.md \
             ./artifacts/web/sbom.json \
             ./artifacts/web/sbom.json.bundle \
+            ./artifacts/web/backup-sbom.json \
+            ./artifacts/web/backup-sbom.json.bundle \
             ./artifacts/web/checksums.txt \
             ./artifacts/VERIFY.md \
             ./artifacts/web/provenance.intoto.jsonl \

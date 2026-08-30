@@ -325,10 +325,17 @@ scoop install cosign
 Verify an image using regex pattern (recommended):
 
 ```bash
+# Verify by immutable digest (Recommended)
 cosign verify \
-  --certificate-identity-regexp="^https://github.com/devakesu/GhostClass/.github/workflows/" \
+  --certificate-identity-regexp="^https://github.com/devakesu/GhostClass/\.github/workflows/" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/devakesu/ghostclass:latest
+  ghcr.io/devakesu/ghostclass@sha256:<digest>
+
+# Verify by commit SHA or release tag
+cosign verify \
+  --certificate-identity-regexp="^https://github.com/devakesu/GhostClass/\.github/workflows/" \
+  --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
+  ghcr.io/devakesu/ghostclass:<commit-sha-or-tag>
 ```
 
 ### Strict Verification
@@ -336,11 +343,11 @@ cosign verify \
 For maximum security, verify against specific workflow:
 
 ```bash
-# Latest release (release.yml)
+# Verify by immutable digest (release.yml)
 cosign verify \
   --certificate-identity="https://github.com/devakesu/GhostClass/.github/workflows/release.yml@refs/heads/main" \
   --certificate-oidc-issuer="https://token.actions.githubusercontent.com" \
-  ghcr.io/devakesu/ghostclass:latest
+  ghcr.io/devakesu/ghostclass@sha256:<digest>
 
 # Specific version tag (release.yml)
 cosign verify \

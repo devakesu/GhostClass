@@ -450,6 +450,8 @@ jobs:
           COOLIFY_BASE_URL: ${{ env.COOLIFY_BASE_URL || secrets.COOLIFY_BASE_URL }}
           COOLIFY_BACKUP_APP_ID: ${{ env.COOLIFY_BACKUP_APP_ID || secrets.COOLIFY_BACKUP_APP_ID || vars.COOLIFY_BACKUP_APP_ID || '' }}
           COOLIFY_API_TOKEN: ${{ env.COOLIFY_API_TOKEN || secrets.COOLIFY_API_TOKEN }}
+          REPO_OWNER: ${{ github.repository_owner }}
+          INPUT_TAG: ${{ github.event.inputs.image_tag || '' }}
         run: |
           set -euo pipefail
           set +x
@@ -462,9 +464,23 @@ jobs:
           [ -n "$COOLIFY_BASE_URL" ] && echo "::add-mask::$COOLIFY_BASE_URL"
           [ -n "$COOLIFY_BACKUP_APP_ID" ] && echo "::add-mask::$COOLIFY_BACKUP_APP_ID"
 
+          TARGET_TAG="${INPUT_TAG:-${{ github.sha }}}"
+          REPO_OWNER_LOWER=$(echo "${REPO_OWNER}" | tr '[:upper:]' '[:lower:]')
+          BACKUP_IMAGE_REPO="ghcr.io/${REPO_OWNER_LOWER}/ghostclass-backup"
+
+          echo "Updating Coolify backup service (${COOLIFY_BACKUP_APP_ID}) to immutable hash: ${BACKUP_IMAGE_REPO}:${TARGET_TAG}"
+
+          # 1. Update application image reference to the exact repository and tag
+          curl --fail-with-body --silent --show-error -X PATCH \
+            "${COOLIFY_BASE_URL}/api/v1/applications/${COOLIFY_BACKUP_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "{\"docker_registry_image_name\": \"${BACKUP_IMAGE_REPO}\", \"docker_registry_image_tag\": \"${TARGET_TAG}\"}"
+
+          # 2. Trigger deployment
           echo "Deploying backup service to Coolify (${COOLIFY_BACKUP_APP_ID})"
-          curl --fail-with-body --silent --show-error \
-            "$COOLIFY_BASE_URL/api/v1/deploy?uuid=$COOLIFY_BACKUP_APP_ID" \
-            -H "Authorization: Bearer $COOLIFY_API_TOKEN"
+          curl --fail-with-body --silent --show-error -X POST \
+            "${COOLIFY_BASE_URL}/api/v1/deploy?uuid=${COOLIFY_BACKUP_APP_ID}" \
+            -H "Authorization: Bearer ${COOLIFY_API_TOKEN}"
 
           echo "✓ Backup service deployment triggered successfully"

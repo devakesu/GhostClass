@@ -148,10 +148,10 @@
     "vitest": "^4.1.11"
   },
   "allowScripts": {
-    "@firebase/util@1.15.2": true,
     "@sentry/cli@2.58.6": true,
-    "esbuild@0.28.1": true,
-    "protobufjs@7.6.5": true,
-    "unrs-resolver@1.12.2": true
+    "unrs-resolver@1.12.2": true,
+    "@firebase/util@1.15.3": true,
+    "protobufjs@7.6.6": true,
+    "esbuild@0.28.2": true
   }
 }
