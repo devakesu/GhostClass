@@ -39,9 +39,18 @@ log_info "       GhostClass PostgreSQL Backup Restoration Tool      "
 log_info "=========================================================="
 
 # ------------------------------------------------------------------------------
+# 0. Dynamic Secret Injection via Infisical (if configured & credentials not yet in env)
+# ------------------------------------------------------------------------------
+if [ -z "${R2_ACCESS_KEY_ID:-}" ] && [ -n "${INFISICAL_TOKEN:-}" ] && [ -n "${INFISICAL_PROJECT_ID:-}" ]; then
+  log_info "🔑 Injecting runtime secrets from Infisical (/runtime)..."
+  exec infisical run --projectId "${INFISICAL_PROJECT_ID}" --path /runtime --env "${INFISICAL_ENV:-prod}" -- "$0" "$@"
+fi
+
+# ------------------------------------------------------------------------------
 # 1. Input & Environment Validation
 # ------------------------------------------------------------------------------
 VERIFY_ONLY="${VERIFY_ONLY:-false}"
+
 TARGET_DB_URL="${TARGET_DB_URL:-${SUPABASE_DB_URL:-}}"
 BACKUP_FILE="${1:-}" # Optional: specific filename or s3 key
 

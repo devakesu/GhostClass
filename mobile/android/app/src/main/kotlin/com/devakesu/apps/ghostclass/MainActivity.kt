@@ -5,6 +5,7 @@ import android.os.Debug
 import android.view.MotionEvent
 import android.view.WindowManager
 import androidx.activity.enableEdgeToEdge
+import androidx.core.view.WindowCompat
 import io.flutter.embedding.android.FlutterFragmentActivity
 import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
@@ -16,6 +17,7 @@ class MainActivity : FlutterFragmentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+        WindowCompat.setDecorFitsSystemWindows(window, false)
     }
 
     override fun dispatchTouchEvent(event: MotionEvent): Boolean {

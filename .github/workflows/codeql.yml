@@ -5,6 +5,8 @@ on:
     branches: [main]
   pull_request:
     branches: [main]
+  schedule:
+    - cron: "0 6 * * 1" # Weekly on Mondays at 06:00 UTC
   workflow_dispatch:
 
 env:
@@ -35,7 +37,31 @@ jobs:
       - name: Run CodeQL analysis (JS/TS)
         uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
         with:
-          category: javascript-typescript
+          category: "/language:javascript-typescript"
+
+  codeql-actions:
+    name: CodeQL Actions
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Initialize CodeQL (Actions)
+        uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        with:
+          languages: actions
+
+      - name: Autobuild (Actions)
+        uses: github/codeql-action/autobuild@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+
+      - name: Run CodeQL analysis (Actions)
+        uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        with:
+          category: "/language:actions"
 
   codeql-android:
     name: CodeQL Android (Java/Kotlin)
@@ -116,4 +142,4 @@ jobs:
       - name: Run CodeQL analysis (Android)
         uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
         with:
-          category: java,kotlin
+          category: "/language:java-kotlin"

@@ -536,6 +536,8 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                                           user?.profile?.avatarUrl != null
                                           ? CachedNetworkImageProvider(
                                               user!.profile!.avatarUrl!,
+                                              maxWidth: 150,
+                                              maxHeight: 150,
                                               headers: {
                                                 'Origin':
                                                     AppConfig.supabaseOrigin,

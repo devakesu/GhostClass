@@ -322,6 +322,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           final _ = precacheImage(
             CachedNetworkImageProvider(
               finalUser.profile!.avatarUrl!,
+              maxWidth: 240,
+              maxHeight: 240,
               headers: {
                 'Origin': AppConfig.supabaseOrigin,
               },

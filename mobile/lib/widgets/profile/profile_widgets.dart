@@ -51,6 +51,8 @@ class ProfileHeader extends StatelessWidget {
                           ? DecorationImage(
                               image: CachedNetworkImageProvider(
                                 avatarUrl!,
+                                maxWidth: 240,
+                                maxHeight: 240,
                                 headers: {
                                   'Origin': AppConfig.supabaseOrigin,
                                 },

@@ -155,25 +155,23 @@ In your Infisical Dashboard under the **`/runtime`** folder (Production environm
 
 ### Step 5: Configure Scheduled Execution in Coolify
 
-#### Option A: Dedicated Coolify Scheduled Service (Recommended)
+#### Method A: Coolify Application Scheduled Tasks (Using the Running Container)
 
-1. In Coolify, create a new Service/Application using this repository with Dockerfile path: `backup/Dockerfile`.
-2. Configure the environment variables (or supply `INFISICAL_TOKEN` and `INFISICAL_PROJECT_ID` so secrets are injected into memory at runtime).
-3. Set the cron schedule for **twice daily**:
+1. In Coolify, deploy the container with Dockerfile `backup/Dockerfile` (or image `ghcr.io/devakesu/ghostclass-backup:latest`).
+2. The container will stay running in the background.
+3. In your Coolify Application $\rightarrow$ **Scheduled Tasks**:
+   - **Name**: `Daily Database Backup`
+   - **Schedule**: `0 2,14 * * *` _(Executes every day at 02:00 UTC and 14:00 UTC)_
+   - **Command**: `/usr/local/bin/backup-db.sh`
+   - **Timeout**: `600` (10 minutes)
 
-   ```cron
-   0 2,14 * * *
-   ```
+#### Method B: Built-in Container Daemon (Supercronic)
 
-   _(Executes every day at 02:00 UTC and 14:00 UTC)._
+The container includes `supercronic` enabled by default:
 
-#### Option B: Coolify Scheduled Task / Cron Command
-
-If running via an existing container with Infisical CLI:
-
-```bash
-infisical run --projectId "$INFISICAL_PROJECT_ID" --path /runtime --env prod -- /usr/local/bin/backup-db.sh
-```
+- Set environment variable `CRON_SCHEDULE="0 2,14 * * *"` in Coolify.
+- The container daemon will automatically run backups twice daily without needing external scheduler triggers.
+- (Optional) Set `BACKUP_ON_STARTUP=true` if you want a backup executed immediately whenever the container starts.
 
 ---
 

@@ -388,10 +388,10 @@ echo "✓ Signature verified - proceeding with deployment."
 
 #### 2. Automated Immutable Digest Deployment (GitHub Actions)
 
-On every release, `.github/workflows/release.yml` automatically:
+When executing deployment via `.github/workflows/deploy.yml`:
 
-1. Builds, signs, and attests the container image.
-2. Updates the Coolify application image via `PATCH /api/v1/applications/${COOLIFY_APP_ID}` with the immutable `ghcr.io/devakesu/ghostclass:<github.sha>` reference.
+1. Verifies and references the immutable `ghcr.io/devakesu/ghostclass:<github.sha>` container image.
+2. Updates the Coolify application image via `PATCH /api/v1/applications/${COOLIFY_APP_ID}`.
 3. Triggers the deployment via `POST /api/v1/deploy?uuid=${COOLIFY_APP_ID}`.
 
 ### GitHub Attestations

@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/firebase_options.dart';
@@ -65,6 +66,24 @@ class FirebaseInitializer {
 
 void main() async {
   SentryWidgetsFlutterBinding.ensureInitialized();
+
+  // Configure edge-to-edge system UI styling for Android 15 & modern mobile platforms
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+      statusBarBrightness: Brightness.dark,
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
+    ),
+  );
+  await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+  // Configure image cache memory limits to optimize bitmap memory usage
+  PaintingBinding.instance.imageCache.maximumSize = 100;
+  PaintingBinding.instance.imageCache.maximumSizeBytes =
+      50 * 1024 * 1024; // 50MB
 
   // Initialize Sentry early to capture all startup exceptions
   await SentryFlutter.init(
