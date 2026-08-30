@@ -16,33 +16,52 @@ permissions:
   contents: read
 
 jobs:
-  codeql-interpreted:
-    name: CodeQL (${{ matrix.language }})
+  codeql-js:
+    name: CodeQL JavaScript/TypeScript
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      security-events: write
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
+
+      - name: Initialize CodeQL (JS/TS)
+        uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        with:
+          languages: javascript-typescript
+
+      - name: Autobuild (JS/TS)
+        uses: github/codeql-action/autobuild@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+
+      - name: Run CodeQL analysis (JS/TS)
+        uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        with:
+          category: "/language:javascript-typescript"
+
+  codeql-actions:
+    name: CodeQL Actions
     runs-on: ubuntu-latest
     permissions:
       contents: read
       security-events: write
       actions: read
-    strategy:
-      fail-fast: false
-      matrix:
-        language: [actions, javascript-typescript]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
-      - name: Initialize CodeQL (${{ matrix.language }})
+      - name: Initialize CodeQL (Actions)
         uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67
         with:
-          languages: ${{ matrix.language }}
+          languages: actions
 
-      - name: Autobuild (${{ matrix.language }})
+      - name: Autobuild (Actions)
         uses: github/codeql-action/autobuild@e58424170fb0262c8d7ed60a2e84b9bffe205c67
 
-      - name: Run CodeQL analysis (${{ matrix.language }})
+      - name: Run CodeQL analysis (Actions)
         uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
         with:
-          category: "/language:${{ matrix.language }}"
+          category: "/language:actions"
 
   codeql-android:
     name: CodeQL Android (Java/Kotlin)
