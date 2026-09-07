@@ -1069,12 +1069,16 @@ export function AttendanceCalendar({
     const supabase = createClient();
 
     try {
+      const canonicalCourse =
+        getCourseCodeById(courseId) || normalizeCourseCode(courseId);
+      const canonicalSession = toRoman(sessionName);
+
       const { error } = await supabase.from("tracker").insert({
         auth_user_id: authUserId,
-        course: courseId,
+        course: canonicalCourse,
         date: dateStr,
         status,
-        session: sessionName,
+        session: canonicalSession,
         semester,
         year,
         attendance: attendanceCode,

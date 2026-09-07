@@ -13,6 +13,10 @@ void main() {
 
     test('converts strings correctly', () {
       expect(toRoman('2'), 'II');
+      expect(toRoman('II'), 'II');
+      expect(toRoman('ii'), 'II');
+      expect(toRoman('Session 3'), 'III');
+      expect(toRoman('4th period'), 'IV');
       expect(toRoman('invalid'), '0');
     });
 

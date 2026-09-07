@@ -35,10 +35,27 @@ const Map<String, int> romanToNumberMap = {
 
 /// Converts a numeric value (1, 2, 3...) to Roman numerals (I, II, III...).
 String toRoman(dynamic value) {
+  if (value == null) return '0';
+  final s = value.toString().trim();
+  final lower = s.toLowerCase();
+  if (romanToNumberMap.containsKey(lower)) {
+    final idx = romanToNumberMap[lower]!;
+    if (idx > 0 && idx <= romanNumerals.length) {
+      return romanNumerals[idx - 1];
+    }
+  }
+
   final n = (value is String)
       ? int.tryParse(value) ?? 0
       : (value is num ? value.toInt() : 0);
-  if (n < 1) return n.toString();
+  if (n < 1) {
+    final norm = normalizeSession(s);
+    final parsed = int.tryParse(norm);
+    if (parsed != null && parsed > 0 && parsed <= romanNumerals.length) {
+      return romanNumerals[parsed - 1];
+    }
+    return n.toString();
+  }
   if (n > 0 && n <= romanNumerals.length) {
     return romanNumerals[n - 1];
   }
