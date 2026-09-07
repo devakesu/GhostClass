@@ -41,6 +41,14 @@ describe("utils.ts", () => {
       expect(toRoman(12)).toBe("XII");
     });
 
+    it("normalizes existing Roman strings and formatted session names", () => {
+      expect(toRoman("II")).toBe("II");
+      expect(toRoman("ii")).toBe("II");
+      expect(toRoman("Session 3")).toBe("III");
+      expect(toRoman("4th period")).toBe("IV");
+      expect(toRoman("1st hour")).toBe("I");
+    });
+
     it("returns original value for out-of-range or invalid inputs", () => {
       expect(toRoman(0)).toBe("0");
       expect(toRoman(13)).toBe("13");

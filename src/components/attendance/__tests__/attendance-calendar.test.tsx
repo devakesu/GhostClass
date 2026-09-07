@@ -137,4 +137,81 @@ describe("AttendanceCalendar", () => {
     );
     expect(await screen.findByText("NSS Camp 2026")).toBeInTheDocument();
   });
+
+  it("renders course code for extra attendance event", async () => {
+    const eventDateStr = "2026-01-15";
+
+    mockUseTrackingData.mockReturnValue({
+      data: [
+        {
+          course: "GAMAT402",
+          session: "I",
+          date: eventDateStr,
+          attendance: 110,
+          status: "extra",
+          semester: "even",
+          year: "2025-26",
+          remarks: "Extra lecture",
+        },
+      ],
+      isLoading: false,
+      refetch: vi.fn(),
+    } as unknown as ReturnType<typeof mockUseTrackingData>);
+
+    renderWithProviders(
+      <AttendanceCalendar
+        attendanceData={undefined}
+        semester="even"
+        year="2025-26"
+        coursesData={{
+          courses: {
+            "GAMAT402": {
+              id: 999,
+              code: "GAMAT402",
+              name: "Advanced Applied Mathematics",
+            } as any,
+          },
+        }}
+      />,
+    );
+
+    expect(await screen.findByText("GAMAT402")).toBeInTheDocument();
+  });
+
+  it("renders course code for official attendance report event", async () => {
+    const attendanceData = {
+      courses: {
+        "96661": {
+          id: 96661,
+          code: "GAMAT301",
+          name: "Mathematics For Computer Science",
+        },
+      },
+      sessions: {
+        "1": { name: "1st Hour" },
+      },
+      attendanceTypes: {},
+      studentAttendanceData: {
+        "20260115": {
+          "1": {
+            course: "96661",
+            session: "1",
+            attendance: 110,
+          },
+        },
+      },
+      attendanceDatesArray: {},
+    } as any;
+
+    renderWithProviders(
+      <AttendanceCalendar
+        attendanceData={attendanceData}
+        semester="even"
+        year="2025-26"
+      />,
+    );
+
+    expect(await screen.findByText("GAMAT301")).toBeInTheDocument();
+  });
 });
+

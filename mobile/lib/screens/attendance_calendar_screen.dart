@@ -549,8 +549,11 @@ class _CalendarContent extends ConsumerWidget {
                                                 .insertRecord(
                                                   courseId: event.courseId,
                                                   date: event.dbDate,
-                                                  session:
+                                                  session: utils.toRoman(
+                                                    utils.normalizeSession(
                                                       event.displaySessionName,
+                                                    ),
+                                                  ),
                                                   attendance: attendance,
                                                   status: 'correction',
                                                   remarks: finalRemark,

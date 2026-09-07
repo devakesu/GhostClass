@@ -231,6 +231,11 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     if (auth == null || academic == null) return;
 
     final canonicalCourseId = utils.standardizeCourseCode(courseId);
+    final normSession = utils.normalizeSession(session);
+    final sNum = int.tryParse(normSession);
+    final canonicalSession = (sNum != null && sNum > 0)
+        ? utils.toRoman(sNum)
+        : session;
 
     try {
       final response = await ref
@@ -241,7 +246,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
             'course': canonicalCourseId,
             'date': date,
             'status': status,
-            'session': session,
+            'session': canonicalSession,
             'semester': academic.semester,
             'year': academic.year,
             'attendance': attendance,

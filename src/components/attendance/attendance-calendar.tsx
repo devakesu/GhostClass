@@ -88,6 +88,7 @@ interface ExtendedAttendanceEvent extends AttendanceEvent {
   remarks?: string;
   rawSession?: string;
   originalSessionId?: string;
+  courseCode?: string;
 }
 
 interface TrackerRecord {
@@ -342,6 +343,7 @@ function computeRawEvents(
 
           events.push({
             title: courseName,
+            courseCode: courseId,
             date: dateObj,
             sessionName,
             rawSession: sessionName,
@@ -531,6 +533,7 @@ function computeExtraMergedEvents(
 
         extras.push({
           title: resolvedName,
+          courseCode: tCourseCode,
           date: selectedDate,
           sessionName: String(t.session),
           rawSession: String(t.session),
@@ -1066,12 +1069,16 @@ export function AttendanceCalendar({
     const supabase = createClient();
 
     try {
+      const canonicalCourse =
+        getCourseCodeById(courseId) || normalizeCourseCode(courseId);
+      const canonicalSession = toRoman(sessionName);
+
       const { error } = await supabase.from("tracker").insert({
         auth_user_id: authUserId,
-        course: courseId,
+        course: canonicalCourse,
         date: dateStr,
         status,
-        session: sessionName,
+        session: canonicalSession,
         semester,
         year,
         attendance: attendanceCode,
@@ -1769,6 +1776,20 @@ export function AttendanceCalendar({
                         event.rawSession || event.sessionName,
                       );
                       const sessionForDB = toRoman(sNum);
+                      const resolvedCourseCode = getCourseCodeById(
+                        event.courseId,
+                      );
+                      const rawCode =
+                        event.courseCode ||
+                        resolvedCourseCode ||
+                        event.courseId;
+                      const displayCourseCode = rawCode
+                        ? rawCode.trim().toUpperCase()
+                        : "";
+                      const showCourseCode =
+                        Boolean(displayCourseCode) &&
+                        !/^\d+$/.test(displayCourseCode) &&
+                        displayCourseCode !== event.title.trim().toUpperCase();
 
                       return (
                         <motion.div
@@ -1782,9 +1803,16 @@ export function AttendanceCalendar({
                           )}
                         >
                           <div className="flex flex-col gap-1.5">
-                            <h3 className="font-semibold text-sm text-foreground leading-tight capitalize flex items-center gap-2">
-                              {event.title.toLowerCase()}
-                            </h3>
+                            <div className="flex flex-col">
+                              <h3 className="font-semibold text-sm text-foreground leading-tight capitalize flex items-center gap-2">
+                                {event.title.toLowerCase()}
+                              </h3>
+                              {showCourseCode && (
+                                <span className="text-[11px] font-bold text-muted-foreground/80 tracking-wide uppercase mt-0.5">
+                                  {displayCourseCode}
+                                </span>
+                              )}
+                            </div>
                             <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
                               <span className="bg-background/50 px-1.5 py-0.5 rounded border border-border/50">
                                 {event.sessionName
@@ -1801,9 +1829,7 @@ export function AttendanceCalendar({
                                 <Icon className="w-3 h-3" aria-hidden="true" />
                                 {event.status}
                               </Badge>
-                              {isCourseDisabled(
-                                getCourseCodeById(event.courseId),
-                              ) && (
+                              {isCourseDisabled(resolvedCourseCode) && (
                                 <Badge
                                   variant="outline"
                                   className="h-5 px-1.5 gap-1 font-medium text-gray-500 border-gray-500/40 bg-gray-500/10"

@@ -34,8 +34,7 @@ export default defineConfig({
         "mobile/**",
       ],
       include: ["src/**/*.{ts,tsx}"],
-      // @ts-expect-error - 'all' is a valid runtime option but not in Vitest 4.x types
-      all: true,
+      ...({ all: true } as Record<string, unknown>),
       thresholds: {
         lines: 10,
         functions: 10,

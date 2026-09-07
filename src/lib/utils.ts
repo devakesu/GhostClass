@@ -54,8 +54,6 @@ export const redact = (type: "email" | "id", value: string): string => {
  * Converts a number to Roman numeral representation (1-12).
  */
 export const toRoman = (num: number | string): string => {
-  const n = typeof num === "string" ? parseInt(num, 10) : num;
-  if (isNaN(n) || n < 1) return String(num);
   const romans = [
     "I",
     "II",
@@ -70,6 +68,22 @@ export const toRoman = (num: number | string): string => {
     "XI",
     "XII",
   ];
+
+  if (typeof num === "string") {
+    const s = num.trim().toLowerCase();
+    if (SESSION_ROMANS.has(s)) {
+      const val = parseInt(SESSION_ROMANS.get(s)!, 10);
+      return romans[val - 1] || s.toUpperCase();
+    }
+    const norm = normalizeSession(num);
+    const parsed = parseInt(norm, 10);
+    if (!isNaN(parsed) && parsed >= 1 && parsed <= romans.length) {
+      return romans[parsed - 1];
+    }
+  }
+
+  const n = typeof num === "string" ? parseInt(num, 10) : num;
+  if (isNaN(n) || n < 1) return String(num);
   return romans[n - 1] || String(n);
 };
 
@@ -213,7 +227,7 @@ export const generateSlotKey = (
   date: string | Date,
   session: string | number,
 ) => {
-  const cId = String(courseId).trim();
+  const cId = normalizeCourseCode(String(courseId));
   const d = normalizeDate(date);
 
   const normSession = normalizeSession(session);
