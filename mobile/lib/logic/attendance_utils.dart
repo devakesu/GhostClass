@@ -404,3 +404,14 @@ const Set<String> remarkPlaceholders = {
   'Self-Marked: Present',
   'Self-Marked: Absent',
 };
+
+/// Generates a canonical slot key for attendance matching and deduplication.
+/// Matches Web parity: `{courseCode}_{YYYYMMDD}_{ROMAN_SESSION}`
+String generateSlotKey(dynamic courseId, dynamic date, dynamic session) {
+  final cId = standardizeCourseCode(courseId?.toString() ?? '');
+  final d = normalizeDate(date);
+  final normSession = normalizeSession(session);
+  final n = int.tryParse(normSession);
+  final finalSession = (n != null && n > 0) ? toRoman(n) : normSession.toUpperCase();
+  return '${cId}_${d}_$finalSession';
+}

@@ -341,12 +341,13 @@ function processTrackingData(
       if (t.status === "extra") {
         selfTotalDelta += 1;
         if (trackIsPresent) selfPresentDelta += 1;
-      } else {
-        const officialIsPresent = officialStatus !== undefined &&
-          isPresent(officialStatus);
+      } else if (officialStatus !== undefined) {
+        const officialIsPresent = isPresent(officialStatus);
         if (!officialIsPresent && trackIsPresent) {
           selfPresentDelta += 1;
-        } else if (officialIsPresent && !trackIsPresent) selfPresentDelta -= 1;
+        } else if (officialIsPresent && !trackIsPresent) {
+          selfPresentDelta -= 1;
+        }
       }
     });
 

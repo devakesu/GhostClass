@@ -452,8 +452,14 @@ function calculateCourseStats(
     return {
       ...reconciled,
       displayTotal: reconciled.finalTotal,
-      displayPercentage: parseFloat(reconciled.finalPercentage.toFixed(2)),
-      officialPercentage: parseFloat(reconciled.officialPercentage.toFixed(2)),
+      displayPercentage: Math.min(
+        parseFloat(reconciled.finalPercentage.toFixed(2)),
+        100,
+      ),
+      officialPercentage: Math.min(
+        parseFloat(reconciled.officialPercentage.toFixed(2)),
+        100,
+      ),
       safeMetrics,
       extraMetrics,
       realAbsent: reconciled.realTotal - reconciled.realPresent,
@@ -507,8 +513,8 @@ function calculateCourseStats(
     extras: reconciled.extrasCount,
     extraAbsent: reconciled.extraAbsent,
     displayTotal: reconciled.finalTotal,
-    displayPercentage: reconciled.finalPercentage,
-    officialPercentage: reconciled.officialPercentage,
+    displayPercentage: Math.min(reconciled.finalPercentage, 100),
+    officialPercentage: Math.min(reconciled.officialPercentage, 100),
     safeMetrics,
     extraMetrics,
     effectiveTarget: targetPercentage ?? 75,

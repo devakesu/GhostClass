@@ -121,6 +121,7 @@ function initCourseStatsMap(
 function processSingleSession(
   session: OfficialSessionPayload | null | undefined,
   sessionKey: string,
+  sessionIndex: number,
   dateStr: string,
   courseStatsMap: Map<string, CourseStat>,
   officialMap: Map<string, number>,
@@ -132,7 +133,11 @@ function processSingleSession(
 
   const cid = String(session.course);
   const status = Number(session.attendance);
-  const rawSession = getOfficialSessionRaw(session, sessionKey);
+  let rawSession = getOfficialSessionRaw(session, sessionKey);
+  const sNum = parseInt(String(rawSession), 10);
+  if (!isNaN(sNum) && sNum > 20) {
+    rawSession = String(sessionIndex + 1);
+  }
   const statsKey = resolveCode(cid);
 
   const slotKey = generateSlotKey(statsKey, dateStr, rawSession);
@@ -178,10 +183,12 @@ function processOfficialAttendance(
     )
   ) {
     if (!dateData) continue;
+    let idx = 0;
     for (const [sessionKey, session] of Object.entries(dateData)) {
       processSingleSession(
         session as OfficialSessionPayload | null | undefined,
         sessionKey,
+        idx,
         dateStr,
         courseStatsMap,
         officialMap,
@@ -189,6 +196,7 @@ function processOfficialAttendance(
         officialStats,
         resolveCode,
       );
+      idx++;
     }
   }
 }
@@ -198,6 +206,7 @@ function updateCourseStatForTrack(
   isTrulyExtra: boolean,
   trackPos: boolean,
   offPos: boolean,
+  hasOfficialSlot: boolean,
 ) {
   if (isTrulyExtra) {
     cStat.total++;
@@ -208,7 +217,7 @@ function updateCourseStatForTrack(
     } else {
       cStat.extraAbsent++;
     }
-  } else {
+  } else if (hasOfficialSlot) {
     if (!offPos && trackPos) {
       cStat.present++;
       cStat.correctionPresent++;
@@ -226,6 +235,7 @@ function updateModifierStatsForTrack(
   trackDL: boolean,
   offPos: boolean,
   offDL: boolean,
+  hasOfficialSlot: boolean,
 ) {
   if (isTrulyExtra) {
     if (trackPos) {
@@ -236,7 +246,7 @@ function updateModifierStatsForTrack(
     if (trackDL) {
       modifierStats.extraDL++;
     }
-  } else {
+  } else if (hasOfficialSlot) {
     if (!offPos && trackPos) {
       modifierStats.correctionPresent++;
       modifierStats.savedAbsent++;
@@ -267,19 +277,18 @@ function processSingleTrackItem(
   const statsKey = resolveCode(String(item.course));
   const slotKey = generateSlotKey(statsKey, item.date, item.session);
   const officialStatus = officialMap.get(slotKey);
-  const isTrulyExtra = item.status === "extra" && officialStatus === undefined;
+  const hasOfficialSlot = officialStatus !== undefined;
+  const isTrulyExtra = item.status === "extra" && !hasOfficialSlot;
 
   const trackAttendanceNum = Number(item.attendance);
   const trackPos = isPositive(trackAttendanceNum);
   const trackDL = trackAttendanceNum === ATTENDANCE_STATUS.DUTY_LEAVE;
-  const offPos = officialStatus !== undefined
-    ? isPositive(officialStatus)
-    : false;
-  const offDL = officialStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
+  const offPos = hasOfficialSlot ? isPositive(officialStatus) : false;
+  const offDL = hasOfficialSlot && officialStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
 
   const cStat = courseStatsMap.get(statsKey);
   if (cStat) {
-    updateCourseStatForTrack(cStat, isTrulyExtra, trackPos, offPos);
+    updateCourseStatForTrack(cStat, isTrulyExtra, trackPos, offPos, hasOfficialSlot);
   }
 
   if (!normalizedDisabledCodes.has(statsKey)) {
@@ -290,6 +299,7 @@ function processSingleTrackItem(
       trackDL,
       offPos,
       offDL,
+      hasOfficialSlot,
     );
   }
 }
@@ -377,17 +387,29 @@ export function useDashboardStats({
       resolveCode,
     );
 
+    // Apply invariant clamp to individual course stats
+    courseStatsMap.forEach((c) => {
+      c.present = Math.min(c.present, c.total);
+    });
+
+    const clampedSavedAbsent = Math.min(
+      modifierStats.savedAbsent,
+      officialStats.absent,
+    );
     const finalTotal = officialStats.total +
       modifierStats.extraPresent +
       modifierStats.extraAbsent;
-    const finalPresent = officialStats.present +
+    const rawFinalPresent = officialStats.present +
       modifierStats.correctionPresent +
       modifierStats.extraPresent;
+    const finalPresent = Math.min(rawFinalPresent, finalTotal);
 
-    const percentage = finalTotal > 0 ? (finalPresent / finalTotal) * 100 : 0;
-    const officialPercentage = officialStats.total > 0
+    const rawPercentage = finalTotal > 0 ? (finalPresent / finalTotal) * 100 : 0;
+    const percentage = Math.min(rawPercentage, 100);
+    const rawOfficialPercentage = officialStats.total > 0
       ? (officialStats.present / officialStats.total) * 100
       : 0;
+    const officialPercentage = Math.min(rawOfficialPercentage, 100);
 
     const formatPct = (val: number) =>
       val % 1 === 0 ? Math.round(val) : parseFloat(val.toFixed(2));
@@ -403,7 +425,7 @@ export function useDashboardStats({
       correctionPresent: modifierStats.correctionPresent,
       extraPresent: modifierStats.extraPresent,
       realAbsent: officialStats.absent,
-      savedAbsent: modifierStats.savedAbsent,
+      savedAbsent: clampedSavedAbsent,
       extraAbsent: modifierStats.extraAbsent,
       realDL: officialStats.dl,
       correctionDL: modifierStats.correctionDL,

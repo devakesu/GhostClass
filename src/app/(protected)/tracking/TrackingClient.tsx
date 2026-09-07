@@ -547,6 +547,7 @@ function groupAndSortTrackingData(
 
 function buildOfficialSessionsMap(
   attendanceData: AttendanceDataPayload,
+  coursesData?: CoursesDataPayload,
 ): Map<string, AttendanceSessionItem> {
   const map = new Map<string, AttendanceSessionItem>();
   if (!attendanceData?.studentAttendanceData) return map;
@@ -562,7 +563,11 @@ function buildOfficialSessionsMap(
           rawSession = String(index + 1);
         }
 
-        const key = generateSlotKey(session.course, dateStr, rawSession);
+        const rawCourse = String(session.course);
+        /* eslint-disable security/detect-object-injection */
+        const courseCode = coursesData?.courses?.[rawCourse]?.code || rawCourse;
+        /* eslint-enable security/detect-object-injection */
+        const key = generateSlotKey(courseCode, dateStr, rawSession);
         map.set(key, session);
       });
     },
@@ -1613,8 +1618,8 @@ export default function TrackingClient() {
 
   // --- 2. OFFICIAL SESSION LOOKUP MAP ---
   const officialSessionsMap = useMemo(
-    () => buildOfficialSessionsMap(attendanceData),
-    [attendanceData],
+    () => buildOfficialSessionsMap(attendanceData, coursesData),
+    [attendanceData, coursesData],
   );
 
   // Block rendering only on base data readiness; sync runs in the background.

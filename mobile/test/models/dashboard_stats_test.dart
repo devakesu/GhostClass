@@ -418,5 +418,75 @@ void main() {
       expect(stats.courseStats.containsKey('ENG300'), true);
       expect(stats.courseStats.containsKey('HIST400'), true);
     });
+
+    test(
+      'correction on non-existent official slot does not artificially increment present',
+      () {
+        const report = AttendanceReportDetailed(
+          courses: {
+            '96661': AttendanceCourse(
+              id: 96661,
+              name: 'Mathematics',
+              code: 'GAMAT301',
+            ),
+          },
+          studentAttendanceData: {
+            '2026-07-14': {
+              '219': AttendanceSession(
+                course: '96661',
+                attendance: 110,
+                session: 'II',
+                classType: 'Lecture',
+              ),
+            },
+          },
+          attendanceDates: {'2026-07-14': true},
+        );
+
+        final stats = DashboardStats.calculate(
+          attendanceData: report,
+          trackingRecords: const [
+            // Extra class on new slot
+            TrackingRecord(
+              course: 'GAMAT301',
+              date: '2026-07-16',
+              session: 'III',
+              status: 'extra',
+              attendance: 110,
+              semester: 'odd',
+              year: '2026-27',
+            ),
+            // Correction attempted on non-existent official slot (date 2026-07-29, session II)
+            TrackingRecord(
+              course: 'GAMAT301',
+              date: '2026-07-29',
+              session: 'II',
+              status: 'correction',
+              attendance: 110,
+              semester: 'odd',
+              year: '2026-27',
+            ),
+          ],
+          selectedSemester: 'odd',
+          selectedYear: '2026-27',
+          allCourses: const [
+            CourseDetails(id: 96661, name: 'Mathematics', code: 'GAMAT301'),
+          ],
+        );
+
+        // Official: 1/1, Extra: 1/1, Phantom correction ignored
+        expect(stats.officialPresent, 1);
+        expect(stats.officialTotal, 1);
+        expect(stats.corrPresent, 0);
+        expect(stats.extraPresent, 1);
+        expect(stats.finalPresent, 2);
+        expect(stats.finalTotal, 2);
+        expect(stats.percentage, 100);
+        expect(stats.rawPercentage <= 100.0, true);
+        final mathStat = stats.courseStats['GAMAT301']!;
+        expect(mathStat.finalPresent, 2);
+        expect(mathStat.finalTotal, 2);
+      },
+    );
   });
 }

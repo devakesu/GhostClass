@@ -1,7 +1,6 @@
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
-import 'package:ghostclass/services/logger.dart';
 
 class DashboardStats {
   DashboardStats({
@@ -90,6 +89,7 @@ class DashboardStats {
     final officialMap = <String, int>{};
 
     attendanceData.studentAttendanceData.forEach((date, dailySessions) {
+      var sessionIdx = 0;
       dailySessions.forEach((sessionKey, session) {
         if (session.course != null && session.classType != 'Revision') {
           final rawCid = session.course.toString();
@@ -109,13 +109,17 @@ class DashboardStats {
           final isValid = isPos || isNeg;
 
           if (isValid) {
-            final normalizedDate = utils.normalizeDate(date);
-            final normalizedSessionNum = utils.normalizeSession(
-              session.session ?? sessionKey,
-            );
-            final key =
-                '${rawCid}_${normalizedDate}_${normalizedSessionNum.toUpperCase()}';
+            var rawSession = session.session?.toString();
+            final sNumKey = int.tryParse(sessionKey);
+            if ((rawSession == null || rawSession == 'null' || rawSession.isEmpty) &&
+                sNumKey != null &&
+                sNumKey > 20) {
+              rawSession = (sessionIdx + 1).toString();
+            } else if (rawSession == null || rawSession == 'null' || rawSession.isEmpty) {
+              rawSession = sessionKey;
+            }
 
+            final key = utils.generateSlotKey(stdCourseCode, date, rawSession);
             officialMap[key] = status;
 
             var course = courseStats[cid];
@@ -149,6 +153,7 @@ class DashboardStats {
             }
           }
         }
+        sessionIdx++;
       });
     });
 
@@ -164,25 +169,23 @@ class DashboardStats {
       final rawCid = item.course;
       final cid = resolveSafeId(rawCid);
 
-      final normalizedDate = utils.normalizeDate(item.date);
-      final normalizedSessionNum = utils.normalizeSession(item.session);
-      final key =
-          '${rawCid}_${normalizedDate}_${normalizedSessionNum.toUpperCase()}';
-
-      final trackerStatus = _parseStatus(item.attendance);
-      final officialStatus = officialMap[key];
       final courseCode = standardize(
         attendanceData.courses[rawCid]?.code ?? rawCid,
       );
+      final key = utils.generateSlotKey(courseCode, item.date, item.session);
+
+      final trackerStatus = _parseStatus(item.attendance);
+      final officialStatus = officialMap[key];
       final courseDisabled = disabledCourseCodes.contains(courseCode);
 
-      final isTrulyExtra = item.status == 'extra' && officialStatus == null;
+      final hasOfficialSlot = officialStatus != null;
+      final isTrulyExtra = item.status == 'extra' && !hasOfficialSlot;
       final trackerPositive = _isPositive(trackerStatus);
       final trackerDL = trackerStatus == AttendanceStatus.dutyLeave.code;
       final officialPositive =
-          officialStatus != null && _isPositive(officialStatus);
+          hasOfficialSlot && _isPositive(officialStatus);
       final officialDLStatus =
-          officialStatus == AttendanceStatus.dutyLeave.code;
+          hasOfficialSlot && officialStatus == AttendanceStatus.dutyLeave.code;
 
       final course = courseStats[cid];
       if (course != null) {
@@ -190,7 +193,7 @@ class DashboardStats {
           course.finalTotal++;
           if (trackerPositive) course.finalPresent++;
           if (trackerDL) course.extraDL++;
-        } else {
+        } else if (hasOfficialSlot) {
           if (!officialPositive && trackerPositive) {
             course.finalPresent++;
           } else if (officialPositive && !trackerPositive) {
@@ -207,7 +210,7 @@ class DashboardStats {
           } else {
             course.extraAbsent++;
           }
-        } else {
+        } else if (hasOfficialSlot) {
           if (trackerPositive) {
             course.corrPresent++;
           }
@@ -222,7 +225,7 @@ class DashboardStats {
             extraAbsent++;
           }
           if (trackerDL) extraDL++;
-        } else {
+        } else if (hasOfficialSlot) {
           if (!officialPositive && trackerPositive) {
             corrPresent++;
           }
@@ -238,25 +241,21 @@ class DashboardStats {
 
     final manualTotalGain = extraPresent + extraAbsent;
     final finalTotal = officialTotal + manualTotalGain;
-    final finalPresentCount = officialPresent + corrPresent + extraPresent;
-    // Clamp to 0 to guard against data drift between sync cycles where a
-    // tracker correction targets a session already positive in the official
-    // report, causing savedAbsent to exceed officialAbsent in production.
     final rawFinalAbsent = officialAbsent - savedAbsent + extraAbsent;
-    final finalAbsentCount = rawFinalAbsent.clamp(0, double.maxFinite).toInt();
-    if (rawFinalAbsent < 0) {
-      AppLogger.e(
-        'DashboardStats: Attendance invariant violation – finalAbsent was '
-        '$rawFinalAbsent, clamped to 0 '
-        '(official: $officialAbsent, saved: $savedAbsent, extra: $extraAbsent)',
-      );
-    }
+    final finalAbsentCount = rawFinalAbsent.clamp(0, finalTotal);
+
+    final unconstrainedPresent = officialPresent + corrPresent + extraPresent;
+    final finalPresentCount = unconstrainedPresent.clamp(0, finalTotal);
+
+    courseStats.forEach((cid, stat) {
+      stat.finalPresent = stat.finalPresent.clamp(0, stat.finalTotal);
+    });
 
     final rawPercentage = finalTotal > 0
-        ? (finalPresentCount / finalTotal) * 100
+        ? (finalPresentCount / finalTotal * 100).clamp(0.0, 100.0)
         : 0.0;
     final rawOfficialPercentage = officialTotal > 0
-        ? (officialPresent / officialTotal) * 100
+        ? (officialPresent / officialTotal * 100).clamp(0.0, 100.0)
         : 0.0;
 
     final activeCodes = <String>{};

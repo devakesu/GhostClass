@@ -213,7 +213,7 @@ export const generateSlotKey = (
   date: string | Date,
   session: string | number,
 ) => {
-  const cId = String(courseId).trim();
+  const cId = normalizeCourseCode(String(courseId));
   const d = normalizeDate(date);
 
   const normSession = normalizeSession(session);

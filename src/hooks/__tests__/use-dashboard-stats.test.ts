@@ -108,13 +108,13 @@ describe("useDashboardStats", () => {
   it("handles corrections (reconciliation)", () => {
     const trackingWithCorrection = [
       {
-        course: "2", // Originally absent (111)
+        course: "2", // Originally absent (111) in session 2
         date: "2023-10-01",
-        session: "1",
+        session: "2",
         attendance: 110, // Changed to present
         semester: "1",
         year: "2023",
-        status: "original",
+        status: "correction",
       },
     ];
 
@@ -152,5 +152,90 @@ describe("useDashboardStats", () => {
 
     expect(result.current.percentage).toBe(0);
     expect(result.current.finalTotal).toBe(0);
+  });
+
+  it("ignores orphaned corrections targeting non-existent official sessions", () => {
+    const orphanedCorrection = [
+      {
+        course: "CS101",
+        date: "2023-10-05", // No official class on this date
+        session: "II",
+        attendance: 225, // Duty leave
+        semester: "1",
+        year: "2023",
+        status: "correction",
+      },
+    ];
+
+    const { result } = renderHook(() =>
+      useDashboardStats({
+        coursesData: mockCoursesData,
+        attendanceData: mockAttendanceData as any,
+        trackingData: orphanedCorrection as any,
+        classCourses: mockClassCourses,
+        disabledCodes: new Set(),
+        selectedSemester: "1",
+        selectedYear: "2023",
+      })
+    );
+
+    // Initial is 1/2 (50%). Orphaned correction must NOT grant free present or alter stats
+    expect(result.current.finalPresent).toBe(1);
+    expect(result.current.correctionPresent).toBe(0);
+    expect(result.current.percentage).toBe(50);
+  });
+
+  it("handles EzyGo numeric session IDs > 20 and matches with Roman numeral tracking records", () => {
+    const ezygoAttendanceData = {
+      studentAttendanceData: {
+        "2023-10-01": {
+          "219": { course: "1", attendance: 111, class_type: "Theory" }, // Absent in 1st hour
+          "220": { course: "1", attendance: 111, class_type: "Theory" }, // Absent in 2nd hour
+        },
+      },
+    };
+
+    const trackingData = [
+      {
+        course: "CS101",
+        date: "2023-10-01",
+        session: "I", // Roman numeral for 1st hour (219)
+        attendance: 225,
+        semester: "1",
+        year: "2023",
+        status: "correction",
+      },
+      {
+        course: "CS101",
+        date: "2023-10-01",
+        session: "II", // Roman numeral for 2nd hour (220)
+        attendance: 225,
+        semester: "1",
+        year: "2023",
+        status: "correction",
+      },
+    ];
+
+    const { result } = renderHook(() =>
+      useDashboardStats({
+        coursesData: mockCoursesData,
+        attendanceData: ezygoAttendanceData as any,
+        trackingData: trackingData as any,
+        classCourses: mockClassCourses,
+        disabledCodes: new Set(),
+        selectedSemester: "1",
+        selectedYear: "2023",
+      })
+    );
+
+    // Both absents corrected to DL
+    expect(result.current.realPresent).toBe(0);
+    expect(result.current.realAbsent).toBe(2);
+    expect(result.current.realTotal).toBe(2);
+    expect(result.current.correctionPresent).toBe(2);
+    expect(result.current.savedAbsent).toBe(2);
+    expect(result.current.finalPresent).toBe(2);
+    expect(result.current.finalTotal).toBe(2);
+    expect(result.current.percentage).toBe(100);
   });
 });
