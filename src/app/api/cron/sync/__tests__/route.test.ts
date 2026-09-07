@@ -1206,3 +1206,108 @@ describe("Cron sync — malformed authorization header (no Bearer prefix)", () =
     expect(body.error).toBe("Unauthorized");
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe("Cron sync — extra Duty Leave entry when official is absent", () => {
+  it("emits 'Apply for DL! 📝' with conflict-dl topic and updates status to correction", async () => {
+    const { updateTrackerSpy, notificationInsertSpy } = buildAdminMock({
+      trackerData: [
+        {
+          id: 357,
+          course: "GAMAT301",
+          date: "2026-07-28",
+          session: "II",
+          attendance: "225", // Duty Leave
+          status: "extra",
+          remarks: "Attended hackathon",
+        },
+      ],
+      courseMappings: [
+        {
+          ezygo_id: 1001,
+          course_name: "MATHEMATICS FOR COMPUTER AND INFORMATION SCIENCE-3",
+          university_code: "GAMAT301",
+        },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2026-07-28": { "2": ezygoSession(2, 111, 1001) }, // Official is absent
+    });
+
+    const res = await GET(makeCronRequest("testuser"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.conflicts).toBe(1);
+    expect(body.updates).toBe(1);
+
+    expect(updateTrackerSpy).toHaveBeenCalledWith({ status: "correction" });
+
+    expect(notificationInsertSpy).toHaveBeenCalledOnce();
+    const [notifications] = notificationInsertSpy.mock.calls[0];
+    expect(notifications[0].title).toBe("Apply for DL! 📝");
+    expect(notifications[0].topic).toBe("conflict-dl-20260728|II");
+    expect(notifications[0].description).toBe(
+      "Your extra DL entry for Mathematics For Computer And Information Science-3 (GAMAT301) on 2026-07-28 (Session II) is now updated as absent. You can now apply for duty leave.",
+    );
+
+    // Verify email with DL subject
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: MOCK_USER_ROW.email,
+        subject: "Apply for DL! 📝",
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("Cron sync — course name and code formatting across messages", () => {
+  it("formats both manual and official courses as 'Name (CODE)' in course mismatch", async () => {
+    const { notificationInsertSpy } = buildAdminMock({
+      trackerData: [
+        {
+          id: 501,
+          course: "PCCBL308",
+          date: "2026-07-28",
+          session: "II",
+          attendance: "110",
+          status: "extra",
+        },
+      ],
+      courseMappings: [
+        {
+          ezygo_id: 1001,
+          course_name: "MATHEMATICS FOR COMPUTER AND INFORMATION SCIENCE-3",
+          university_code: "GAMAT301",
+        },
+        {
+          ezygo_id: 1002,
+          course_name: "STATISTICAL METHODS LAB",
+          university_code: "PCCBL308",
+        },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2026-07-28": { "2": ezygoSession(2, 110, 1001) },
+    });
+
+    const res = await GET(makeCronRequest("testuser"));
+    expect(res.status).toBe(200);
+
+    expect(notificationInsertSpy).toHaveBeenCalledOnce();
+    const [notifications] = notificationInsertSpy.mock.calls[0];
+    expect(notifications[0].title).toBe("Course Mismatch 💀");
+    expect(notifications[0].description).toBe(
+      "Course mismatch on 2026-07-28 (Session II). Manual: Statistical Methods Lab (PCCBL308), Official: Mathematics For Computer And Information Science-3 (GAMAT301).",
+    );
+  });
+});

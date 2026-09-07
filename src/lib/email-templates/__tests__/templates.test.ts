@@ -116,6 +116,23 @@ describe("Email Render Functions (index.tsx)", () => {
     expect(html).toContain("Attendance Conflict Detected");
   });
 
+  it("renders duty leave conflict email html with appropriate messaging", async () => {
+    const html = await renderAttendanceConflictEmail({
+      username: "Jane",
+      courseLabel: "Mathematics (GAMAT301)",
+      date: "2026-07-28",
+      session: "II",
+      dashboardUrl: "https://example.com",
+      markedAttendance: "Duty Leave",
+      isDutyLeave: true,
+    });
+    expect(html).toContain("Jane");
+    expect(html).toContain("Mathematics (GAMAT301)");
+    expect(html).toContain("Duty Leave Update — Apply for DL");
+    expect(html).toContain("apply for official duty leave");
+    expect(html).toContain("Duty Leave");
+  });
+
   it("renders course mismatch email html", async () => {
     const html = await renderCourseMismatchEmail({
       username: "Jane",

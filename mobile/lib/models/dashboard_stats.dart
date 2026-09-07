@@ -111,11 +111,15 @@ class DashboardStats {
           if (isValid) {
             var rawSession = session.session?.toString();
             final sNumKey = int.tryParse(sessionKey);
-            if ((rawSession == null || rawSession == 'null' || rawSession.isEmpty) &&
+            if ((rawSession == null ||
+                    rawSession == 'null' ||
+                    rawSession.isEmpty) &&
                 sNumKey != null &&
                 sNumKey > 20) {
               rawSession = (sessionIdx + 1).toString();
-            } else if (rawSession == null || rawSession == 'null' || rawSession.isEmpty) {
+            } else if (rawSession == null ||
+                rawSession == 'null' ||
+                rawSession.isEmpty) {
               rawSession = sessionKey;
             }
 
@@ -182,8 +186,7 @@ class DashboardStats {
       final isTrulyExtra = item.status == 'extra' && !hasOfficialSlot;
       final trackerPositive = _isPositive(trackerStatus);
       final trackerDL = trackerStatus == AttendanceStatus.dutyLeave.code;
-      final officialPositive =
-          hasOfficialSlot && _isPositive(officialStatus);
+      final officialPositive = hasOfficialSlot && _isPositive(officialStatus);
       final officialDLStatus =
           hasOfficialSlot && officialStatus == AttendanceStatus.dutyLeave.code;
 

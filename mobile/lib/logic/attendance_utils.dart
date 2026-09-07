@@ -412,6 +412,8 @@ String generateSlotKey(dynamic courseId, dynamic date, dynamic session) {
   final d = normalizeDate(date);
   final normSession = normalizeSession(session);
   final n = int.tryParse(normSession);
-  final finalSession = (n != null && n > 0) ? toRoman(n) : normSession.toUpperCase();
+  final finalSession = (n != null && n > 0)
+      ? toRoman(n)
+      : normSession.toUpperCase();
   return '${cId}_${d}_$finalSession';
 }

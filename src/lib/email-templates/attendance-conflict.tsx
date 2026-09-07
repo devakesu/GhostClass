@@ -23,6 +23,8 @@ interface AttendanceConflictEmailProps {
   date: string;
   session: string;
   dashboardUrl: string;
+  markedAttendance?: string;
+  isDutyLeave?: boolean;
 }
 
 export const AttendanceConflictEmail = ({
@@ -31,6 +33,8 @@ export const AttendanceConflictEmail = ({
   date,
   session,
   dashboardUrl,
+  markedAttendance,
+  isDutyLeave,
 }: AttendanceConflictEmailProps) => (
   <Html>
     <Head />
@@ -47,13 +51,16 @@ export const AttendanceConflictEmail = ({
 
         <Section style={emailStyles.content}>
           <Heading style={emailStyles.title}>
-            Attendance Conflict Detected
+            {isDutyLeave
+              ? "Duty Leave Update — Apply for DL"
+              : "Attendance Conflict Detected"}
           </Heading>
 
           <Text style={emailStyles.paragraph}>
             Hi <strong>{username}</strong>,<br />
-            We found a discrepancy between your self-marked attendance and the
-            official record.
+            {isDutyLeave
+              ? `Your extra Duty Leave entry for ${courseLabel} on ${date} (Session ${session}) has been updated as absent in the official records. You can now apply for official duty leave.`
+              : "We found a discrepancy between your self-marked attendance and the official record."}
           </Text>
 
           <Section style={emailStyles.conflictBox}>
@@ -73,7 +80,13 @@ export const AttendanceConflictEmail = ({
                 <tr>
                   <td style={tableStyles.cellLabel}>👤 You Marked</td>
                   <td style={tableStyles.cellValueWithBadge}>
-                    <span style={badgeStyles.present}>Present</span>
+                    <span
+                      style={isDutyLeave
+                        ? badgeStyles.dutyLeave
+                        : badgeStyles.present}
+                    >
+                      {markedAttendance || (isDutyLeave ? "Duty Leave" : "Present")}
+                    </span>
                   </td>
                 </tr>
                 <tr>
@@ -87,9 +100,15 @@ export const AttendanceConflictEmail = ({
           </Section>
 
           <Text style={emailStyles.note}>
-            We have automatically flagged this entry as a{" "}
-            <strong>Correction</strong>{" "}
-            in your dashboard to keep your stats accurate.
+            {isDutyLeave
+              ? "We have automatically updated this entry to match the official status so you can track your attendance accurately while your Duty Leave application is processed."
+              : (
+                <>
+                  We have automatically flagged this entry as a{" "}
+                  <strong>Correction</strong>{" "}
+                  in your dashboard to keep your stats accurate.
+                </>
+              )}
           </Text>
 
           <Section style={emailStyles.buttonContainer}>

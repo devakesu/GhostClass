@@ -195,4 +195,13 @@ export const badgeStyles = {
     fontWeight: "700",
     fontSize: "12px",
   },
+
+  dutyLeave: {
+    backgroundColor: "#eff6ff",
+    color: "#1d4ed8",
+    padding: "4px 10px",
+    borderRadius: "999px",
+    fontWeight: "700",
+    fontSize: "12px",
+  },
 };
