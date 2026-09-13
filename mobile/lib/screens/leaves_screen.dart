@@ -4,6 +4,7 @@ import 'package:ghostclass/models/leave.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/leave_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/providers/profile_hydration_service.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/refresh_coordinator.dart';
 import 'package:ghostclass/theme/app_theme.dart';
@@ -153,7 +154,8 @@ class LeavesScreen extends ConsumerWidget {
     final user = ref.watch(authProvider).value;
     final isSyncing = user?.isSyncing ?? false;
 
-    if (isSyncing) {
+    final data = leaveState.value;
+    if (isSyncing && data == null) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -211,10 +213,17 @@ class LeavesScreen extends ConsumerWidget {
                         .auth
                         .currentSession
                         ?.accessToken;
-                    if (supabaseToken == null) return;
-                    await ref
+                    if (supabaseToken == null) return null;
+                    return ref
                         .read(apiServiceProvider)
-                        .triggerSync(supabaseToken, force: true);
+                        .runCronSync(supabaseToken, force: true);
+                  },
+                  onSyncResult: (result) {
+                    if (result is CronSyncResult && result.hasChanges) {
+                      ref
+                          .read(profileHydrationServiceProvider.notifier)
+                          .handleCronSyncResult(result);
+                    }
                   },
                   refreshData: () => ref.read(leaveProvider.notifier).refresh(),
                 );
@@ -264,10 +273,17 @@ class LeavesScreen extends ConsumerWidget {
                               .auth
                               .currentSession
                               ?.accessToken;
-                          if (supabaseToken == null) return;
-                          await ref
+                          if (supabaseToken == null) return null;
+                          return ref
                               .read(apiServiceProvider)
-                              .triggerSync(supabaseToken, force: true);
+                              .runCronSync(supabaseToken, force: true);
+                        },
+                        onSyncResult: (result) {
+                          if (result is CronSyncResult && result.hasChanges) {
+                            ref
+                                .read(profileHydrationServiceProvider.notifier)
+                                .handleCronSyncResult(result);
+                          }
                         },
                         refreshData: () =>
                             ref.read(leaveProvider.notifier).refresh(),

@@ -4,6 +4,7 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/providers/profile_hydration_service.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/refresh_coordinator.dart';
@@ -88,8 +89,9 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
     final permissionAsync = ref.watch(notificationPermissionProvider);
     final user = ref.watch(authProvider).value;
     final isSyncing = user?.isSyncing ?? false;
+    final data = notificationsAsync.value;
 
-    if (isSyncing) {
+    if (isSyncing && data == null) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -193,11 +195,18 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                       syncCron: () async {
                         final supabaseToken =
                             supabaseClient.auth.currentSession?.accessToken;
-                        if (supabaseToken == null) return;
-                        await apiService.triggerSync(
+                        if (supabaseToken == null) return null;
+                        return apiService.runCronSync(
                           supabaseToken,
                           force: true,
                         );
+                      },
+                      onSyncResult: (result) {
+                        if (result is CronSyncResult && result.hasChanges) {
+                          ref
+                              .read(profileHydrationServiceProvider.notifier)
+                              .handleCronSyncResult(result);
+                        }
                       },
                       refreshData: () async {
                         await ref.read(notificationsProvider.future);

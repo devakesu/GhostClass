@@ -62,7 +62,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
       _hasSeenSyncing = true;
     }
 
-    if (dashboardState.isLoading || isSyncing) {
+    if ((dashboardState.isLoading || isSyncing) && data == null) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),

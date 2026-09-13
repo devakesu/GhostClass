@@ -201,6 +201,7 @@ class ApiService {
               headers: {'Authorization': 'Bearer $token'},
               sendTimeout: AppConfig.defaultTimeout,
               receiveTimeout: AppConfig.defaultTimeout,
+              validateStatus: (s) => s != null && s < 600,
             ),
           );
         }
@@ -255,6 +256,27 @@ class ApiService {
     } on Object catch (e, st) {
       AppLogger.e('ApiService: Background scheduled sync failed', e, st);
     }
+  }
+
+  /// Run cron sync safely and parse the response into [CronSyncResult].
+  Future<CronSyncResult?> runCronSync(
+    String supabaseToken, {
+    bool force = false,
+  }) async {
+    try {
+      final response = await triggerSync(supabaseToken, force: force);
+      return parseSyncResult(response.data);
+    } on Object catch (e, st) {
+      AppLogger.e('ApiService: Background cron sync failed', e, st);
+      return null;
+    }
+  }
+
+  static CronSyncResult? parseSyncResult(dynamic data) {
+    if (data is Map<String, dynamic>) {
+      return CronSyncResult.fromJson(data);
+    }
+    return null;
   }
 
   Future<Response<dynamic>> addCourse({
@@ -374,3 +396,38 @@ class ApiService {
 }
 
 final apiServiceProvider = Provider<ApiService>(ApiService.new);
+
+class CronSyncResult {
+  const CronSyncResult({
+    required this.success,
+    required this.processed,
+    required this.deletions,
+    required this.conflicts,
+    required this.updates,
+    required this.errors,
+  });
+
+  factory CronSyncResult.fromJson(Map<String, dynamic> json) {
+    return CronSyncResult(
+      success: json['success'] as bool? ?? false,
+      processed: (json['processed'] as num?)?.toInt() ?? 0,
+      deletions: (json['deletions'] as num?)?.toInt() ?? 0,
+      conflicts: (json['conflicts'] as num?)?.toInt() ?? 0,
+      updates: (json['updates'] as num?)?.toInt() ?? 0,
+      errors: (json['errors'] as num?)?.toInt() ?? 0,
+    );
+  }
+
+  final bool success;
+  final int processed;
+  final int deletions;
+  final int conflicts;
+  final int updates;
+  final int errors;
+
+  bool get hasChanges => deletions > 0 || updates > 0;
+
+  @override
+  String toString() =>
+      'CronSyncResult(success: $success, processed: $processed, deletions: $deletions, conflicts: $conflicts, updates: $updates, errors: $errors)';
+}

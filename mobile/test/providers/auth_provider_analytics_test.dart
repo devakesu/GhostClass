@@ -159,6 +159,8 @@ void main() {
     when(() => mockStorage.saveUserProfile(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveEzygoUserId(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveTermsVersion(any())).thenAnswer((_) async {});
+    when(() => mockStorage.saveAcademicState(any())).thenAnswer((_) async {});
+    when(() => mockStorage.getAcademicState()).thenAnswer((_) async => null);
     when(() => mockStorage.clearAll()).thenAnswer((_) async {});
     when(() => mockStorage.clearAllCachedData()).thenAnswer((_) async {});
 

@@ -391,6 +391,14 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       final initialYear =
           bridgeData['current_year'] ?? bridgeData['academic_year'];
 
+      AcademicState? initialAcademic;
+      if (initialSem != null && initialYear != null) {
+        initialAcademic = AcademicState(
+          semester: initialSem.toString(),
+          year: initialYear.toString(),
+        );
+      }
+
       final settingsWithAcademic = settingsFallback.copyWith(
         semester: initialSem?.toString(),
         academicYear: initialYear?.toString(),
@@ -456,8 +464,23 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
               st,
             );
           }),
+        if (initialAcademic != null)
+          storage.saveAcademicState(initialAcademic).catchError((
+            Object e,
+            StackTrace st,
+          ) {
+            AppLogger.e(
+              'AuthNotifier: Failed to persist academic state (post-login)',
+              e,
+              st,
+            );
+          }),
       ];
       await Future.wait(saves);
+
+      if (initialAcademic != null) {
+        ref.read(academicProvider.notifier).updateState(initialAcademic);
+      }
 
       final cachedUser = await ref
           .read(profileHydrationServiceProvider.notifier)

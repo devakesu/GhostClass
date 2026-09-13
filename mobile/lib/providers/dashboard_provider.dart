@@ -11,6 +11,7 @@ import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/providers/profile_hydration_service.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -580,10 +581,17 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
                 .auth
                 .currentSession
                 ?.accessToken;
-            if (supabaseToken == null) return;
-            await ref
+            if (supabaseToken == null) return null;
+            return ref
                 .read(apiServiceProvider)
-                .triggerSync(supabaseToken, force: true);
+                .runCronSync(supabaseToken, force: true);
+          },
+          onSyncResult: (result) {
+            if (result is CronSyncResult && result.hasChanges) {
+              ref
+                  .read(profileHydrationServiceProvider.notifier)
+                  .handleCronSyncResult(result);
+            }
           },
           refreshData: () => ref.read(trackingProvider.notifier).refresh(),
         );

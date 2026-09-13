@@ -10,6 +10,7 @@ import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/providers/profile_hydration_service.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/providers/tracking_ui_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -49,7 +50,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final user = ref.watch(authProvider).value;
     final isSyncing = user?.isSyncing ?? false;
 
-    if (trackingState.isLoading || isSyncing) {
+    if ((trackingState.isLoading || isSyncing) && data == null) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -155,8 +156,15 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
             syncCron: () async {
               final supabaseToken =
                   supabaseClient.auth.currentSession?.accessToken;
-              if (supabaseToken == null) return;
-              await apiService.triggerSync(supabaseToken, force: true);
+              if (supabaseToken == null) return null;
+              return apiService.runCronSync(supabaseToken, force: true);
+            },
+            onSyncResult: (result) {
+              if (result is CronSyncResult && result.hasChanges) {
+                ref
+                    .read(profileHydrationServiceProvider.notifier)
+                    .handleCronSyncResult(result);
+              }
             },
             refreshData: trackingNotifier.refresh,
           );

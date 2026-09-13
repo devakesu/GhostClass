@@ -19,6 +19,7 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/providers/leave_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/providers/profile_hydration_service.dart';
 import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -139,7 +140,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             authStack = st;
           });
 
-      api.clearCaches();
       AppLogger.i('SplashScreen: Awaiting Future.wait...');
       await Future.wait<dynamic>([
         integrityTask,
@@ -251,11 +251,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    // Keep the splash visible for 1.5s to improve perceived startup time
+    // Keep the splash visible for 350ms to allow entrance animation to play cleanly
     final splashHold = Future<void>.delayed(
-      const Duration(milliseconds: 1500),
+      const Duration(milliseconds: 350),
       () {
-        AppLogger.i('SplashScreen: 1.5s delay completed');
+        AppLogger.i('SplashScreen: 350ms entrance animation delay completed');
       },
     );
 
@@ -445,6 +445,32 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final token = supabaseClient.auth.currentSession?.accessToken;
 
     if (finalUser != null) {
+      final storage = ref.read(secureStorageProvider);
+      final localAcademic = await storage.getAcademicState();
+      final hasLocalAcademic =
+          localAcademic != null &&
+          localAcademic.semester.trim().isNotEmpty &&
+          localAcademic.year.trim().isNotEmpty;
+
+      if (!hasLocalAcademic) {
+        AppLogger.i(
+          'SplashScreen: Missing local academic state. Running fallback blocking profile sync...',
+        );
+        try {
+          await ref
+              .read(profileHydrationServiceProvider.notifier)
+              .runProfileRefresh(finalUser, sync: true, force: true);
+        } on Object catch (syncErr, syncSt) {
+          AppLogger.e(
+            'SplashScreen: Fallback blocking profile sync failed',
+            syncErr,
+            syncSt,
+          );
+        }
+      }
+
+      if (!mounted) return;
+
       if (finalUser.termsAccepted) {
         final dashboardFuture = ref.read(dashboardProvider.future);
         final trackingFuture = ref.read(trackingProvider.future);
@@ -517,12 +543,25 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     required Future<dynamic> scoreFuture,
     required Future<dynamic> notificationsFuture,
   }) {
-    // 1. Trigger Cron Sync in parallel (fire-and-forget)
+    // 1. Trigger Cron Sync in parallel
     if (token != null) {
       AppLogger.safeUnawait(
-        apiService.scheduleSync(token).catchError((Object e, StackTrace st) {
-          AppLogger.e('SplashScreen: Cron Sync failed', e, st);
-        }),
+        apiService
+            .runCronSync(token)
+            .then((result) {
+              if (result != null && result.hasChanges) {
+                AppLogger.i(
+                  'SplashScreen: Background cron sync reported changes ($result). '
+                  'Invalidating all screen providers.',
+                );
+                ref
+                    .read(profileHydrationServiceProvider.notifier)
+                    .handleCronSyncResult(result);
+              }
+            })
+            .catchError((Object e, StackTrace st) {
+              AppLogger.e('SplashScreen: Cron Sync failed', e, st);
+            }),
         'SplashScreen: Cron Sync',
       );
     }
