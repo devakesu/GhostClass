@@ -31,9 +31,23 @@ class AcademicContextService extends Notifier<void> {
     final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
 
+    // 1. Immediately display syncing loader in UI
+    authNotifier.updateState(user.copyWith(isSyncing: true));
+
     try {
+      final currentAcademic = await storage.getAcademicState();
+      final nextSem =
+          sem ??
+          currentAcademic?.semester ??
+          calculateCurrentAcademicInfo()['current_semester']!;
+      final nextYear =
+          year ??
+          currentAcademic?.year ??
+          calculateCurrentAcademicInfo()['current_year']!;
+      final nextAcademic = AcademicState(semester: nextSem, year: nextYear);
+
       if (year != null) {
-        final yearResponse = await api.updateAcademicYear(year, storage);
+        final yearResponse = await api.updateAcademicYear(nextYear, storage);
         if (yearResponse.statusCode != 200 && yearResponse.statusCode != 201) {
           final resData = yearResponse.data as Map<String, dynamic>?;
           throw Exception(formatApiError(resData, 'Auth.AcademicUpdate'));
@@ -41,7 +55,7 @@ class AcademicContextService extends Notifier<void> {
       }
 
       if (sem != null) {
-        final semesterResponse = await api.updateSemester(sem, storage);
+        final semesterResponse = await api.updateSemester(nextSem, storage);
         if (semesterResponse.statusCode != 200 &&
             semesterResponse.statusCode != 201) {
           final resData = semesterResponse.data as Map<String, dynamic>?;
@@ -49,24 +63,32 @@ class AcademicContextService extends Notifier<void> {
         }
       }
 
-      AcademicState? nextAcademic;
-      if (sem != null || year != null) {
-        final currentAcademic = await storage.getAcademicState();
-        nextAcademic = AcademicState(
-          semester:
-              sem ??
-              currentAcademic?.semester ??
-              calculateCurrentAcademicInfo()['current_semester']!,
-          year:
-              year ??
-              currentAcademic?.year ??
-              calculateCurrentAcademicInfo()['current_year']!,
-        );
-        await storage.saveAcademicState(nextAcademic);
-      }
+      final updatedSettings = user.settings.copyWith(
+        semester: nextSem,
+        academicYear: nextYear,
+      );
+      final updatedProfile = user.profile?.copyWith(
+        currentSemester: nextSem,
+        currentYear: nextYear,
+      );
 
-      final syncingUser = user.copyWith(isSyncing: true);
-      authNotifier.updateState(syncingUser);
+      await Future.wait([
+        storage.saveAcademicState(nextAcademic),
+        storage.saveSettings(updatedSettings),
+        if (updatedProfile != null) storage.saveUserProfile(updatedProfile),
+      ]);
+
+      authNotifier.updateState(
+        user.copyWith(
+          settings: updatedSettings,
+          profile: updatedProfile,
+          isSyncing: true,
+        ),
+      );
+      ref.read(academicProvider.notifier).updateState(nextAcademic);
+
+      api.clearCaches();
+      await storage.clearAllCachedData();
 
       final token = await authNotifier.getFreshSupabaseToken();
       if (token == null) {
@@ -75,8 +97,6 @@ class AcademicContextService extends Notifier<void> {
       }
 
       try {
-        api.clearCaches();
-
         final response = await api.refreshProfile(
           token,
           sync: true,
@@ -105,18 +125,31 @@ class AcademicContextService extends Notifier<void> {
           );
         }
 
+        final currentUser = ref.read(authProvider).value ?? user;
         await ref
             .read(profileHydrationServiceProvider.notifier)
             .applyProfileResponseData(
-              currentUser: syncingUser,
+              currentUser: currentUser.copyWith(isSyncing: true),
               data: response.data as Map<String, dynamic>,
             );
-      } finally {
-        final finalUser = ref.read(authProvider).value;
-        if (finalUser != null) {
-          authNotifier.updateState(finalUser.copyWith(isSyncing: false));
+      } on Object catch (profileErr) {
+        AppLogger.e(
+          'AcademicContextService: Profile refresh during academic update failed',
+          profileErr,
+        );
+        if (profileErr is AppException && profileErr.isAuthError) {
+          rethrow;
         }
       }
+
+      // Re-assert persistence of chosen academic context
+      await storage.saveAcademicState(nextAcademic);
+      ref.read(academicProvider.notifier).updateState(nextAcademic);
+
+      ref
+          .read(profileHydrationServiceProvider.notifier)
+          .invalidateAllScreenProviders();
+      ref.invalidate(academicProvider);
 
       AppLogger.i(
         'AuthNotifier: Academic context updated successfully ($sem, $year)',
@@ -139,6 +172,11 @@ class AcademicContextService extends Notifier<void> {
         }
       }
       rethrow;
+    } finally {
+      final finalUser = ref.read(authProvider).value;
+      if (finalUser != null && finalUser.isSyncing) {
+        authNotifier.updateState(finalUser.copyWith(isSyncing: false));
+      }
     }
   }
 

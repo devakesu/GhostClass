@@ -464,9 +464,13 @@ class ProfileHydrationService extends Notifier<void> {
         : Map<String, dynamic>.from(data);
 
     rawProfile['current_semester'] =
-        data['current_semester'] ?? rawProfile['current_semester'];
+        data['current_semester'] ??
+        rawProfile['current_semester'] ??
+        currentUser.profile?.currentSemester;
     rawProfile['current_year'] =
-        data['current_year'] ?? rawProfile['current_year'];
+        data['current_year'] ??
+        rawProfile['current_year'] ??
+        currentUser.profile?.currentYear;
 
     final profile = UserProfile.fromJson(rawProfile);
 
@@ -620,18 +624,11 @@ class ProfileHydrationService extends Notifier<void> {
       invalidateAllScreenProviders();
     } else {
       if (nextAcademic != null) {
-        AppLogger.safeUnawait(
-          Future.delayed(Duration.zero, () {
-            ref
-                .read(academicProvider.notifier)
-                .updateState(
-                  nextAcademic,
-                );
-          }).catchError((Object e, StackTrace st) {
-            AppLogger.e('AuthNotifier: Deferred academic set failed', e, st);
-          }),
-          'AuthNotifier: deferred academic set',
-        );
+        try {
+          ref.read(academicProvider.notifier).updateState(nextAcademic);
+        } on Object catch (e) {
+          AppLogger.d('AuthNotifier: Direct academic set skipped: $e');
+        }
       }
     }
 

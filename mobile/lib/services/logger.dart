@@ -86,7 +86,7 @@ class AppLogger {
 
   /// Logs a debug message.
   static void d(String message, [Object? error, StackTrace? stackTrace]) {
-    if (kDebugMode) {
+    if (!kReleaseMode) {
       _addToBuffer('DEBUG', message);
       debugPrint('[DEBUG] $message');
       if (error != null) debugPrint('Error: $error');
@@ -115,7 +115,7 @@ class AppLogger {
   /// Logs an information message.
   static void i(String message) {
     _addToBuffer('INFO', message);
-    if (kDebugMode) debugPrint('[INFO] $message');
+    if (!kReleaseMode) debugPrint('[INFO] $message');
     unawaited(
       Sentry.addBreadcrumb(
         Breadcrumb(message: message, level: SentryLevel.info),
@@ -130,7 +130,7 @@ class AppLogger {
   /// Logs a warning message.
   static void w(String message, [Object? error]) {
     _addToBuffer('WARN', message);
-    if (kDebugMode) {
+    if (!kReleaseMode) {
       debugPrint('[WARNING] $message');
       if (error != null) debugPrint('Details: $error');
     }
@@ -157,7 +157,7 @@ class AppLogger {
   /// Logs a handled/expected error to the buffer and debug console without sending to Sentry.
   static void eLocal(String message, [Object? error, StackTrace? stackTrace]) {
     _addToBuffer('ERROR_LOCAL', message);
-    if (kDebugMode) {
+    if (!kReleaseMode) {
       debugPrint('[ERROR_LOCAL] $message');
       if (error != null) debugPrint('Error: $error');
       if (stackTrace != null) debugPrint('StackTrace: $stackTrace');
@@ -174,7 +174,7 @@ class AppLogger {
     Map<String, dynamic>? extras,
   }) {
     _addToBuffer('ERROR', message);
-    if (kDebugMode) {
+    if (!kReleaseMode) {
       debugPrint('[ERROR] $message');
       if (error != null) debugPrint('Error: $error');
       if (stackTrace != null) debugPrint('StackTrace: $stackTrace');

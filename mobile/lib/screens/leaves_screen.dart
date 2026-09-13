@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/leave.dart';
+import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/leave_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
@@ -153,9 +154,12 @@ class LeavesScreen extends ConsumerWidget {
     final leaveState = ref.watch(leaveProvider);
     final user = ref.watch(authProvider).value;
     final isSyncing = user?.isSyncing ?? false;
+    final academicAsync = ref.watch(academicProvider);
 
     final data = leaveState.value;
-    if (isSyncing && data == null) {
+    if (isSyncing ||
+        academicAsync.isLoading ||
+        (leaveState.isLoading && data == null)) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),

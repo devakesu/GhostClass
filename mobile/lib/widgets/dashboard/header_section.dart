@@ -5,6 +5,7 @@ import 'package:ghostclass/logic/attendance_utils.dart'
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -129,12 +130,10 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
                 nextPeriod: nextPeriod,
                 isBusy: isUpdating,
                 onPrevious: () => _requestAcademicPeriodChange(
-                  context,
                   currentPeriod: currentPeriod,
                   targetPeriod: previousPeriod,
                 ),
                 onNext: () => _requestAcademicPeriodChange(
-                  context,
                   currentPeriod: currentPeriod,
                   targetPeriod: nextPeriod,
                   isAllowed: isNextAllowed,
@@ -147,8 +146,7 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
     );
   }
 
-  Future<void> _requestAcademicPeriodChange(
-    BuildContext context, {
+  Future<void> _requestAcademicPeriodChange({
     required _AcademicPeriod currentPeriod,
     required _AcademicPeriod? targetPeriod,
     bool isAllowed = true,
@@ -205,6 +203,15 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
             targetPeriod.semester,
             targetPeriod.year,
           );
+    } on Object catch (e, st) {
+      AppLogger.e('HeaderSection: Failed to update academic period', e, st);
+      if (mounted) {
+        ServiceToast.show(
+          context,
+          'Failed to update academic period. Please try again.',
+          isError: true,
+        );
+      }
     } finally {
       if (mounted) {
         setState(() {

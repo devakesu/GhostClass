@@ -251,9 +251,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    // Keep the splash visible for 350ms to allow entrance animation to play cleanly
+    // Keep the splash visible for 750ms to allow entrance animation to play cleanly
     final splashHold = Future<void>.delayed(
-      const Duration(milliseconds: 350),
+      const Duration(milliseconds: 750),
       () {
         AppLogger.i('SplashScreen: 350ms entrance animation delay completed');
       },

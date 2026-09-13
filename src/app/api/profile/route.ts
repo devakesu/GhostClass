@@ -334,8 +334,12 @@ const getHandler = async (req: NextRequest) => {
     );
   }
 
-  const originErr = validateRequestOrigin(req);
-  if (originErr) return originErr;
+  // Enforce same-origin checks for browser/cookie flows; skip for bearer flows.
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    const originErr = validateRequestOrigin(req);
+    if (originErr) return originErr;
+  }
 
   const supabaseAdmin = getAdminClient();
   const { user, isUpstreamError } = await authenticateUser(req, supabaseAdmin);

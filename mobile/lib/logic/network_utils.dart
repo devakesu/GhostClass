@@ -21,9 +21,9 @@ class NetworkUtils {
     String host,
     int port,
   ) {
-    // In production, always return false to let the system's standard
-    // verification handle everything (CA-signed certs).
-    if (!kDebugMode) {
+    // In production release builds, always return false to let the system's
+    // standard verification handle everything (CA-signed certs).
+    if (kReleaseMode) {
       return false;
     }
 

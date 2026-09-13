@@ -45,12 +45,15 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
   Widget build(BuildContext context) {
     final trackingState = ref.watch(trackingProvider);
     final dashboardAsync = ref.watch(dashboardProvider);
+    final academicAsync = ref.watch(academicProvider);
     final data = trackingState.value;
     final dashboard = dashboardAsync.value;
     final user = ref.watch(authProvider).value;
     final isSyncing = user?.isSyncing ?? false;
 
-    if ((trackingState.isLoading || isSyncing) && data == null) {
+    if (isSyncing ||
+        academicAsync.isLoading ||
+        ((trackingState.isLoading || isSyncing) && data == null)) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),

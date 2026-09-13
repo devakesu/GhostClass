@@ -177,6 +177,9 @@ class DioService {
   }
 
   Future<void> _addSecurityHeaders(RequestOptions options) async {
+    if (AppConfig.bypassAppCheck) {
+      return;
+    }
     try {
       final useLimited = options.extra['useLimitedToken'] == true;
 

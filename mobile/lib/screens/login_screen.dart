@@ -114,7 +114,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
 
     if (_cooldownSecondsRemaining > 0) return;
 
-    if (!kDebugMode && !kIsWeb && Platform.isAndroid) {
+    if (kReleaseMode && !kIsWeb && Platform.isAndroid) {
       const channel = MethodChannel('com.devakesu.apps.ghostclass/security');
       try {
         final isDebuggerAttached =

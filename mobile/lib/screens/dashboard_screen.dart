@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -57,12 +58,22 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final data = dashboardState.value;
     final user = ref.watch(authProvider).value;
     final isSyncing = user?.isSyncing ?? false;
+    final academicAsync = ref.watch(academicProvider);
 
     if (isSyncing) {
       _hasSeenSyncing = true;
     }
 
-    if ((dashboardState.isLoading || isSyncing) && data == null) {
+    final isStalePeriod =
+        data != null &&
+        academicAsync.value != null &&
+        (data.selectedSemester != academicAsync.value!.semester ||
+            data.selectedYear != academicAsync.value!.year);
+
+    if (isSyncing ||
+        academicAsync.isLoading ||
+        isStalePeriod ||
+        (dashboardState.isLoading && data == null)) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
