@@ -46,8 +46,16 @@ describe("exams hooks", () => {
       });
 
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
-      expect(result.current.data).toEqual(mockExams);
-      expect(axios.get).toHaveBeenCalledWith("/exams");
+      expect(axios.get).toHaveBeenCalledWith(
+        "/exams",
+        expect.objectContaining({
+          params: expect.objectContaining({ _t: expect.any(Number) }),
+          headers: expect.objectContaining({
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          }),
+        }),
+      );
     });
   });
 

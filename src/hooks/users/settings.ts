@@ -65,63 +65,38 @@ async function fetchSettingWithFallback<T extends string>(
   return extractAcademicField<T>(cachedProfile, field);
 }
 
-async function resolveSettingFromProfileQuery<T extends string>(
-  queryClient: ReturnType<typeof useQueryClient>,
-  field: "sem" | "year",
-  fallbackApiCall: () => Promise<T | null>,
-): Promise<T | null> {
-  const syncedState = queryClient.getQueryState(["profile", "synced"]);
-  const normalState = queryClient.getQueryState(["profile"]);
-  const isSyncedPending = syncedState && syncedState.status === "pending";
-  const isNormalPending = normalState && normalState.status === "pending";
-
-  if (isSyncedPending || isNormalPending) {
-    const targetKey = isSyncedPending ? "synced" : "normal";
-    return new Promise<T | null>((resolve) => {
-      let isSettled = false;
-      const unsubscribe = queryClient.getQueryCache().subscribe((event) => {
-        const key = event.query.queryKey;
-        const matchesKey = targetKey === "synced"
-          ? (key[0] === "profile" && key[1] === "synced")
-          : (key[0] === "profile" && key.length === 1);
-
-        if (matchesKey) {
-          if (event.query.state.status === "success") {
-            unsubscribe();
-            isSettled = true;
-            const profile = event.query.state.data as UserProfile | null;
-            const liveValue = field === "sem"
-              ? (profile?.current_semester as T | null | undefined)
-              : (profile?.current_year as T | null | undefined);
-            if (liveValue) {
-              resolve(liveValue);
-            } else {
-              fetchSettingWithFallback(queryClient, field, fallbackApiCall)
-                .then(resolve)
-                .catch(() => resolve(null));
-            }
-          } else if (event.query.state.status === "error") {
-            unsubscribe();
-            isSettled = true;
-            fetchSettingWithFallback(queryClient, field, fallbackApiCall)
-              .then(resolve)
-              .catch(() => resolve(null));
-          }
-        }
-      });
-      // Safety timeout to prevent hanging if the profile sync fails/hangs
-      setTimeout(() => {
-        if (!isSettled) {
-          unsubscribe();
-          fetchSettingWithFallback(queryClient, field, fallbackApiCall)
-            .then(resolve)
-            .catch(() => resolve(null));
-        }
-      }, 30000);
-    });
+export function extractSemesterValue(raw: unknown): "even" | "odd" | null {
+  if (!raw) return null;
+  let val: unknown = raw;
+  if (typeof val === "object" && val !== null) {
+    const obj = val as Record<string, unknown>;
+    val = obj.default_semester ?? obj.current_semester ?? obj.semester ?? obj.data ?? obj.value;
+    if (typeof val === "object" && val !== null) {
+      const inner = val as Record<string, unknown>;
+      val = inner.default_semester ?? inner.current_semester ?? inner.semester;
+    }
   }
+  if (!val) return null;
+  const s = String(val).trim().toLowerCase();
+  if (s.includes("odd") || s === "1") return "odd";
+  if (s.includes("even") || s === "2") return "even";
+  return null;
+}
 
-  return fetchSettingWithFallback(queryClient, field, fallbackApiCall);
+export function extractAcademicYearValue(raw: unknown): string | null {
+  if (!raw) return null;
+  let val: unknown = raw;
+  if (typeof val === "object" && val !== null) {
+    const obj = val as Record<string, unknown>;
+    val = obj.default_academic_year ?? obj.current_year ?? obj.academic_year ?? obj.year ?? obj.data ?? obj.value;
+    if (typeof val === "object" && val !== null) {
+      const inner = val as Record<string, unknown>;
+      val = inner.default_academic_year ?? inner.current_year ?? inner.academic_year ?? inner.year;
+    }
+  }
+  if (!val) return null;
+  const s = String(val).trim();
+  return s.length > 0 ? s : null;
 }
 
 export const useFetchSemester = () => {
@@ -130,13 +105,20 @@ export const useFetchSemester = () => {
   return useQuery<"even" | "odd" | null>({
     queryKey: ["semester"],
     queryFn: async () => {
-      return resolveSettingFromProfileQuery(queryClient, "sem", async () => {
-        const res = await axios.get("/user/setting/default_semester");
-        return res.data;
+      return fetchSettingWithFallback(queryClient, "sem", async () => {
+        const res = await axios.get("/user/setting/default_semester", {
+          params: { _t: Date.now() },
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
+        return extractSemesterValue(res.data);
       });
     },
     retry: settingsRetryFn,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    refetchOnMount: "always",
     refetchOnWindowFocus: true,
   });
 };
@@ -147,13 +129,20 @@ export const useFetchAcademicYear = () => {
   return useQuery<string | null>({
     queryKey: ["academic-year"],
     queryFn: async () => {
-      return resolveSettingFromProfileQuery(queryClient, "year", async () => {
-        const res = await axios.get("/user/setting/default_academic_year");
-        return res.data;
+      return fetchSettingWithFallback(queryClient, "year", async () => {
+        const res = await axios.get("/user/setting/default_academic_year", {
+          params: { _t: Date.now() },
+          headers: {
+            "Cache-Control": "no-cache",
+            Pragma: "no-cache",
+          },
+        });
+        return extractAcademicYearValue(res.data);
       });
     },
     retry: settingsRetryFn,
-    staleTime: 1000 * 60 * 5,
+    staleTime: 0,
+    refetchOnMount: "always",
     refetchOnWindowFocus: true,
   });
 };

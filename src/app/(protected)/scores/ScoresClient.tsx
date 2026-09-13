@@ -32,6 +32,7 @@ import {
 } from "@/hooks/courses/exams";
 import { useFetchAcademicYear, useFetchSemester } from "@/hooks/users/settings";
 import { useDisabledCourses } from "@/hooks/courses/useDisabledCourses";
+import { useAcademicSyncCoordinator } from "@/hooks/use-academic-sync-coordinator";
 import type { Exam, ExamAnswer, ExamQuestion } from "@/types";
 import { cn } from "@/lib/utils";
 
@@ -963,6 +964,21 @@ export default function ScoresClient() {
   }, [panel, exams]);
   const { data: semesterData } = useFetchSemester();
   const { data: academicYearData } = useFetchAcademicYear();
+  const { checkAcademicRollover } = useAcademicSyncCoordinator();
+
+  const handleManualRefresh = useCallback(async () => {
+    await checkAcademicRollover();
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["semester"] }),
+      queryClient.invalidateQueries({ queryKey: ["academic-year"] }),
+      queryClient.invalidateQueries({ queryKey: ["exams"] }),
+      queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] }),
+      queryClient.invalidateQueries({ queryKey: ["exam-answers"] }),
+      queryClient.invalidateQueries({ queryKey: ["exam-questions"] }),
+    ]);
+    await refetch();
+  }, [checkAcademicRollover, queryClient, refetch]);
+
   const { isDisabled: isCourseDisabled } = useDisabledCourses({
     academicYear: academicYearData,
     semester: semesterData,
@@ -1191,9 +1207,16 @@ export default function ScoresClient() {
             />
           </div>
           <div>
-            <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight mb-1">
-              Internal Marks
-            </h1>
+            <div className="flex items-center gap-2.5 flex-wrap mb-1">
+              <h1 className="text-2xl font-bold text-foreground tracking-tight leading-tight">
+                Internal Marks
+              </h1>
+              {semesterData && academicYearData && (
+                <span className="inline-flex items-center rounded-md bg-primary/10 border border-primary/20 px-2 py-0.5 text-xs font-semibold text-primary uppercase tracking-wide">
+                  {semesterData} {academicYearData}
+                </span>
+              )}
+            </div>
             <p className="text-sm text-muted-foreground">
               Your assessments and assignments
             </p>
@@ -1270,7 +1293,7 @@ export default function ScoresClient() {
               variant="ghost"
               size="sm"
               className="text-muted-foreground hover:text-foreground h-8 w-8 p-0"
-              onClick={() => refetch()}
+              onClick={handleManualRefresh}
               disabled={isFetching || batchQuery.isFetching}
               aria-label="Refresh internal marks"
             >

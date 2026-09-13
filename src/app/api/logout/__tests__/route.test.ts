@@ -29,6 +29,10 @@ const mockRemoveCsrfToken = vi.fn();
 vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: mockValidateCsrf,
   removeCsrfToken: mockRemoveCsrfToken,
+  getSessionIdFromCookie: vi.fn(() => Promise.resolve(null)),
+  verifyCsrfTokenWithSessionBinding: vi.fn(() =>
+    Promise.resolve({ isValid: true })
+  ),
 }));
 
 // --- Mock auth cookie ---

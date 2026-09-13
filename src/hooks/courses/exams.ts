@@ -33,7 +33,13 @@ export const useExams = (options?: { enabled?: boolean }) => {
   return useQuery<Exam[]>({
     queryKey: ["exams", semester, year],
     queryFn: async () => {
-      const res = await axios.get("/exams");
+      const res = await axios.get("/exams", {
+        params: { _t: Date.now() },
+        headers: {
+          "Cache-Control": "no-cache",
+          Pragma: "no-cache",
+        },
+      });
       if (!res) throw new Error("Failed to fetch exams data");
       return res.data;
     },

@@ -261,6 +261,46 @@ vi.mock("@/hooks/users/settings", () => ({
     data: { semester: "even", academicYear: "2024-25" },
     isLoading: false,
   })),
+  extractSemesterValue: (raw: unknown) => {
+    if (!raw) return null;
+    let val: unknown = raw;
+    if (typeof val === "object" && val !== null) {
+      const obj = val as Record<string, unknown>;
+      val = obj.default_semester ?? obj.current_semester ?? obj.semester ?? obj.data ?? obj.value;
+    }
+    if (!val) return null;
+    const s = String(val).trim().toLowerCase();
+    if (s.includes("odd") || s === "1") return "odd";
+    if (s.includes("even") || s === "2") return "even";
+    return null;
+  },
+  extractAcademicYearValue: (raw: unknown) => {
+    if (!raw) return null;
+    let val: unknown = raw;
+    if (typeof val === "object" && val !== null) {
+      const obj = val as Record<string, unknown>;
+      val = obj.default_academic_year ?? obj.current_year ?? obj.academic_year ?? obj.year ?? obj.data ?? obj.value;
+    }
+    if (!val) return null;
+    const s = String(val).trim();
+    return s.length > 0 ? s : null;
+  },
+}));
+
+vi.mock("@/hooks/use-academic-sync-coordinator", () => ({
+  useAcademicSyncCoordinator: () => ({
+    checkAcademicRollover: vi.fn().mockResolvedValue({
+      hasChanged: false,
+      semester: "even",
+      academicYear: "2024-25",
+    }),
+  }),
+  AcademicSyncCoordinator: () => null,
+  invalidateAllTermQueries: vi.fn().mockResolvedValue(undefined),
+  fetchLiveAcademicPeriod: vi.fn().mockResolvedValue({
+    semester: "even",
+    academicYear: "2024-25",
+  }),
 }));
 
 vi.mock("@/hooks/courses/courses", () => ({

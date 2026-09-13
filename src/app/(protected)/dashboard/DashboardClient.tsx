@@ -587,6 +587,11 @@ export default function DashboardClient({
       : null,
   );
 
+  const [selectedSemester, setSelectedSemester] = useState<
+    "even" | "odd" | null
+  >(null);
+  const [selectedYear, setSelectedYear] = useState<string | null>(null);
+
   // The force variant uses its own ["profile", "synced"] query key to avoid
   // deduplication with the navbar's no-force fetch. Once the EzyGo sync resolves,
   // backfill the shared ["profile"] cache so the navbar and all other components
@@ -605,10 +610,17 @@ export default function DashboardClient({
         const preferredSem = rawProfile.current_semester || userClass.sem;
         const preferredYear = rawProfile.current_year || userClass.year;
 
-        if (!existingSem && preferredSem) {
+        if (
+          preferredSem &&
+          (!existingSem ||
+            semestersDiffer(existingSem as string, preferredSem))
+        ) {
           queryClient.setQueryData(["semester"], preferredSem);
         }
-        if (!existingYear && preferredYear) {
+        if (
+          preferredYear &&
+          (!existingYear || yearsDiffer(existingYear as string, preferredYear))
+        ) {
           queryClient.setQueryData(["academic-year"], preferredYear);
         }
       }
@@ -644,6 +656,11 @@ export default function DashboardClient({
         logger.info(
           `[Dashboard] Academic context or class changed on profile sync (sem: ${prev?.semester}->${newSem}, year: ${prev?.year}->${newYear}). Invalidating queries.`,
         );
+        setSelectedSemester(null);
+        setSelectedYear(null);
+
+        queryClient.invalidateQueries({ queryKey: ["semester"] });
+        queryClient.invalidateQueries({ queryKey: ["academic-year"] });
         queryClient.invalidateQueries({ queryKey: ["courses"] });
         queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
         queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
@@ -651,6 +668,12 @@ export default function DashboardClient({
         queryClient.invalidateQueries({ queryKey: ["course_instructors"] });
         queryClient.invalidateQueries({ queryKey: ["track_data"] });
         queryClient.invalidateQueries({ queryKey: ["count"] });
+        queryClient.invalidateQueries({ queryKey: ["tracking_count"] });
+        queryClient.invalidateQueries({ queryKey: ["exams"] });
+        queryClient.invalidateQueries({ queryKey: ["exam-answers"] });
+        queryClient.invalidateQueries({ queryKey: ["exam-questions"] });
+        queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] });
+        queryClient.invalidateQueries({ queryKey: ["student_leaves"] });
       } else {
         logger.dev(
           "[Dashboard] Profile sync completed with matching academic context and class. Preserving cache without redundant refetches.",
@@ -665,7 +688,7 @@ export default function DashboardClient({
       };
     }
     prevIsProfileFetchingRef.current = isFetchingProfile;
-  }, [isFetchingProfile, rawProfile, queryClient]);
+  }, [isFetchingProfile, rawProfile, queryClient, setSelectedSemester, setSelectedYear]);
   const setSemesterMutation = useSetSemester({ skipInvalidations: true });
   const setAcademicYearMutation = useSetAcademicYear({
     skipInvalidations: true,
@@ -676,11 +699,6 @@ export default function DashboardClient({
     useFetchUserSettings();
   const ezygoSemester = userSettings?.semester;
   const ezygoYear = userSettings?.academicYear;
-
-  const [selectedSemester, setSelectedSemester] = useState<
-    "even" | "odd" | null
-  >(null);
-  const [selectedYear, setSelectedYear] = useState<string | null>(null);
 
   const defaultAcademicInfo = useMemo(() => calculateCurrentAcademicInfo(), []);
   const effectiveSemester = selectedSemester ?? ezygoSemester ??

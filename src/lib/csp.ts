@@ -229,6 +229,7 @@ export const getCspHeader = (nonce?: string) => {
       "'sha256-nzTgYzXYDNe6BAHiiI7NNlfK8n/auuOAhh2t92YvuXo='", // Login/auth inline styles
       "'sha256-Q9MUdYBtYzn5frLpoNRLdFYW76cJ4ok2SmIKzTFq57Q='", // Runtime inline styles
       "'sha256-wiog7aClo6fLAZmHb/tPNxWHoZlb/gI0ju+YaSxXMrI='", // Runtime inline styles
+      "'sha256-StEaX+se6YS7pqjzrzMIA0KaX9zF/8zAhvQXZAe5epY='", // Component inline styles
     ];
 
   // script-src-elem: Controls <script> elements specifically

@@ -189,6 +189,15 @@ function releaseSlot(slotGeneration: number) {
 function getTtlForEndpoint(endpoint: string): number {
   const clean = endpoint.replace(/^\/+/, "");
 
+  // 0. User settings, default semester & default academic year — NEVER cache so checks reflect current live state!
+  if (
+    clean.includes("default_semester") ||
+    clean.includes("default_academic_year") ||
+    clean.includes("user/setting")
+  ) {
+    return 0;
+  }
+
   // 1. Institution settings & lookup lists (1 hour)
   if (
     clean.includes("institution/setting") ||
@@ -221,6 +230,7 @@ function getTtlForEndpoint(endpoint: string): number {
  * @param body - Request body for POST requests
  * @returns Promise with API response data
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Core batch fetch orchestrator with queueing, deduplication, and circuit breaking
 export function fetchEzygoData<T>(
   endpoint: string,
   token: string,
@@ -250,6 +260,9 @@ export function fetchEzygoData<T>(
     : "__SENTINEL_NO_BODY_VALUE__";
   const cacheKey = `${method}:${tokenHash}:${normalizedEndpoint}:${bodyHash}`;
 
+  const ttl = getTtlForEndpoint(normalizedEndpoint);
+  const shouldCache = ttl > 0;
+
   // Prune expired keys for this user
   let keysSet = tokenCacheKeysIndex.get(tokenHash);
   if (keysSet) {
@@ -264,10 +277,12 @@ export function fetchEzygoData<T>(
     }
   }
 
-  // Check if request is already in-flight
-  const existingRequest = requestCache.get(cacheKey);
-  if (existingRequest) {
-    return existingRequest as Promise<T>;
+  // Check if request is already in-flight (only for cacheable endpoints)
+  if (shouldCache) {
+    const existingRequest = requestCache.get(cacheKey);
+    if (existingRequest) {
+      return existingRequest as Promise<T>;
+    }
   }
 
   // Create a deferred promise that we control
@@ -279,20 +294,21 @@ export function fetchEzygoData<T>(
     rejectDeferred = reject;
   });
 
-  const ttl = getTtlForEndpoint(normalizedEndpoint);
-  const cacheSet = requestCache.set as (
-    key: string,
-    value: Promise<unknown>,
-    options?: { ttl?: number },
-  ) => LRUCache<string, Promise<unknown>>;
-  cacheSet.call(requestCache, cacheKey, deferredPromise, { ttl });
+  if (shouldCache) {
+    const cacheSet = requestCache.set as (
+      key: string,
+      value: Promise<unknown>,
+      options?: { ttl?: number },
+    ) => LRUCache<string, Promise<unknown>>;
+    cacheSet.call(requestCache, cacheKey, deferredPromise, { ttl });
 
-  // Add to secondary index
-  if (!keysSet) {
-    keysSet = new Set<string>();
-    tokenCacheKeysIndex.set(tokenHash, keysSet);
+    // Add to secondary index
+    if (!keysSet) {
+      keysSet = new Set<string>();
+      tokenCacheKeysIndex.set(tokenHash, keysSet);
+    }
+    keysSet.add(cacheKey);
   }
-  keysSet.add(cacheKey);
 
   // Execute the actual request asynchronously
   (async () => {

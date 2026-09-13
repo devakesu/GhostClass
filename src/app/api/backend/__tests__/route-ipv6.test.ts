@@ -35,6 +35,10 @@ vi.mock("@/lib/security/auth-cookie", () => ({
 
 vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
+  getSessionIdFromCookie: vi.fn(() => Promise.resolve(null)),
+  verifyCsrfTokenWithSessionBinding: vi.fn(() =>
+    Promise.resolve({ isValid: true })
+  ),
 }));
 
 vi.mock("@/lib/ratelimit", () => ({

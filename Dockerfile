@@ -183,21 +183,17 @@ RUN --mount=type=secret,id=sentry_token \
 # @serwist/next doesn't generate SW with standalone mode, so we compile src/sw.ts manually using esbuild
 # Note: Precaching is disabled (self.__SW_MANIFEST='[]') since we don't have a build-time manifest;
 # runtime caching strategies (NetworkFirst, CacheFirst, StaleWhileRevalidate) can only serve previously cached resources offline (full offline support would require precaching or explicit caching logic)
-RUN if [ ! -f "public/sw.js" ]; then \
-      echo "Compiling service worker from src/sw.ts..."; \
-      ./node_modules/.bin/esbuild src/sw.ts \
-        --bundle \
-        --outfile=public/sw.js \
-        --format=iife \
-        --target=es2020 \
-        --minify \
-        --define:self.__SW_MANIFEST='[]' \
-        --platform=browser \
-        --log-level=warning && \
-      echo "✓ Service worker compiled: $(du -h public/sw.js | cut -f1)"; \
-    else \
-      echo "✓ Service worker already exists"; \
-    fi
+RUN echo "Compiling service worker from src/sw.ts..."; \
+    ./node_modules/.bin/esbuild src/sw.ts \
+      --bundle \
+      --outfile=public/sw.js \
+      --format=iife \
+      --target=es2020 \
+      --minify \
+      --define:self.__SW_MANIFEST='[]' \
+      --platform=browser \
+      --log-level=warning && \
+    echo "✓ Service worker compiled: $(du -h public/sw.js | cut -f1)"
 
 # 2. Normalize timestamps
 RUN find .next -exec touch -d "@${SOURCE_DATE_EPOCH}" {} +

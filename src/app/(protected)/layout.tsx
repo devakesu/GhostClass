@@ -15,6 +15,7 @@ import { cn } from "@/lib/utils";
 import { ErrorBoundary } from "@/components/error-boundary";
 import { ensureCSRFToken } from "@/hooks/use-csrf-token";
 import { OutageProvider } from "@/providers/outage-provider";
+import { AcademicSyncCoordinator } from "@/hooks/use-academic-sync-coordinator";
 
 function ProtectedChrome({ children }: { children: React.ReactNode }) {
   const [isHidden, setIsHidden] = useState(false);
@@ -61,6 +62,7 @@ function ProtectedChrome({ children }: { children: React.ReactNode }) {
     <ErrorBoundary>
       <div className="flex min-h-screen flex-col" suppressHydrationWarning>
         <Toaster />
+        <AcademicSyncCoordinator />
         <>
           <LazyMotion features={domAnimation}>
             <motion.div

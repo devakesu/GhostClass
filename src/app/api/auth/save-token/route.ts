@@ -19,6 +19,7 @@ import {
 } from "@/lib/security/auth-lock";
 import {
   getAllowedHosts,
+  isLoopbackHost,
   resolveRequestHostname,
 } from "@/lib/security/origin-validation";
 
@@ -60,15 +61,16 @@ function validateOrigin(headerList: Headers, isMobileApp: boolean) {
   if (!allowedHosts) return "Server configuration error";
 
   const origin = headerList.get("origin");
+  const requestHostname = resolveRequestHostname({
+    headers: headerList,
+    nextUrl: { hostname: headerList.get("host") ?? "" },
+  } as NextRequest);
+
   if (!origin) {
     const secFetchSite = headerList.get("sec-fetch-site")?.toLowerCase();
-    const requestHostname = resolveRequestHostname({
-      headers: headerList,
-      nextUrl: { hostname: headerList.get("host") ?? "" },
-    } as NextRequest);
     if (
       !(secFetchSite === "same-origin" && !!requestHostname &&
-        allowedHosts.has(requestHostname))
+        (allowedHosts.has(requestHostname) || isLoopbackHost(requestHostname)))
     ) {
       return "Invalid origin";
     }
@@ -77,7 +79,9 @@ function validateOrigin(headerList: Headers, isMobileApp: boolean) {
 
   try {
     const originHostname = new URL(origin).hostname.toLowerCase();
-    if (!allowedHosts.has(originHostname)) return "Invalid origin";
+    const isAllowed = allowedHosts.has(originHostname) ||
+      (isLoopbackHost(originHostname) && isLoopbackHost(requestHostname));
+    if (!isAllowed) return "Invalid origin";
   } catch {
     return "Invalid origin";
   }
