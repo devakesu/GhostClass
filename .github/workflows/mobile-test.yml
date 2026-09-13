@@ -35,17 +35,17 @@ jobs:
           channel: stable
           cache: true
 
+      - name: Install dependencies
+        run: flutter pub get
+
+      - name: Verify formatting
+        run: dart format --output=none --set-exit-if-changed . lib/config/app_secrets.dart.example
+
       - name: Prepare app_secrets.dart
         run: cp lib/config/app_secrets.dart.example lib/config/app_secrets.dart
 
       - name: Generate dynamic firebase.json
         run: node ../scripts/generate-firebase-json.js
-
-      - name: Install dependencies
-        run: flutter pub get
-
-      - name: Verify formatting
-        run: dart format --output=none --set-exit-if-changed .
 
       - name: Run static analysis (Audit)
         run: flutter analyze --fatal-infos --fatal-warnings

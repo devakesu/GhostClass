@@ -97,8 +97,11 @@ describe("firebase-admin", () => {
         token: "mock-token",
       });
 
-      const result = await verifier!.verifyToken("token");
+      const result = await verifier!.verifyToken("token", { consume: true });
       expect(result.appId).toBe("test-app");
+      expect(mockAppCheckService.verifyToken).toHaveBeenCalledWith("token", {
+        consume: true,
+      });
     });
 
     it("uses existing firebase app if already initialized", () => {

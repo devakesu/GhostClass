@@ -14,6 +14,7 @@ import "server-only";
 import { LRUCache } from "lru-cache";
 import { logger } from "./logger";
 import { ezygoCircuitBreaker, NonBreakerError } from "./circuit-breaker";
+export { NonBreakerError } from "./circuit-breaker";
 import { createHash } from "node:crypto";
 import { egressFetch } from "./utils.server";
 
@@ -88,7 +89,7 @@ const requestCache = new LRUCache<string, Promise<unknown>>({
 // This is conservative but safe - increase only if you verify EzyGo's limits
 let activeRequests = 0;
 const MAX_CONCURRENT = 3; // Conservative: 3 concurrent requests from single IP
-const MAX_QUEUE_SIZE = 100; // Prevent unbounded queue growth
+const MAX_QUEUE_SIZE = 250; // Accommodate burst leave application requests
 const QUEUE_TIMEOUT_MS = 30000; // 30 seconds max wait time in queue
 
 // Use a counter for unique queue item identification
@@ -188,6 +189,15 @@ function releaseSlot(slotGeneration: number) {
 function getTtlForEndpoint(endpoint: string): number {
   const clean = endpoint.replace(/^\/+/, "");
 
+  // 0. User settings, default semester & default academic year — NEVER cache so checks reflect current live state!
+  if (
+    clean.includes("default_semester") ||
+    clean.includes("default_academic_year") ||
+    clean.includes("user/setting")
+  ) {
+    return 0;
+  }
+
   // 1. Institution settings & lookup lists (1 hour)
   if (
     clean.includes("institution/setting") ||
@@ -220,6 +230,7 @@ function getTtlForEndpoint(endpoint: string): number {
  * @param body - Request body for POST requests
  * @returns Promise with API response data
  */
+// eslint-disable-next-line sonarjs/cognitive-complexity -- Core batch fetch orchestrator with queueing, deduplication, and circuit breaking
 export function fetchEzygoData<T>(
   endpoint: string,
   token: string,
@@ -236,12 +247,21 @@ export function fetchEzygoData<T>(
   // and keeps raw tokens/bodies out of long-lived cache key / LRU structures, while
   // still using serializedBody transiently for the request. Explicitly encode body
   // presence to distinguish undefined from {} or other falsy values.
-  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const isInstitutional =
+    normalizedEndpoint.includes("institution/setting") ||
+    normalizedEndpoint.includes("attendancetypes") ||
+    normalizedEndpoint.includes("usersubgroups");
+  const tokenHash = isInstitutional
+    ? "GLOBAL_INSTITUTION"
+    : createHash("sha256").update(token).digest("hex");
   const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
   const bodyHash = serializedBody
     ? createHash("sha256").update(serializedBody).digest("hex")
     : "__SENTINEL_NO_BODY_VALUE__";
   const cacheKey = `${method}:${tokenHash}:${normalizedEndpoint}:${bodyHash}`;
+
+  const ttl = getTtlForEndpoint(normalizedEndpoint);
+  const shouldCache = ttl > 0;
 
   // Prune expired keys for this user
   let keysSet = tokenCacheKeysIndex.get(tokenHash);
@@ -257,10 +277,12 @@ export function fetchEzygoData<T>(
     }
   }
 
-  // Check if request is already in-flight
-  const existingRequest = requestCache.get(cacheKey);
-  if (existingRequest) {
-    return existingRequest as Promise<T>;
+  // Check if request is already in-flight (only for cacheable endpoints)
+  if (shouldCache) {
+    const existingRequest = requestCache.get(cacheKey);
+    if (existingRequest) {
+      return existingRequest as Promise<T>;
+    }
   }
 
   // Create a deferred promise that we control
@@ -272,20 +294,21 @@ export function fetchEzygoData<T>(
     rejectDeferred = reject;
   });
 
-  const ttl = getTtlForEndpoint(normalizedEndpoint);
-  const cacheSet = requestCache.set as (
-    key: string,
-    value: Promise<unknown>,
-    options?: { ttl?: number },
-  ) => LRUCache<string, Promise<unknown>>;
-  cacheSet.call(requestCache, cacheKey, deferredPromise, { ttl });
+  if (shouldCache) {
+    const cacheSet = requestCache.set as (
+      key: string,
+      value: Promise<unknown>,
+      options?: { ttl?: number },
+    ) => LRUCache<string, Promise<unknown>>;
+    cacheSet.call(requestCache, cacheKey, deferredPromise, { ttl });
 
-  // Add to secondary index
-  if (!keysSet) {
-    keysSet = new Set<string>();
-    tokenCacheKeysIndex.set(tokenHash, keysSet);
+    // Add to secondary index
+    if (!keysSet) {
+      keysSet = new Set<string>();
+      tokenCacheKeysIndex.set(tokenHash, keysSet);
+    }
+    keysSet.add(cacheKey);
   }
-  keysSet.add(cacheKey);
 
   // Execute the actual request asynchronously
   (async () => {
@@ -384,11 +407,8 @@ export function fetchEzygoData<T>(
 
       resolveDeferred(result);
     } catch (error) {
-      // Only evict transient failures from cache to allow immediate retries
-      // NonBreakerErrors (401/403/404 + config errors) represent permanent/config errors that shouldn't be retried
-      if (!(error instanceof NonBreakerError)) {
-        requestCache.delete(cacheKey);
-      }
+      // Always evict rejected promises so subsequent requests can re-attempt
+      requestCache.delete(cacheKey);
       rejectDeferred(error as Error);
     } finally {
       releaseSlot(slotGeneration);

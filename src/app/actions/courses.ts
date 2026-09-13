@@ -44,13 +44,11 @@ export async function addCourseAction(
     formData.get("csrf_token") ?? formData.get("csrfToken") ?? "",
   );
 
-  // 1. Validate CSRF Token if present in form payload
-  if (csrfToken) {
-    const csrfValid = await validateCsrfToken(csrfToken);
-    if (!csrfValid) {
-      logger.warn("Invalid CSRF token in add course submission");
-      return { error: "Invalid security token. Please refresh and try again." };
-    }
+  // 1. Validate CSRF Token
+  const csrfValid = await validateCsrfToken(csrfToken);
+  if (!csrfValid) {
+    logger.warn("Invalid or missing CSRF token in add course submission");
+    return { error: "Invalid security token. Please refresh and try again." };
   }
 
   // 2. Verify Turnstile Security Token

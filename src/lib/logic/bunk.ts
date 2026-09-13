@@ -16,6 +16,8 @@ export interface AttendanceResult {
   isExact: boolean;
   /** True when slightly above the target but not enough to skip a full class. */
   isBorderline: boolean;
+  /** True when the target percentage is mathematically impossible to reach (e.g. missed classes with 100% target). */
+  isUnreachable?: boolean;
 }
 
 export function calculateAttendance(
@@ -34,6 +36,7 @@ export function calculateAttendance(
       targetPercentage: safeTarget,
       isExact: false,
       isBorderline: false,
+      isUnreachable: false,
     };
   }
 
@@ -46,6 +49,7 @@ export function calculateAttendance(
       targetPercentage: safeTarget,
       isExact: true,
       isBorderline: false,
+      isUnreachable: false,
     };
   }
 
@@ -54,10 +58,11 @@ export function calculateAttendance(
       // Impossible to reach 100% if missed any class
       return {
         canBunk: 0,
-        requiredToAttend: 999,
+        requiredToAttend: -1,
         targetPercentage: safeTarget,
         isExact: false,
         isBorderline: false,
+        isUnreachable: true,
       };
     }
     const required = Math.ceil(

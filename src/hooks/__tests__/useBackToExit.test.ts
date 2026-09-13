@@ -56,6 +56,7 @@ describe("useBackToExit", () => {
   let pushStateSpy: ReturnType<typeof vi.spyOn>;
   let replaceStateSpy: ReturnType<typeof vi.spyOn>;
   let closeSpy: ReturnType<typeof vi.spyOn>;
+  let backSpy: ReturnType<typeof vi.spyOn>;
 
   beforeEach(async () => {
     vi.useFakeTimers();
@@ -65,6 +66,7 @@ describe("useBackToExit", () => {
     pushStateSpy = vi.spyOn(history, "pushState");
     replaceStateSpy = vi.spyOn(history, "replaceState");
     closeSpy = vi.spyOn(window, "close").mockImplementation(() => {});
+    backSpy = vi.spyOn(history, "back").mockImplementation(() => {});
 
     const mod = await import("@/hooks/useBackToExit");
     useBackToExit = mod.useBackToExit;
@@ -77,6 +79,7 @@ describe("useBackToExit", () => {
     pushStateSpy.mockRestore();
     replaceStateSpy.mockRestore();
     closeSpy.mockRestore();
+    backSpy.mockRestore();
   });
 
   // -------------------------------------------------------------------------
@@ -211,7 +214,7 @@ describe("useBackToExit", () => {
       fireMidAppPopState();
     });
 
-    expect(closeSpy).toHaveBeenCalledTimes(1);
+    expect(backSpy).toHaveBeenCalledTimes(1);
   });
 
   it("requires two qualifying non-dashboard backs again after deep-mode threshold expires", () => {
@@ -278,10 +281,10 @@ describe("useBackToExit", () => {
   });
 
   // -------------------------------------------------------------------------
-  // Second sentinel hit within threshold → window.close()
+  // Second sentinel hit within threshold → history.back() / window.close()
   // -------------------------------------------------------------------------
 
-  it("calls window.close() on second sentinel hit within 2 s", () => {
+  it("calls history.back() on second sentinel hit within 2 s when history length > 1", () => {
     renderHook(() => useBackToExit());
     mockToast.mockReturnValueOnce("toast-42");
 
@@ -293,7 +296,27 @@ describe("useBackToExit", () => {
       fireSentinelPopState();
     });
 
+    expect(backSpy).toHaveBeenCalledTimes(1);
+  });
+
+  it("calls window.close() on second sentinel hit when history length is 1", () => {
+    const lengthSpy = vi.spyOn(history, "length", "get").mockReturnValue(1);
+
+    renderHook(() => useBackToExit());
+    mockToast.mockReturnValueOnce("toast-close");
+
+    act(() => {
+      fireSentinelPopState();
+    });
+    act(() => {
+      vi.advanceTimersByTime(500);
+      fireSentinelPopState();
+    });
+
     expect(closeSpy).toHaveBeenCalledTimes(1);
+    expect(backSpy).not.toHaveBeenCalled();
+
+    lengthSpy.mockRestore();
   });
 
   it("dismisses toast before closing on second sentinel hit", () => {
@@ -446,7 +469,7 @@ describe("useBackToExit", () => {
       fireSentinelPopState();
     });
 
-    expect(closeSpy).toHaveBeenCalledTimes(1);
+    expect(backSpy).toHaveBeenCalledTimes(1);
   });
 
   // -------------------------------------------------------------------------

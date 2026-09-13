@@ -46,7 +46,34 @@ describe("settings hooks", () => {
       expect(result.current.data).toEqual("even");
     });
 
-    it("returns null on 404", async () => {
+    it("prioritizes server setting over static profile class semester", async () => {
+      queryClient.setQueryData(["profile"], {
+        id: 1,
+        class: { id: 10, sem: "even", year: "2024-25" },
+      });
+      vi.mocked(axios.get).mockResolvedValue({ data: "odd" });
+      const { result } = renderHook(() => useFetchSemester(), { wrapper });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual("odd");
+    });
+
+    it("falls back to profile class semester when server returns 404", async () => {
+      queryClient.setQueryData(["profile"], {
+        id: 1,
+        class: { id: 10, sem: "even", year: "2024-25" },
+      });
+      vi.mocked(axios.get).mockRejectedValue({
+        isAxiosError: true,
+        response: { status: 404 },
+      });
+      const { result } = renderHook(() => useFetchSemester(), { wrapper });
+
+      await waitFor(() => expect(result.current.isSuccess).toBe(true));
+      expect(result.current.data).toEqual("even");
+    });
+
+    it("returns null on 404 if no profile fallback exists", async () => {
       vi.mocked(axios.get).mockRejectedValue({
         isAxiosError: true,
         response: { status: 404 },

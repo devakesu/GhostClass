@@ -122,7 +122,7 @@ function StatusMessage(
   if (requiredToAttend > 0) {
     return (
       <span className="text-red-500 dark:text-red-400">
-        {!isFinite(requiredToAttend)
+        {!isFinite(requiredToAttend) || requiredToAttend >= 0x7FFFFFFF
           ? <span className="font-bold">Impossible 💀</span>
           : (
             <>
@@ -155,7 +155,7 @@ function renderPanelMetrics(
     );
   }
   if (metrics.requiredToAttend > 0) {
-    if (!isFinite(metrics.requiredToAttend)) {
+    if (!isFinite(metrics.requiredToAttend) || metrics.requiredToAttend >= 0x7FFFFFFF) {
       return (
         <span className="font-bold text-red-500 dark:text-red-400">
           Impossible 💀

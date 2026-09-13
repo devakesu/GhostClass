@@ -32,6 +32,51 @@ export function __resetAllowedHostsCache(): void {
  * PORTS: If your domain includes a non-standard port (e.g., "localhost:3000"),
  * it will be automatically stripped for origin validation.
  */
+function computeAllowedHosts(domain: string): Set<string> {
+  if (domain.includes("://")) {
+    logger.error(
+      "[origin-validation] Invalid NEXT_PUBLIC_APP_DOMAIN configuration: value must not include protocol",
+      { appDomain: domain },
+    );
+    throw new Error(
+      "Configuration error: NEXT_PUBLIC_APP_DOMAIN must be hostname only (e.g., 'example.com', not 'https://example.com')",
+    );
+  }
+
+  let hosts: Set<string>;
+  try {
+    hosts = new Set([new URL(`https://${domain}`).hostname.toLowerCase()]);
+  } catch {
+    hosts = new Set([domain.toLowerCase()]);
+  }
+
+  if (
+    process.env.ALLOW_LOCAL_ORIGIN === "true" ||
+    process.env.ALLOW_LOCALHOST === "true"
+  ) {
+    hosts.add("localhost");
+    hosts.add("127.0.0.1");
+    hosts.add("::1");
+  }
+
+  return hosts;
+}
+
+/**
+ * Determines whether a hostname is a loopback address (localhost / 127.0.0.1 / ::1).
+ */
+export function isLoopbackHost(host: string | null | undefined): boolean {
+  if (!host) return false;
+  const normalized = host.toLowerCase();
+  return (
+    normalized === "localhost" ||
+    normalized === "127.0.0.1" ||
+    normalized === "::1" ||
+    normalized === "[::1]" ||
+    normalized.endsWith(".localhost")
+  );
+}
+
 export function getAllowedHosts(): Set<string> | null {
   const currentAppDomain = process.env.NEXT_PUBLIC_APP_DOMAIN?.trim();
 
@@ -52,26 +97,7 @@ export function getAllowedHosts(): Set<string> | null {
     if (!currentAppDomain) {
       cachedAllowedHosts = null;
     } else {
-      // Validate that host doesn't include protocol (common misconfiguration)
-      if (currentAppDomain.includes("://")) {
-        logger.error(
-          "[origin-validation] Invalid NEXT_PUBLIC_APP_DOMAIN configuration: value must not include protocol",
-          { appDomain: currentAppDomain },
-        );
-        throw new Error(
-          "Configuration error: NEXT_PUBLIC_APP_DOMAIN must be hostname only (e.g., 'example.com', not 'https://example.com')",
-        );
-      }
-
-      try {
-        // Parse as URL to extract hostname (strips port if present)
-        cachedAllowedHosts = new Set([
-          new URL(`https://${currentAppDomain}`).hostname.toLowerCase(),
-        ]);
-      } catch {
-        // Fallback: assume it's already a bare hostname
-        cachedAllowedHosts = new Set([currentAppDomain.toLowerCase()]);
-      }
+      cachedAllowedHosts = computeAllowedHosts(currentAppDomain);
 
       if (process.env.NODE_ENV === "development") {
         logger.dev(
@@ -81,9 +107,6 @@ export function getAllowedHosts(): Set<string> | null {
         );
       }
     }
-    // Only mark as computed after successful execution so a throw (e.g. protocol
-    // misconfiguration) leaves the cache in a retryable state rather than permanently
-    // "computed" with a stale null result.
     cachedAppDomain = currentAppDomain;
     allowedHostsComputed = true;
   }

@@ -126,6 +126,15 @@ class SecurityService {
 
   Future<AppVersionCheckResult?> verifyIntegrity() async {
     if (_disposed) return null;
+    if (AppConfig.bypassAppCheck) {
+      AppLogger.i('SecurityService: App Check bypassed via compile-time flag.');
+      return AppVersionCheckResult(
+        latestVersion: AppConfig.appVersion,
+        minVersion: AppConfig.appVersion,
+        hasUpdate: false,
+        isForceUpdate: false,
+      );
+    }
     final storage = _ref.read(secureStorageProvider);
     final cachedRaw = await storage.getAttestationResult();
     if (_disposed) return null;
@@ -325,6 +334,14 @@ class SecurityService {
   }
 
   Future<AppVersionCheckResult?> _performNetworkVerify() async {
+    if (AppConfig.bypassAppCheck) {
+      return AppVersionCheckResult(
+        latestVersion: AppConfig.appVersion,
+        minVersion: AppConfig.appVersion,
+        hasUpdate: false,
+        isForceUpdate: false,
+      );
+    }
     try {
       final response = await _dio.get<dynamic>(
         '$_ghostclassBaseUrl/security/attestation',

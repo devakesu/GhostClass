@@ -38,6 +38,7 @@ export const renderAttendanceConflictEmail = (props: {
   dashboardUrl: string;
   markedAttendance?: string;
   isDutyLeave?: boolean;
+  remarks?: string | null;
 }): Promise<string> => {
   return render(<AttendanceConflictEmail {...props} />);
 };

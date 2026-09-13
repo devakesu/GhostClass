@@ -159,8 +159,12 @@ void main() {
     when(() => mockStorage.saveUserProfile(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveEzygoUserId(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveTermsVersion(any())).thenAnswer((_) async {});
+    when(() => mockStorage.saveAcademicState(any())).thenAnswer((_) async {});
+    when(() => mockStorage.getAcademicState()).thenAnswer((_) async => null);
     when(() => mockStorage.clearAll()).thenAnswer((_) async {});
     when(() => mockStorage.clearAllCachedData()).thenAnswer((_) async {});
+    when(() => mockStorage.clearEzygoToken()).thenAnswer((_) async {});
+    when(() => mockStorage.saveFcmToken(any())).thenAnswer((_) async {});
 
     when(
       () => mockProfileService.hasRenderableLocalProfile(any()),
@@ -391,6 +395,8 @@ void main() {
     verify(() => mockApi.clearCaches()).called(1);
     verify(() => mockStorage.clearAll()).called(1);
     verify(() => mockAuth.signOut()).called(1);
+    verify(() => mockStorage.clearEzygoToken()).called(1);
+    verify(() => mockStorage.saveFcmToken('')).called(1);
     final verification = verify(
       () => mockAnalytics.logEvent(
         name: 'logout',

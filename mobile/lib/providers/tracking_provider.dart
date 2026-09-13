@@ -75,7 +75,76 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       );
     }
 
-    // 2. Initial Load
+    final storage = ref.read(secureStorageProvider);
+    final user = authState.value!;
+    final cacheKeySuffix =
+        '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+
+    // 1. Try disk cache first for instant boot (<15ms)
+    try {
+      final cachedReportRaw = await storage.getCachedData(
+        'tracking_report_$cacheKeySuffix',
+      );
+      final cachedRecordsRaw = await storage.getCachedData(
+        'tracking_records_$cacheKeySuffix',
+      );
+
+      if (cachedReportRaw is Map && cachedRecordsRaw is List) {
+        final officialReport = AttendanceReportDetailed.fromJson(
+          Map<String, dynamic>.from(cachedReportRaw),
+        );
+        final records = cachedRecordsRaw
+            .map(
+              (json) => TrackingRecord.fromJson(
+                Map<String, dynamic>.from(json as Map),
+              ),
+            )
+            .toList();
+
+        final grouped = <String, List<TrackingRecord>>{};
+        for (final record in records) {
+          final safeId = _resolveToSafeId(
+            record.course,
+            officialReport,
+            academic,
+          );
+          if (!grouped.containsKey(safeId)) grouped[safeId] = [];
+          grouped[safeId]!.add(record);
+        }
+
+        for (final course in grouped.keys) {
+          grouped[course]!.sort(utils.compareTrackingRecords);
+        }
+
+        // Revalidate in background quietly
+        AppLogger.safeUnawait(
+          _fetchAndProcess(academic: academic)
+              .then((fresh) {
+                state = AsyncValue.data(fresh);
+              })
+              .catchError((Object e, StackTrace st) {
+                AppLogger.e(
+                  'TrackingNotifier: Background revalidation failed',
+                  e,
+                  st,
+                );
+              }),
+          'TrackingNotifier: background revalidate',
+        );
+
+        return TrackingState(
+          groupedByCourse: grouped,
+          officialReport: officialReport,
+          totalCount: records.length,
+          isSyncing: false,
+          syncCompleted: true,
+        );
+      }
+    } on Object catch (e) {
+      AppLogger.e('TrackingNotifier: Error loading disk cache', e);
+    }
+
+    // 2. Initial Load from network
     return _fetchAndProcess(academic: academic, isInitial: true);
   }
 
@@ -150,6 +219,23 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     for (final course in grouped.keys) {
       grouped[course]!.sort(utils.compareTrackingRecords);
     }
+
+    final cacheKeySuffix =
+        '${auth.supabaseUserId}_${academic.semester}_${academic.year}';
+    AppLogger.safeUnawait(
+      storage.saveCachedData(
+        'tracking_report_$cacheKeySuffix',
+        officialReport.toJson(),
+      ),
+      'TrackingNotifier: save report cache',
+    );
+    AppLogger.safeUnawait(
+      storage.saveCachedData(
+        'tracking_records_$cacheKeySuffix',
+        records.map((r) => r.toJson()).toList(),
+      ),
+      'TrackingNotifier: save records cache',
+    );
 
     return TrackingState(
       groupedByCourse: grouped,

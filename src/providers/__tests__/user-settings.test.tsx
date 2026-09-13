@@ -426,16 +426,15 @@ describe("UserSettingsProvider", () => {
       });
     });
 
-    it("handles TOKEN_REFRESHED event without throwing", async () => {
+    it("handles TOKEN_REFRESHED event without triggering query invalidation", async () => {
       render(<WrappedConsumer />);
 
+      mockInvalidateQueries.mockClear();
       await act(async () => {
         authStateCallback?.("TOKEN_REFRESHED", { user: { id: "user-123" } });
       });
 
-      expect(mockRemoveQueries).toHaveBeenCalledWith({
-        queryKey: ["userSettings", null],
-      });
+      expect(mockInvalidateQueries).not.toHaveBeenCalled();
     });
 
     it("handles null session in INITIAL_SESSION without throwing", async () => {
@@ -648,6 +647,33 @@ describe("UserSettingsProvider", () => {
           expect.any(Error),
         );
       });
+    });
+
+    it("guards against infinite mutation loop when dbSettings remains null across rerenders", async () => {
+      mockMutate.mockClear();
+      vi.mocked(useQuery).mockReturnValue({
+        data: null,
+        isLoading: false,
+        isFetching: false,
+      } as unknown as ReturnType<typeof useQuery>);
+
+      const { rerender } = render(<WrappedConsumer />);
+
+      await act(async () => {
+        authStateCallback?.("INITIAL_SESSION", {
+          user: { id: "loop-guard-user" },
+        });
+      });
+
+      await waitFor(() => {
+        expect(mockMutate).toHaveBeenCalledTimes(1);
+      });
+
+      // Simulate re-render or pending state completion while dbSettings is still null
+      rerender(<WrappedConsumer />);
+
+      // Should not call mutate a second time due to hasMigratedRef
+      expect(mockMutate).toHaveBeenCalledTimes(1);
     });
   });
 

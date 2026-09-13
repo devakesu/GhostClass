@@ -18,6 +18,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { sendEmail } from "@/lib/email";
+import {
+  renderAttendanceConflictEmail,
+  renderCourseMismatchEmail,
+} from "@/lib/email-templates";
 
 // Mock server-only package so Vitest's jsdom environment doesn't reject it.
 // Must be declared before any module that transitively imports server-only.
@@ -97,6 +101,14 @@ vi.mock("@/lib/ratelimit", () => ({
 // ---------------------------------------------------------------------------
 // Email / template mocks
 // ---------------------------------------------------------------------------
+const mockSendPushNotification = vi.fn().mockResolvedValue({
+  success: true,
+  messageId: "msg-1",
+});
+vi.mock("@/lib/notifications/push", () => ({
+  sendPushNotification: (...args: any[]) => mockSendPushNotification(...args),
+}));
+
 vi.mock(
   "@/lib/email",
   () => ({ sendEmail: vi.fn().mockResolvedValue(undefined) }),
@@ -265,6 +277,7 @@ function buildAdminMock(opts: {
   const notificationInsertSpy = vi.fn().mockResolvedValue({ error: null });
   const usersUpdateSpy = vi.fn().mockReturnValue({
     eq: vi.fn().mockResolvedValue({ error: null }),
+    in: vi.fn().mockResolvedValue({ error: null }),
   });
 
   const usersEqSpy = vi.fn().mockImplementation(() => {
@@ -339,6 +352,11 @@ function buildAdminMock(opts: {
 beforeEach(async () => {
   vi.resetModules();
   vi.clearAllMocks();
+  mockCreateClient.mockResolvedValue({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+    },
+  });
   (mockFetch as any)._courses = undefined;
   (mockFetch as any)._roles = undefined;
   (mockFetch as any)._attendance = undefined;
@@ -521,11 +539,56 @@ describe("Cron sync — official absent, tracker extra (self-mark present) → c
     expect(notifications[0].title).toBe("Attendance Conflict 💀");
     expect(notifications[0].topic).toContain("conflict-");
 
+    expect(notifications[0].description).not.toContain(
+      "Your Manual Record Remarks:",
+    );
+
     // Verify email was sent
     expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: MOCK_USER_ROW.email,
       subject: "Attendance Conflict 💀",
     }));
+  });
+
+  it("appends manual record remarks to notification description and forwards to email on conflict", async () => {
+    const { notificationInsertSpy } = buildAdminMock({
+      trackerData: [
+        {
+          id: 104,
+          course: "1001",
+          date: "2025-12-31",
+          session: "I",
+          attendance: "110",
+          status: "extra",
+          remarks: "Attended lab exam",
+        },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2025-12-31": { "1": ezygoSession(1, 111, 1001) },
+    });
+
+    const res = await GET(makeCronRequest("testuser"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.conflicts).toBe(1);
+
+    expect(notificationInsertSpy).toHaveBeenCalledOnce();
+    const [notifications] = notificationInsertSpy.mock.calls[0];
+    expect(notifications[0].title).toBe("Attendance Conflict 💀");
+    expect(notifications[0].description).toContain(
+      "Your Manual Record Remarks: Attended lab exam",
+    );
+
+    expect(renderAttendanceConflictEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        remarks: "Attended lab exam",
+      }),
+    );
   });
 });
 
@@ -953,6 +1016,127 @@ describe("GET /api/cron/sync — Batch & Auth modes", () => {
     expect(spies.usersQuerySpy).toHaveBeenCalledWith("users");
     expect(spies.usersEqSpy).toHaveBeenCalledWith("auth_id", "u-auth");
   });
+
+  it("syncs the authenticated user when called with user Bearer token (JWT fall-through without app-check)", async () => {
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "u-auth-bearer" } },
+          error: null,
+        }),
+      },
+    } as any);
+
+    const spies = buildAdminMock({
+      usersData: [{ ...MOCK_USER_ROW, auth_id: "u-auth-bearer" }],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({});
+
+    // Standard Bearer auth header - NOT cron secret and NOT app-check
+    const req = new NextRequest("http://localhost/api/cron/sync", {
+      headers: { Authorization: "Bearer valid-user-jwt-token" },
+    });
+
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.processed).toBe(1);
+    expect(spies.usersQuerySpy).toHaveBeenCalledWith("users");
+    expect(spies.usersEqSpy).toHaveBeenCalledWith("auth_id", "u-auth-bearer");
+  });
+
+  it("leases users immediately by updating last_synced_at via .in(...) in cron mode", async () => {
+    const mockUsers = [
+      { ...MOCK_USER_ROW, auth_id: "u1", username: "user1" },
+      { ...MOCK_USER_ROW, auth_id: "u2", username: "user2" },
+    ];
+
+    const spies = buildAdminMock({
+      usersData: mockUsers,
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({});
+
+    const req = new NextRequest("http://localhost/api/cron/sync", {
+      headers: { Authorization: "Bearer cron-secret" },
+    });
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+
+    const usersUpdateCall = spies.usersUpdateSpy.mock.results[0]?.value;
+    expect(usersUpdateCall.in).toHaveBeenCalledWith("auth_id", ["u1", "u2"]);
+  });
+
+  it("skips execution when another cron job holds the distributed redis lock", async () => {
+    const { redis } = await import("@/lib/redis");
+    await redis.set("cron:sync:lock", "locked");
+
+    const req = new NextRequest("http://localhost/api/cron/sync", {
+      headers: { Authorization: "Bearer cron-secret" },
+    });
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.skipped).toBe(true);
+    expect(data.message).toMatch(/already in progress/i);
+
+    // Clean up lock
+    await redis.del("cron:sync:lock");
+  });
+
+  it("purges dead FCM registration token from database when push returns isTerminal: true", async () => {
+    mockSendPushNotification.mockResolvedValueOnce({
+      success: false,
+      error: "Registration token is no longer valid",
+      isTerminal: true,
+    });
+
+    const spies = buildAdminMock({
+      usersData: [
+        {
+          ...MOCK_USER_ROW,
+          auth_id: "u-dead-fcm",
+          fcm_token: "dead-device-token",
+        },
+      ],
+      trackerData: [
+        {
+          id: 103,
+          course: "1001",
+          date: "2025-12-31",
+          session: "I",
+          attendance: "110",
+          status: "extra",
+        },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2025-12-31": { "1": ezygoSession(1, 111, 1001) },
+    });
+
+    const req = new NextRequest(
+      "http://localhost/api/cron/sync?username=testuser",
+      {
+        headers: { Authorization: "Bearer cron-secret" },
+      },
+    );
+    const res = await GET(req);
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.conflicts).toBe(1);
+
+    expect(spies.usersUpdateSpy).toHaveBeenCalledWith({ fcm_token: null });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1172,8 +1356,8 @@ describe("Cron sync — invalid CRON_SECRET → 401", () => {
     });
 
     const res = await GET(req);
-    // Wrong secret is immediately rejected with 403 before any rate limiting.
-    expect(res.status).toBe(403);
+    // Wrong secret falls through to Supabase user JWT verification, which fails with 401
+    expect(res.status).toBe(401);
   });
 });
 
@@ -1252,7 +1436,14 @@ describe("Cron sync — extra Duty Leave entry when official is absent", () => {
     expect(notifications[0].title).toBe("Apply for DL! 📝");
     expect(notifications[0].topic).toBe("conflict-dl-20260728|II");
     expect(notifications[0].description).toBe(
-      "Your extra DL entry for Mathematics For Computer And Information Science-3 (GAMAT301) on 2026-07-28 (Session II) is now updated as absent. You can now apply for duty leave.",
+      "Your extra DL entry for Mathematics For Computer And Information Science-3 (GAMAT301) on 2026-07-28 (Session II) is now updated as absent. You can now apply for duty leave. Your Manual Record Remarks: Attended hackathon",
+    );
+
+    expect(renderAttendanceConflictEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        remarks: "Attended hackathon",
+        isDutyLeave: true,
+      }),
     );
 
     // Verify email with DL subject
@@ -1309,5 +1500,164 @@ describe("Cron sync — course name and code formatting across messages", () => 
     expect(notifications[0].description).toBe(
       "Course mismatch on 2026-07-28 (Session II). Manual: Statistical Methods Lab (PCCBL308), Official: Mathematics For Computer And Information Science-3 (GAMAT301).",
     );
+  });
+
+  it("appends manual record remarks in course mismatch notification and email", async () => {
+    const { notificationInsertSpy } = buildAdminMock({
+      trackerData: [
+        {
+          id: 502,
+          course: "PCCBL308",
+          date: "2026-07-28",
+          session: "II",
+          attendance: "110",
+          status: "extra",
+          remarks: "Attended substitute lecture",
+        },
+      ],
+      courseMappings: [
+        {
+          ezygo_id: 1001,
+          course_name: "MATHEMATICS FOR COMPUTER AND INFORMATION SCIENCE-3",
+          university_code: "GAMAT301",
+        },
+        {
+          ezygo_id: 1002,
+          course_name: "STATISTICAL METHODS LAB",
+          university_code: "PCCBL308",
+        },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2026-07-28": { "2": ezygoSession(2, 110, 1001) },
+    });
+
+    const res = await GET(makeCronRequest("testuser"));
+    expect(res.status).toBe(200);
+
+    expect(notificationInsertSpy).toHaveBeenCalledOnce();
+    const [notifications] = notificationInsertSpy.mock.calls[0];
+    expect(notifications[0].title).toBe("Course Mismatch 💀");
+    expect(notifications[0].description).toBe(
+      "Course mismatch on 2026-07-28 (Session II). Manual: Statistical Methods Lab (PCCBL308), Official: Mathematics For Computer And Information Science-3 (GAMAT301). Your Manual Record Remarks: Attended substitute lecture",
+    );
+
+    expect(renderCourseMismatchEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        remarks: "Attended substitute lecture",
+      }),
+    );
+  });
+});
+
+// ---------------------------------------------------------------------------
+
+describe("Cron sync — Stale / expired token handling (401 & decryption)", () => {
+  it("purges stale token from database and does not fail batch when EzyGo returns 401 in cron mode", async () => {
+    const spies = buildAdminMock({
+      usersData: [
+        {
+          ...MOCK_USER_ROW,
+          auth_id: "u-expired",
+          username: "expired_user",
+          ezygo_token: "encrypted-token-blob",
+        },
+      ],
+    });
+
+    // Attendance API returns 401 Unauthorized
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "Invalid or expired token" }), {
+        status: 401,
+      }),
+    );
+
+    const req = makeCronRequest();
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.errors).toBe(0);
+    expect(body.processed).toBe(0);
+
+    // Verify token was purged
+    const updateCalls = spies.usersUpdateSpy.mock.calls;
+    const purgeCall = updateCalls.find((call) => call[0]?.ezygo_token === null);
+    expect(purgeCall).toBeDefined();
+    expect(purgeCall?.[0].ezygo_iv).toBeNull();
+  });
+
+  it("purges corrupt token from database when decryption fails in cron mode", async () => {
+    const { decrypt } = await import("@/lib/crypto");
+    vi.mocked(decrypt).mockImplementationOnce(() => {
+      throw new Error("Decryption failed");
+    });
+
+    const spies = buildAdminMock({
+      usersData: [
+        {
+          ...MOCK_USER_ROW,
+          auth_id: "u-corrupt",
+          username: "corrupt_user",
+          ezygo_token: "corrupt-invalid-token",
+          ezygo_iv: "invalid-iv",
+        },
+      ],
+    });
+
+    const req = makeCronRequest();
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.errors).toBe(0);
+
+    // Verify token was purged
+    const updateCalls = spies.usersUpdateSpy.mock.calls;
+    const purgeCall = updateCalls.find((call) => call[0]?.ezygo_token === null);
+    expect(purgeCall).toBeDefined();
+    expect(purgeCall?.[0].ezygo_iv).toBeNull();
+  });
+
+  it("returns 200 with partial success in batch cron mode when at least one user succeeds", async () => {
+    buildAdminMock({
+      usersData: [
+        {
+          ...MOCK_USER_ROW,
+          auth_id: "u1",
+          username: "user1",
+        },
+        {
+          ...MOCK_USER_ROW,
+          auth_id: "u2",
+          username: "user2",
+        },
+      ],
+      trackerData: [],
+    });
+
+    // User 1 succeeds
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({});
+
+    // User 2 fails with 502
+    mockFetch.mockResolvedValueOnce(
+      new Response("Bad Gateway", { status: 502 }),
+    );
+
+    const req = makeCronRequest();
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.processed).toBe(1);
+    expect(body.errors).toBe(1);
   });
 });

@@ -8,6 +8,12 @@ vi.mock("@/lib/logger", () => ({
   },
 }));
 
+vi.mock("@/lib/ratelimit", () => ({
+  cspReportRateLimiter: {
+    limit: vi.fn().mockResolvedValue({ success: true }),
+  },
+}));
+
 describe("POST /api/csp-report", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -124,5 +130,25 @@ describe("POST /api/csp-report", () => {
 
     const response = await POST(req);
     expect(response.status).toBe(413);
+  });
+
+  it("returns 429 when rate limit is exceeded", async () => {
+    const { cspReportRateLimiter } = await import("@/lib/ratelimit");
+    vi.mocked(cspReportRateLimiter.limit).mockResolvedValueOnce({ success: false } as any);
+
+    const buffer = Buffer.from(JSON.stringify({ "csp-report": {} }));
+    const req = {
+      headers: {
+        get: vi.fn((name) => {
+          if (name.toLowerCase() === "content-type") return "application/csp-report";
+          if (name.toLowerCase() === "x-forwarded-for") return "203.0.113.1";
+          return null;
+        }),
+      },
+      arrayBuffer: vi.fn().mockResolvedValue(buffer),
+    } as any;
+
+    const response = await POST(req);
+    expect(response.status).toBe(429);
   });
 });

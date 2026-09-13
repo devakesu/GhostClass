@@ -11,6 +11,7 @@ import { withSecurity } from "@/lib/security/app-check";
 import { getAuthTokenServer } from "@/lib/security/auth-cookie";
 import { sendPushNotification } from "@/lib/notifications/push";
 import { sendEmail } from "@/lib/email";
+import { redis } from "@/lib/redis";
 import {
   renderAttendanceConflictEmail,
   renderCourseMismatchEmail,
@@ -19,7 +20,7 @@ import {
 
 export const dynamic = "force-dynamic";
 
-const BATCH_SIZE = 10;
+const BATCH_SIZE = parseInt(process.env.CRON_SYNC_BATCH_SIZE ?? "25", 10) || 25;
 
 const AttendanceSessionSchema = z.object({
   class_type: z.string().nullable().optional(),
@@ -85,6 +86,7 @@ interface AttendanceConflictProps {
   dashboardUrl: string;
   markedAttendance?: string;
   isDutyLeave?: boolean;
+  remarks?: string | null;
 }
 
 interface CourseMetadata {
@@ -178,12 +180,9 @@ function handleAuthentication(
     ) {
       return { isCron: true };
     }
-    return {
-      isCron: false,
-      errorResponse: NextResponse.json({ error: "Unauthorized" }, {
-        status: 403,
-      }),
-    };
+    // INT-05: If timing-safe comparison against CRON_SECRET fails, do not return 403;
+    // fall through so user JWT validation can be attempted.
+    return { isCron: false };
   }
   return { isCron: false };
 }
@@ -211,20 +210,112 @@ async function fetchEzygoResource(
   }
 }
 
+async function purgeStaleCronToken(
+  user: UserSyncData,
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+  reason: string,
+  err?: unknown,
+): Promise<{ expired: true }> {
+  logger.warn(
+    `[cron/sync] ${reason} for ${redact("username", user.username)} (${
+      redact("id", user.auth_id)
+    }) — purging stale token`,
+    err,
+  );
+  await supabaseAdmin.from("users").update({
+    ezygo_token: null,
+    ezygo_iv: null,
+    last_synced_at: new Date().toISOString(),
+  }).eq("auth_id", user.auth_id);
+  return { expired: true };
+}
+
+async function resolveDecryptedToken(
+  user: UserSyncData,
+  isCron: boolean,
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+): Promise<{ token: string } | { expired: true }> {
+  let decryptedToken: string | null = null;
+  try {
+    decryptedToken = decrypt({
+      iv: user.ezygo_iv,
+      content: user.ezygo_token,
+    });
+  } catch (decErr) {
+    if (isCron) {
+      return purgeStaleCronToken(
+        user,
+        supabaseAdmin,
+        "Token decryption failed",
+        decErr,
+      );
+    }
+    throw decErr;
+  }
+
+  if (!decryptedToken) {
+    if (isCron) {
+      return purgeStaleCronToken(
+        user,
+        supabaseAdmin,
+        "Decryption returned empty token",
+      );
+    }
+    throw new Error("Decryption failed");
+  }
+
+  return { token: decryptedToken };
+}
+
+async function attemptCookieFallback(
+  user: UserSyncData,
+  currentDecryptedToken: string,
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+): Promise<{ token: string; res: Response } | null> {
+  const cookieToken = await getAuthTokenServer();
+  if (!cookieToken || cookieToken === currentDecryptedToken) return null;
+
+  const res = await fetchEzygoResource(
+    "attendancereports/student/detailed",
+    cookieToken,
+    "POST",
+    {},
+  );
+  if (res.ok) {
+    const { iv, content } = encrypt(cookieToken);
+    await supabaseAdmin.from("users").update({
+      ezygo_token: content,
+      ezygo_iv: iv,
+    }).eq("auth_id", user.auth_id);
+    return { token: cookieToken, res };
+  }
+  return null;
+}
+
 async function getValidTokenAndAttendance(
   user: UserSyncData,
   isCron: boolean,
   supabaseAdmin: ReturnType<typeof getAdminClient>,
-): Promise<{
-  token: string;
-  officialData: OfficialAttendanceData;
-  officialCourses?: Record<string, unknown>;
-}> {
-  let decryptedToken = decrypt({
-    iv: user.ezygo_iv,
-    content: user.ezygo_token,
-  });
-  if (!decryptedToken) throw new Error("Decryption failed");
+): Promise<
+  | {
+    expired: false;
+    token: string;
+    officialData: OfficialAttendanceData;
+    officialCourses?: Record<string, unknown>;
+  }
+  | {
+    expired: true;
+  }
+> {
+  const tokenResolution = await resolveDecryptedToken(
+    user,
+    isCron,
+    supabaseAdmin,
+  );
+  if ("expired" in tokenResolution) {
+    return tokenResolution;
+  }
+  let decryptedToken = tokenResolution.token;
 
   let attRes = await fetchEzygoResource(
     "attendancereports/student/detailed",
@@ -233,23 +324,22 @@ async function getValidTokenAndAttendance(
     {},
   );
 
-  if (attRes.status === 401 && !isCron) {
-    const cookieToken = await getAuthTokenServer();
-    if (cookieToken && cookieToken !== decryptedToken) {
-      attRes = await fetchEzygoResource(
-        "attendancereports/student/detailed",
-        cookieToken,
-        "POST",
-        {},
+  if (attRes.status === 401) {
+    if (isCron) {
+      return purgeStaleCronToken(
+        user,
+        supabaseAdmin,
+        "EzyGo token expired (401)",
       );
-      if (attRes.ok) {
-        decryptedToken = cookieToken;
-        const { iv, content } = encrypt(decryptedToken);
-        await supabaseAdmin.from("users").update({
-          ezygo_token: content,
-          ezygo_iv: iv,
-        }).eq("auth_id", user.auth_id);
-      }
+    }
+    const fallback = await attemptCookieFallback(
+      user,
+      decryptedToken,
+      supabaseAdmin,
+    );
+    if (fallback) {
+      decryptedToken = fallback.token;
+      attRes = fallback.res;
     }
   }
 
@@ -267,6 +357,7 @@ async function getValidTokenAndAttendance(
   if (!officialParse.success) throw new Error("Invalid attendance data shape");
 
   return {
+    expired: false,
     token: decryptedToken,
     officialData: officialParse.data,
     officialCourses: attData?.courses,
@@ -382,11 +473,15 @@ function handleCourseMismatch(
     attendanceLabel = "Medically Excused";
   }
 
+  const remarksSuffix = item.remarks?.trim()
+    ? ` Your Manual Record Remarks: ${item.remarks.trim()}`
+    : "";
+
   notifications.push({
     auth_user_id: user.auth_id,
     title: "Course Mismatch 💀",
     description:
-      `Course mismatch on ${item.date} (Session ${romanSession}). Manual: ${manualCourseLabel}, Official: ${officialCourseLabel}.`,
+      `Course mismatch on ${item.date} (Session ${romanSession}). Manual: ${manualCourseLabel}, Official: ${officialCourseLabel}.${remarksSuffix}`,
     topic: `conflict-course-${key}`,
   });
   emails.push({
@@ -462,12 +557,15 @@ function handleAttendanceStatus(
     if (item.status === "extra") {
       toUpdateStatus.push(item.id);
       const isDL = trackerCode === 225;
+      const remarksSuffix = item.remarks?.trim()
+        ? ` Your Manual Record Remarks: ${item.remarks.trim()}`
+        : "";
       if (isDL) {
         notifications.push({
           auth_user_id: user.auth_id,
           title: "Apply for DL! 📝",
           description:
-            `Your extra DL entry for ${courseLabel} on ${item.date} (Session ${romanSession}) is now updated as absent. You can now apply for duty leave.`,
+            `Your extra DL entry for ${courseLabel} on ${item.date} (Session ${romanSession}) is now updated as absent. You can now apply for duty leave.${remarksSuffix}`,
           topic: `conflict-dl-${key}`,
         });
         emails.push({
@@ -480,6 +578,7 @@ function handleAttendanceStatus(
             dashboardUrl,
             markedAttendance: "Duty Leave",
             isDutyLeave: true,
+            remarks: item.remarks,
           },
         });
       } else {
@@ -487,7 +586,7 @@ function handleAttendanceStatus(
           auth_user_id: user.auth_id,
           title: "Attendance Conflict 💀",
           description:
-            `Conflict: Marked present for ${courseLabel} on ${item.date} (Session ${romanSession}) but official record is absent.`,
+            `Conflict: Marked present for ${courseLabel} on ${item.date} (Session ${romanSession}) but official record is absent.${remarksSuffix}`,
           topic: `conflict-${key}`,
         });
         emails.push({
@@ -500,6 +599,7 @@ function handleAttendanceStatus(
             dashboardUrl,
             markedAttendance: "Present",
             isDutyLeave: false,
+            remarks: item.remarks,
           },
         });
       }
@@ -631,16 +731,28 @@ async function executeSyncMutations(
   if (notificationsInserted && user.fcm_token) {
     notifications.forEach((n) =>
       notificationPromises.push(
-        sendPushNotification({
-          token: user.fcm_token!,
-          title: n.title,
-          body: n.description,
-          data: {
-            topic: n.topic,
+        (async () => {
+          const res = await sendPushNotification({
+            token: user.fcm_token!,
             title: n.title,
             body: n.description,
-          },
-        }),
+            data: {
+              topic: n.topic,
+              title: n.title,
+              body: n.description,
+            },
+          });
+          if (res.isTerminal && user.auth_id) {
+            logger.warn(
+              `[cron/sync] Purging terminal FCM registration token for ${redact("username", user.username)}`,
+            );
+            user.fcm_token = null;
+            await supabaseAdmin
+              .from("users")
+              .update({ fcm_token: null })
+              .eq("auth_id", user.auth_id);
+          }
+        })(),
       )
     );
   }
@@ -710,12 +822,17 @@ async function syncUser(
   const dashboardUrl = `${appUrl}/dashboard`;
 
   try {
-    const { officialData, officialCourses } = await getValidTokenAndAttendance(
+    const tokenResult = await getValidTokenAndAttendance(
       user,
       isCron,
       supabaseAdmin,
     );
 
+    if (tokenResult.expired) {
+      return stats;
+    }
+
+    const { officialData, officialCourses } = tokenResult;
     stats.processed = 1;
 
     const { data: trackerData } = await supabaseAdmin
@@ -823,58 +940,106 @@ async function syncUser(
   }
 }
 
-export const GET = withSecurity(async (req, { authType }) => {
-  const supabaseAdmin = getAdminClient();
-
-  const auth = handleAuthentication(req, authType!);
-  if (auth.errorResponse) return auth.errorResponse;
-
-  const { searchParams } = new URL(req.url);
-  let users: UserSyncData[] = [];
-
-  if (auth.isCron) {
-    const target = searchParams.get("username");
-    // H-2: Explicit column list — avoids loading sensitive password fields
-    // (auth_password, auth_password_iv) into cron memory.
-    let q = supabaseAdmin.from("users")
-      .select(
-        "username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name",
-      )
-      .not("ezygo_token", "is", null);
-    if (target) q = q.eq("username", target);
-    else q = q.order("last_synced_at", { ascending: true }).limit(BATCH_SIZE);
-    const { data } = await q;
-    users = data || [];
-  } else {
-    const supabase = await createClient();
-    const authHeader = req.headers.get("authorization");
-    const supabaseToken = authHeader?.startsWith("Bearer ")
-      ? authHeader.substring(7)
-      : null;
-
-    const { data: { user } } = supabaseToken
-      ? await supabase.auth.getUser(supabaseToken)
-      : await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+async function acquireCronLock(
+  lockKey: string,
+  ttlSec: number,
+): Promise<{ acquired: boolean; response?: NextResponse }> {
+  try {
+    const lockResult = await redis.set(lockKey, "locked", {
+      nx: true,
+      ex: ttlSec,
+    });
+    if (!lockResult) {
+      logger.info(
+        "[cron/sync] Another sync job is currently running. Skipping duplicate run.",
+      );
+      return {
+        acquired: false,
+        response: NextResponse.json(
+          {
+            success: true,
+            skipped: true,
+            message: "Sync job already in progress",
+          },
+          { status: 200 },
+        ),
+      };
     }
-    // H-2: Explicit column list here too.
-    const { data } = await supabaseAdmin.from("users")
-      .select(
-        "username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name",
-      )
-      .eq("auth_id", user.id);
-    users = data || [];
+    return { acquired: true };
+  } catch (lockErr) {
+    logger.warn(
+      "[cron/sync] Failed to check/acquire distributed lock in Redis:",
+      lockErr,
+    );
+    return { acquired: false };
   }
+}
 
+async function fetchCronUsers(
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+  target: string | null,
+): Promise<UserSyncData[]> {
+  let q = supabaseAdmin.from("users")
+    .select(
+      "username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name",
+    )
+    .not("ezygo_token", "is", null);
+  if (target) q = q.eq("username", target);
+  else q = q.order("last_synced_at", { ascending: true }).limit(BATCH_SIZE);
+  const { data } = await q;
+  const users: UserSyncData[] = data || [];
+
+  if (users.length > 0 && !target) {
+    const userAuthIds = users.map((u) => u.auth_id).filter(Boolean);
+    if (userAuthIds.length > 0) {
+      await supabaseAdmin
+        .from("users")
+        .update({ last_synced_at: new Date().toISOString() })
+        .in("auth_id", userAuthIds);
+    }
+  }
+  return users;
+}
+
+async function fetchSessionUser(
+  req: Request,
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+): Promise<{ users?: UserSyncData[]; errorResponse?: NextResponse }> {
+  const supabase = await createClient();
+  const authHeader = req.headers.get("authorization");
+  const supabaseToken = authHeader?.startsWith("Bearer ")
+    ? authHeader.substring(7)
+    : null;
+
+  const { data: { user } } = supabaseToken
+    ? await supabase.auth.getUser(supabaseToken)
+    : await supabase.auth.getUser();
+
+  if (!user) {
+    return {
+      errorResponse: NextResponse.json({ error: "Unauthorized" }, {
+        status: 401,
+      }),
+    };
+  }
+  const { data } = await supabaseAdmin.from("users")
+    .select(
+      "username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name",
+    )
+    .eq("auth_id", user.id);
+  return { users: data || [] };
+}
+
+async function loadCourseMaps(
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+): Promise<{
+  courseInfoMap: Map<string, CourseMetadata>;
+  universityCodeToEzygoId: Map<string, string>;
+}> {
   const { data: mappings } = await supabaseAdmin.from("course_mappings").select(
     "ezygo_id, course_name, university_code",
   );
   const courseInfoMap = new Map<string, CourseMetadata>();
-  // Reverse map: university_code (upper-cased) → ezygo_id (string)
-  // Used to resolve manually-entered course codes to EzyGo numeric IDs
-  // so the mismatch check isn't triggered for the same course.
   const universityCodeToEzygoId = new Map<string, string>();
   if (mappings) {
     mappings.forEach((m) => {
@@ -895,33 +1060,81 @@ export const GET = withSecurity(async (req, { authType }) => {
       }
     });
   }
+  return { courseInfoMap, universityCodeToEzygoId };
+}
 
-  const overallStats = createEmptyStats();
-  // L-3: Process users concurrently instead of sequentially.
-  // With BATCH_SIZE=10 and 1-2 EzyGo API calls + DB writes per user,
-  // sequential processing takes 30-60 s per cron run. Parallel execution
-  // keeps this well within serverless and Docker health-check timeouts.
-  const userResults = await Promise.all(
-    users.map((user) =>
-      syncUser(
-        user,
-        auth.isCron,
-        supabaseAdmin,
-        courseInfoMap,
-        universityCodeToEzygoId,
-      )
-    ),
-  );
-  for (const userStats of userResults) {
-    overallStats.processed += userStats.processed;
-    overallStats.deletions += userStats.deletions;
-    overallStats.updates += userStats.updates;
-    overallStats.conflicts += userStats.conflicts;
-    overallStats.errors += userStats.errors;
+export const GET = withSecurity(async (req, { authType }) => {
+  const supabaseAdmin = getAdminClient();
+
+  const auth = handleAuthentication(req, authType!);
+  if (auth.errorResponse) return auth.errorResponse;
+
+  const LOCK_KEY = "cron:sync:lock";
+  const LOCK_TTL_SEC = 120;
+  let lockAcquired = false;
+
+  if (auth.isCron) {
+    const lock = await acquireCronLock(LOCK_KEY, LOCK_TTL_SEC);
+    if (lock.response) return lock.response;
+    lockAcquired = lock.acquired;
   }
 
-  const successFlag = overallStats.errors === 0;
-  return NextResponse.json({ success: successFlag, ...overallStats }, {
-    status: successFlag ? 200 : 500,
-  });
+  try {
+    const { searchParams } = new URL(req.url);
+    let users: UserSyncData[] = [];
+
+    if (auth.isCron) {
+      users = await fetchCronUsers(supabaseAdmin, searchParams.get("username"));
+    } else {
+      const sessionResult = await fetchSessionUser(req, supabaseAdmin);
+      if (sessionResult.errorResponse) return sessionResult.errorResponse;
+      users = sessionResult.users || [];
+    }
+
+    const { courseInfoMap, universityCodeToEzygoId } = await loadCourseMaps(
+      supabaseAdmin,
+    );
+
+    const overallStats = createEmptyStats();
+    // L-3: Process users concurrently instead of sequentially.
+    // With BATCH_SIZE=10 and 1-2 EzyGo API calls + DB writes per user,
+    // sequential processing takes 30-60 s per cron run. Parallel execution
+    // keeps this well within serverless and Docker health-check timeouts.
+    const userResults = await Promise.all(
+      users.map((user) =>
+        syncUser(
+          user,
+          auth.isCron,
+          supabaseAdmin,
+          courseInfoMap,
+          universityCodeToEzygoId,
+        )
+      ),
+    );
+    for (const userStats of userResults) {
+      overallStats.processed += userStats.processed;
+      overallStats.deletions += userStats.deletions;
+      overallStats.updates += userStats.updates;
+      overallStats.conflicts += userStats.conflicts;
+      overallStats.errors += userStats.errors;
+    }
+
+    const isBatchCron = auth.isCron && !searchParams.get("username");
+    // In batch cron mode, consider the run successful if at least one user processed
+    // or if there were no errors at all. Only fail the whole batch with 500 if every user errored.
+    const successFlag = isBatchCron
+      ? (overallStats.processed > 0 || overallStats.errors === 0)
+      : overallStats.errors === 0;
+    return NextResponse.json({ success: successFlag, ...overallStats }, {
+      status: successFlag ? 200 : 500,
+    });
+  } finally {
+    if (lockAcquired) {
+      try {
+        await redis.del(LOCK_KEY);
+      } catch (err) {
+        logger.warn("[cron/sync] Failed to release distributed lock:", err);
+      }
+    }
+  }
 });

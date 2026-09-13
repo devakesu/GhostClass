@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import {
   __resetAllowedHostsCache,
   getAllowedHosts,
+  isLoopbackHost,
   normalizeHost,
   resolveRequestHostname,
 } from "../origin-validation";
@@ -42,6 +43,16 @@ describe("Origin Validation Security", () => {
       expect(getAllowedHosts()?.has("example.com")).toBe(true);
     });
 
+    it("includes loopback origins when ALLOW_LOCAL_ORIGIN is true", () => {
+      vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "example.com");
+      vi.stubEnv("ALLOW_LOCAL_ORIGIN", "true");
+      const hosts = getAllowedHosts();
+      expect(hosts?.has("example.com")).toBe(true);
+      expect(hosts?.has("localhost")).toBe(true);
+      expect(hosts?.has("127.0.0.1")).toBe(true);
+      expect(hosts?.has("::1")).toBe(true);
+    });
+
     it("invalidates cache in development when env changes", () => {
       vi.stubEnv("NODE_ENV", "development");
       vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "dev1.com");
@@ -61,6 +72,25 @@ describe("Origin Validation Security", () => {
       expect(() => getAllowedHosts()).toThrow(
         "Configuration error: NEXT_PUBLIC_APP_DOMAIN must be hostname only",
       );
+    });
+  });
+
+  describe("isLoopbackHost", () => {
+    it("recognizes localhost and loopback IPs", () => {
+      expect(isLoopbackHost("localhost")).toBe(true);
+      expect(isLoopbackHost("LOCALHOST")).toBe(true);
+      expect(isLoopbackHost("127.0.0.1")).toBe(true);
+      expect(isLoopbackHost("::1")).toBe(true);
+      expect(isLoopbackHost("[::1]")).toBe(true);
+      expect(isLoopbackHost("subdomain.localhost")).toBe(true);
+    });
+
+    it("rejects non-loopback hosts", () => {
+      expect(isLoopbackHost("example.com")).toBe(false);
+      expect(isLoopbackHost("192.168.1.1")).toBe(false);
+      expect(isLoopbackHost(null)).toBe(false);
+      expect(isLoopbackHost(undefined)).toBe(false);
+      expect(isLoopbackHost("")).toBe(false);
     });
   });
 

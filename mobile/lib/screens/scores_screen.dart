@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/score.dart';
+import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/providers/profile_hydration_service.dart';
 import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/ui_state_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -34,8 +36,22 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
     final scoreState = ref.watch(scoreProvider);
     final user = ref.watch(authProvider).value;
     final isSyncing = user?.isSyncing ?? false;
+    final academicAsync = ref.watch(academicProvider);
+    final data = scoreState.value;
 
-    if (scoreState.isLoading || isSyncing) {
+    if (scoreState.hasError && data == null) {
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: ServiceErrorView(
+          error: scoreState.error,
+          onRetry: () => ref.read(scoreProvider.notifier).refresh(),
+        ),
+      );
+    }
+
+    if (isSyncing ||
+        academicAsync.isLoading ||
+        (scoreState.isLoading && (data == null || data.rawExams.isEmpty))) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -93,8 +109,15 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                   syncCron: () async {
                     final supabaseToken =
                         supabaseClient.auth.currentSession?.accessToken;
-                    if (supabaseToken == null) return;
-                    await apiService.triggerSync(supabaseToken, force: true);
+                    if (supabaseToken == null) return null;
+                    return apiService.runCronSync(supabaseToken, force: true);
+                  },
+                  onSyncResult: (result) {
+                    if (result is CronSyncResult && result.hasChanges) {
+                      ref
+                          .read(profileHydrationServiceProvider.notifier)
+                          .handleCronSyncResult(result);
+                    }
                   },
                   refreshData: scoreNotifier.refresh,
                 );
@@ -204,12 +227,13 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                             ),
                           ),
                         ),
-                  loading: () =>
-                      const SliverFillRemaining(child: SizedBox.shrink()),
+                  loading: () => const SliverFillRemaining(
+                    child: LoadingOverlay(isFullScreen: false, showLogo: false),
+                  ),
                   error: (err, _) => SliverFillRemaining(
                     child: ServiceErrorView(
                       error: err,
-                      onRetry: () => ref.invalidate(scoreProvider),
+                      onRetry: () => ref.read(scoreProvider.notifier).refresh(),
                     ),
                   ),
                 ),

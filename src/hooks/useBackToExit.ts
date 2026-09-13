@@ -15,7 +15,12 @@ function getHistoryState(): Record<string, unknown> {
     : {};
 }
 
-export function useBackToExit(): void {
+export interface UseBackToExitOptions {
+  thresholdMs?: number;
+}
+
+export function useBackToExit(options: UseBackToExitOptions = {}): void {
+  const threshold = options.thresholdMs ?? THRESHOLD_MS;
   const firstBackTimeRef = useRef<number | null>(null);
   const toastIdRef = useRef<ReturnType<typeof toast> | null>(null);
   const exitArmedRef = useRef(false);
@@ -64,7 +69,7 @@ export function useBackToExit(): void {
       };
 
       newId = toast("Press back again to exit", {
-        duration: THRESHOLD_MS,
+        duration: threshold,
         onDismiss: handleClear,
         onAutoClose: handleClear,
       });
@@ -85,9 +90,13 @@ export function useBackToExit(): void {
         exitArmedRef.current && exitModeRef.current === "deep" &&
         firstBackTimeRef.current
       ) {
-        if (now - firstBackTimeRef.current < THRESHOLD_MS) {
+        if (now - firstBackTimeRef.current < threshold) {
           resetExitState();
-          window.close();
+          if (window.history.length > 1) {
+            window.history.back();
+          } else {
+            window.close();
+          }
           return;
         }
         resetExitState();
@@ -108,10 +117,14 @@ export function useBackToExit(): void {
         exitArmedRef.current &&
         exitModeRef.current === "root" &&
         firstBackTimeRef.current &&
-        now - firstBackTimeRef.current < THRESHOLD_MS
+        now - firstBackTimeRef.current < threshold
       ) {
         resetExitState();
-        window.close();
+        if (window.history.length > 1) {
+          window.history.back();
+        } else {
+          window.close();
+        }
         return;
       }
 
@@ -145,5 +158,5 @@ export function useBackToExit(): void {
       window.removeEventListener("popstate", handlePopState);
       resetExitState();
     };
-  }, []);
+  }, [threshold]);
 }

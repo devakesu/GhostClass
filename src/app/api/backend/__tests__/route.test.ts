@@ -21,6 +21,10 @@ vi.mock("@/lib/security/auth-cookie", () => ({
 
 vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
+  getSessionIdFromCookie: vi.fn(() => Promise.resolve(null)),
+  verifyCsrfTokenWithSessionBinding: vi.fn(() =>
+    Promise.resolve({ isValid: true })
+  ),
 }));
 
 vi.mock("@/lib/ratelimit", () => ({
@@ -562,6 +566,31 @@ describe("Backend Proxy Route", () => {
       expect(response.status).toBe(400);
       const body = await response.json();
       expect(body.message).toBe("Invalid path format");
+    });
+
+    it("should reject requests with path traversal segments", async () => {
+      const request = new NextRequest(
+        "http://localhost:3000/api/backend/..",
+        {
+          method: "GET",
+        },
+      );
+
+      const response1 = await forward(request, "GET", ["..", "internal"]);
+      expect(response1.status).toBe(400);
+      expect((await response1.json()).message).toBe("Invalid path segment");
+
+      const response2 = await forward(request, "GET", ["."]);
+      expect(response2.status).toBe(400);
+      expect((await response2.json()).message).toBe("Invalid path segment");
+
+      const response3 = await forward(request, "GET", ["user/info"]);
+      expect(response3.status).toBe(400);
+      expect((await response3.json()).message).toBe("Invalid path segment");
+
+      const response4 = await forward(request, "GET", ["user\\info"]);
+      expect(response4.status).toBe(400);
+      expect((await response4.json()).message).toBe("Invalid path segment");
     });
 
     it("should accept valid path segments", async () => {

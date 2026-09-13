@@ -3,6 +3,7 @@ vi.unmock("@/hooks/courses/attendance");
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import {
   _resetModuleState,
+  resetWorkingSummaryEndpoint,
   useAllCourseDetails,
   useAttendanceReport,
   useCourseDetails,
@@ -198,6 +199,158 @@ describe("attendance hooks", () => {
       );
       expect(axios.get).toHaveBeenCalledWith(
         "/attendancereports/institutionuser/courses/456/summary",
+      );
+    });
+
+    it("should not lock to /summary when /summery failure is transient (e.g. 502)", async () => {
+      // First call encounters a 502 Bad Gateway
+      const transientErr = new Error("Bad Gateway");
+      (transientErr as any).response = { status: 502 };
+
+      (axios.get as any)
+        .mockRejectedValueOnce(transientErr)
+        .mockResolvedValueOnce({ data: { total: 5, percentage: 100 } });
+
+      const wrapper = createWrapper();
+      const { result: firstResult } = renderHook(
+        () => useCourseDetails("CS102", 456),
+        { wrapper },
+      );
+
+      await waitFor(() => expect(firstResult.current.isSuccess).toBe(true));
+      expect(axios.get).toHaveBeenCalledWith(
+        "/attendancereports/institutionuser/courses/456/summery",
+      );
+      expect(axios.get).toHaveBeenCalledWith(
+        "/attendancereports/institutionuser/courses/456/summary",
+      );
+
+      vi.clearAllMocks();
+
+      // Subsequent call should STILL attempt /summery first because previous error was transient
+      (axios.get as any).mockResolvedValueOnce({
+        data: { total: 10, percentage: 90 },
+      });
+
+      const { result: secondResult } = renderHook(
+        () => useCourseDetails("CS103", 789),
+        { wrapper },
+      );
+
+      await waitFor(() => expect(secondResult.current.isSuccess).toBe(true));
+      expect(axios.get).toHaveBeenCalledWith(
+        "/attendancereports/institutionuser/courses/789/summery",
+      );
+    });
+
+    it("should lock to /summary when /summery failure is 404 Not Found", async () => {
+      const notFoundErr = new Error("Not Found");
+      (notFoundErr as any).response = { status: 404 };
+
+      (axios.get as any)
+        .mockRejectedValueOnce(notFoundErr)
+        .mockResolvedValueOnce({ data: { total: 5, percentage: 100 } });
+
+      const wrapper = createWrapper();
+      const { result: firstResult } = renderHook(
+        () => useCourseDetails("CS102", 456),
+        { wrapper },
+      );
+
+      await waitFor(() => expect(firstResult.current.isSuccess).toBe(true));
+
+      vi.clearAllMocks();
+
+      // Subsequent call should skip /summery and directly use cached /summary
+      (axios.get as any).mockResolvedValueOnce({
+        data: { total: 10, percentage: 90 },
+      });
+
+      const { result: secondResult } = renderHook(
+        () => useCourseDetails("CS103", 789),
+        { wrapper },
+      );
+
+      await waitFor(() => expect(secondResult.current.isSuccess).toBe(true));
+      expect(axios.get).toHaveBeenCalledWith(
+        "/attendancereports/institutionuser/courses/789/summary",
+      );
+    });
+
+    it("should scope cached endpoints per institution key", async () => {
+      const notFoundErr = new Error("Not Found");
+      (notFoundErr as any).response = { status: 404 };
+
+      // Institution "instA" has 404 on /summery -> caches /summary
+      (axios.get as any)
+        .mockRejectedValueOnce(notFoundErr)
+        .mockResolvedValueOnce({ data: { total: 5, percentage: 100 } });
+
+      const wrapper = createWrapper();
+      const { result: instAResult } = renderHook(
+        () =>
+          useCourseDetails("CS102", 456, undefined, {
+            institutionKey: "instA",
+          }),
+        { wrapper },
+      );
+
+      await waitFor(() => expect(instAResult.current.isSuccess).toBe(true));
+
+      vi.clearAllMocks();
+
+      // Institution "instB" should NOT be polluted by instA and should try /summery first
+      (axios.get as any).mockResolvedValueOnce({
+        data: { total: 12, percentage: 85 },
+      });
+
+      const { result: instBResult } = renderHook(
+        () =>
+          useCourseDetails("CS104", 999, undefined, {
+            institutionKey: "instB",
+          }),
+        { wrapper },
+      );
+
+      await waitFor(() => expect(instBResult.current.isSuccess).toBe(true));
+      expect(axios.get).toHaveBeenCalledWith(
+        "/attendancereports/institutionuser/courses/999/summery",
+      );
+    });
+
+    it("should reset cached endpoint when resetWorkingSummaryEndpoint is called", async () => {
+      const notFoundErr = new Error("Not Found");
+      (notFoundErr as any).response = { status: 404 };
+
+      (axios.get as any)
+        .mockRejectedValueOnce(notFoundErr)
+        .mockResolvedValueOnce({ data: { total: 5, percentage: 100 } });
+
+      const wrapper = createWrapper();
+      const { result: firstResult } = renderHook(
+        () => useCourseDetails("CS102", 456),
+        { wrapper },
+      );
+
+      await waitFor(() => expect(firstResult.current.isSuccess).toBe(true));
+
+      // Reset endpoint cache
+      resetWorkingSummaryEndpoint();
+      vi.clearAllMocks();
+
+      (axios.get as any).mockResolvedValueOnce({
+        data: { total: 10, percentage: 90 },
+      });
+
+      const { result: secondResult } = renderHook(
+        () => useCourseDetails("CS103", 789),
+        { wrapper },
+      );
+
+      await waitFor(() => expect(secondResult.current.isSuccess).toBe(true));
+      // Should attempt /summery again after reset
+      expect(axios.get).toHaveBeenCalledWith(
+        "/attendancereports/institutionuser/courses/789/summery",
       );
     });
   });

@@ -47,11 +47,10 @@ function createNonce() {
 function applyProxyHeaders(
   response: NextResponse,
   cspHeader: string,
-  nonce: string,
+  _nonce: string,
   isApiDocs: boolean,
 ) {
   response.headers.set("Content-Security-Policy", cspHeader);
-  response.headers.set("x-nonce", nonce);
   if (isApiDocs) {
     response.headers.set("X-Robots-Tag", "noindex, nofollow");
   }
@@ -429,7 +428,6 @@ export async function proxy(request: NextRequest) {
     : cspHeader;
 
   response.headers.set("Content-Security-Policy", effectiveCspHeader);
-  response.headers.set("x-nonce", nonce);
   if (isApiDocs) {
     // M-2: Restrict indexing under degraded CSP for Scalar docs.
     response.headers.set("X-Robots-Tag", "noindex, nofollow");

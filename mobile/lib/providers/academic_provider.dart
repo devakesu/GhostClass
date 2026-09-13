@@ -70,6 +70,17 @@ class AcademicState {
     );
     return DateTime(parsed.$2, 6, 30, 23, 59, 59);
   }
+
+  /// Checks whether an academic rollover has occurred relative to another state.
+  bool hasRollover(AcademicState? other) {
+    if (other == null) return false;
+    return hasAcademicRollover(
+      oldSemester: semester,
+      oldYear: year,
+      newSemester: other.semester,
+      newYear: other.year,
+    );
+  }
 }
 
 final academicProvider =

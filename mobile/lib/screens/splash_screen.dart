@@ -19,6 +19,7 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/providers/leave_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/providers/profile_hydration_service.dart';
 import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -139,7 +140,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             authStack = st;
           });
 
-      api.clearCaches();
       AppLogger.i('SplashScreen: Awaiting Future.wait...');
       await Future.wait<dynamic>([
         integrityTask,
@@ -204,12 +204,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     );
   }
 
-  void _prewarmAppData({
+  void _prewarmCriticalData({
     required Future<dynamic> dashboardFuture,
     required Future<dynamic> trackingFuture,
-    required Future<dynamic> leaveFuture,
-    required Future<dynamic> scoreFuture,
-    required Future<dynamic> notificationsFuture,
   }) {
     void prewarm(Future<dynamic> future, String label) {
       AppLogger.safeUnawait(
@@ -223,11 +220,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     prewarm(dashboardFuture, 'dashboard');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       prewarm(trackingFuture, 'tracking');
-      prewarm(leaveFuture, 'leave');
-      Future.delayed(const Duration(milliseconds: 150), () {
-        prewarm(scoreFuture, 'scores');
-        prewarm(notificationsFuture, 'notifications');
-      });
     });
   }
 
@@ -251,11 +243,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
-    // Keep the splash visible for 1.5s to improve perceived startup time
+    // Keep the splash visible for 750ms to allow entrance animation to play cleanly
     final splashHold = Future<void>.delayed(
-      const Duration(milliseconds: 1500),
+      const Duration(milliseconds: 750),
       () {
-        AppLogger.i('SplashScreen: 1.5s delay completed');
+        AppLogger.i('SplashScreen: 350ms entrance animation delay completed');
       },
     );
 
@@ -445,26 +437,51 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final token = supabaseClient.auth.currentSession?.accessToken;
 
     if (finalUser != null) {
+      final storage = ref.read(secureStorageProvider);
+      final localAcademic = await storage.getAcademicState();
+      final hasLocalAcademic =
+          localAcademic != null &&
+          localAcademic.semester.trim().isNotEmpty &&
+          localAcademic.year.trim().isNotEmpty;
+
+      if (!hasLocalAcademic) {
+        AppLogger.i(
+          'SplashScreen: Missing local academic state. Running fallback blocking profile sync...',
+        );
+        try {
+          await ref
+              .read(profileHydrationServiceProvider.notifier)
+              .runProfileRefresh(finalUser, sync: true, force: true);
+        } on Object catch (syncErr, syncSt) {
+          AppLogger.e(
+            'SplashScreen: Fallback blocking profile sync failed',
+            syncErr,
+            syncSt,
+          );
+        }
+      }
+
+      if (!mounted) return;
+
       if (finalUser.termsAccepted) {
         final dashboardFuture = ref.read(dashboardProvider.future);
         final trackingFuture = ref.read(trackingProvider.future);
-        final leaveFuture = ref.read(leaveProvider.future);
-        final scoreFuture = ref.read(scoreProvider.future);
-        final notificationsFuture = ref.read(notificationsProvider.future);
+
+        _prewarmCriticalData(
+          dashboardFuture: dashboardFuture,
+          trackingFuture: trackingFuture,
+        );
 
         _startPushInitInBackgroundAfterSplash(pushService);
+        final refContainer = ProviderScope.containerOf(context);
         context.go('/dashboard');
         AppLogger.safeUnawait(
-          Future<void>.microtask(() async {
-            _triggerCronSyncAndPrewarm(
+          Future<void>.delayed(const Duration(seconds: 3), () async {
+            _triggerDeferredPreloads(
+              container: refContainer,
               user: finalUser,
               apiService: apiService,
               token: token,
-              dashboardFuture: dashboardFuture,
-              trackingFuture: trackingFuture,
-              leaveFuture: leaveFuture,
-              scoreFuture: scoreFuture,
-              notificationsFuture: notificationsFuture,
             );
             _startPostNavigationPreloads(
               apiService: apiService,
@@ -507,34 +524,48 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
   }
 
-  void _triggerCronSyncAndPrewarm({
+  void _triggerDeferredPreloads({
+    required ProviderContainer container,
     required AuthenticatedUser user,
     required ApiService apiService,
     required String? token,
-    required Future<dynamic> dashboardFuture,
-    required Future<dynamic> trackingFuture,
-    required Future<dynamic> leaveFuture,
-    required Future<dynamic> scoreFuture,
-    required Future<dynamic> notificationsFuture,
   }) {
-    // 1. Trigger Cron Sync in parallel (fire-and-forget)
+    // 1. Trigger Cron Sync deferred in background
     if (token != null) {
       AppLogger.safeUnawait(
-        apiService.scheduleSync(token).catchError((Object e, StackTrace st) {
-          AppLogger.e('SplashScreen: Cron Sync failed', e, st);
-        }),
+        apiService
+            .runCronSync(token)
+            .then((result) {
+              if (result != null && result.hasChanges) {
+                AppLogger.i(
+                  'SplashScreen: Background cron sync reported changes ($result). '
+                  'Invalidating all screen providers.',
+                );
+                container
+                    .read(profileHydrationServiceProvider.notifier)
+                    .handleCronSyncResult(result);
+              }
+            })
+            .catchError((Object e, StackTrace st) {
+              AppLogger.e('SplashScreen: Cron Sync failed', e, st);
+            }),
         'SplashScreen: Cron Sync',
       );
     }
 
-    // 2. Prewarm all other screen queries
-    _prewarmAppData(
-      dashboardFuture: dashboardFuture,
-      trackingFuture: trackingFuture,
-      leaveFuture: leaveFuture,
-      scoreFuture: scoreFuture,
-      notificationsFuture: notificationsFuture,
-    );
+    // 2. Prewarm deferred screen queries
+    void prewarm(Future<dynamic> future, String label) {
+      AppLogger.safeUnawait(
+        future.catchError((Object e, StackTrace st) {
+          AppLogger.e('SplashScreen: $label prewarm failed', e, st);
+        }),
+        'SplashScreen: $label prewarm',
+      );
+    }
+
+    prewarm(container.read(leaveProvider.future), 'leave');
+    prewarm(container.read(scoreProvider.future), 'scores');
+    prewarm(container.read(notificationsProvider.future), 'notifications');
   }
 
   @override

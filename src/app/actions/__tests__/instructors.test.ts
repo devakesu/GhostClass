@@ -20,6 +20,10 @@ vi.mock("next/cache", () => ({
   revalidatePath: vi.fn(),
 }));
 
+vi.mock("@/lib/security/csrf", () => ({
+  validateCsrfToken: vi.fn(() => Promise.resolve(true)),
+}));
+
 vi.mock("@sentry/nextjs", () => ({
   captureException: vi.fn(),
 }));
@@ -31,6 +35,18 @@ describe("instructor actions", () => {
   });
 
   describe("upsertInstructorAction", () => {
+    it("returns error if csrf token is invalid or missing", async () => {
+      const { validateCsrfToken } = await import("@/lib/security/csrf");
+      vi.mocked(validateCsrfToken).mockResolvedValueOnce(false);
+      const formData = new FormData();
+      formData.append("courseCode", "CS101");
+      formData.append("instructorName", "Dr. Smith");
+      const result = await upsertInstructorAction(formData);
+      expect(result.error).toBe(
+        "Invalid security token. Please refresh and try again.",
+      );
+    });
+
     it("returns error if courseCode or instructorName is missing", async () => {
       const formData = new FormData();
       formData.append("courseCode", "");

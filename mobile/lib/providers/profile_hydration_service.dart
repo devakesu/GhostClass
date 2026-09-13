@@ -9,6 +9,11 @@ import 'package:ghostclass/models/institution.dart';
 import 'package:ghostclass/models/user.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/providers/dashboard_provider.dart';
+import 'package:ghostclass/providers/leave_provider.dart';
+import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/providers/score_provider.dart';
+import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
@@ -144,13 +149,49 @@ class ProfileHydrationService extends Notifier<void> {
       ezygoToken: ezygoToken ?? '',
     );
 
+    final localAcademic = await storage.getAcademicState();
+    final hasAcademic =
+        localAcademic != null &&
+        localAcademic.semester.trim().isNotEmpty &&
+        localAcademic.year.trim().isNotEmpty;
+
+    if (hasAcademic) {
+      ref.read(academicProvider.notifier).updateState(localAcademic);
+    }
+
     // Trigger profile sync in parallel without blocking startup/splash screen
     AppLogger.safeUnawait(
       runBackgroundStartupHydration(user),
       'AuthNotifier: background startup hydration',
     );
 
-    return user.copyWith(isSyncing: true);
+    return user.copyWith(isSyncing: !hasAcademic);
+  }
+
+  void invalidateAllScreenProviders({bool includeNotifications = true}) {
+    if (includeNotifications) {
+      ref.invalidate(notificationsProvider);
+    }
+    ref
+      ..invalidate(dashboardProvider)
+      ..invalidate(trackingProvider)
+      ..invalidate(leaveProvider)
+      ..invalidate(scoreProvider);
+  }
+
+  void handleCronSyncResult(CronSyncResult? result) {
+    if (result == null) return;
+    if (result.hasChanges) {
+      AppLogger.i(
+        'ProfileHydrationService: Cron sync reported changes ($result). '
+        'Invalidating all screen providers.',
+      );
+      invalidateAllScreenProviders();
+    } else {
+      AppLogger.d(
+        'ProfileHydrationService: Cron sync reported no changes ($result).',
+      );
+    }
   }
 
   Future<void> runBackgroundStartupHydration(
@@ -423,9 +464,13 @@ class ProfileHydrationService extends Notifier<void> {
         : Map<String, dynamic>.from(data);
 
     rawProfile['current_semester'] =
-        data['current_semester'] ?? rawProfile['current_semester'];
+        data['current_semester'] ??
+        rawProfile['current_semester'] ??
+        currentUser.profile?.currentSemester;
     rawProfile['current_year'] =
-        data['current_year'] ?? rawProfile['current_year'];
+        data['current_year'] ??
+        rawProfile['current_year'] ??
+        currentUser.profile?.currentYear;
 
     final profile = UserProfile.fromJson(rawProfile);
 
@@ -551,15 +596,16 @@ class ProfileHydrationService extends Notifier<void> {
     final newYear = profile.currentYear;
     final newClassLabel = profile.classField?.name;
 
-    final oldSem = currentUser.profile?.currentSemester;
-    final oldYear = currentUser.profile?.currentYear;
+    final localAcademic = await storage.getAcademicState();
+    final oldSem =
+        currentUser.profile?.currentSemester ?? localAcademic?.semester;
+    final oldYear = currentUser.profile?.currentYear ?? localAcademic?.year;
     final oldClassLabel = currentUser.profile?.classField?.name;
 
     final classChanged =
         oldClassLabel != null && oldClassLabel != newClassLabel;
     final academicChanged =
-        (oldSem != null && oldSem != newSem) ||
-        (oldYear != null && oldYear != newYear);
+        semestersDiffer(oldSem, newSem) || yearsDiffer(oldYear, newYear);
 
     if (academicChanged || classChanged) {
       AppLogger.i(
@@ -569,27 +615,71 @@ class ProfileHydrationService extends Notifier<void> {
       ref.read(apiServiceProvider).clearCaches();
       await storage.clearAllCachedData();
 
+      if (nextAcademic != null) {
+        await storage.saveAcademicState(nextAcademic);
+        ref.read(academicProvider.notifier).updateState(nextAcademic);
+      }
+
       ref.invalidate(academicProvider);
+      invalidateAllScreenProviders();
     } else {
       if (nextAcademic != null) {
-        AppLogger.safeUnawait(
-          Future.delayed(Duration.zero, () {
-            ref
-                .read(academicProvider.notifier)
-                .updateState(
-                  nextAcademic,
-                );
-          }).catchError((Object e, StackTrace st) {
-            AppLogger.e('AuthNotifier: Deferred academic set failed', e, st);
-          }),
-          'AuthNotifier: deferred academic set',
-        );
+        try {
+          ref.read(academicProvider.notifier).updateState(nextAcademic);
+        } on Object catch (e) {
+          AppLogger.d('AuthNotifier: Direct academic set skipped: $e');
+        }
       }
     }
 
     if (updateState) authNotifier.updateState(mergedUser);
     _lastRefresh = DateTime.now();
     return mergedUser;
+  }
+
+  static bool yearsDiffer(String? y1, String? y2) {
+    if (y1 == null || y2 == null) return false;
+    final s1 = y1.trim();
+    final s2 = y2.trim();
+    if (s1 == s2) return false;
+
+    final nums1 = RegExp(
+      r'\d+',
+    ).allMatches(s1).map((m) => m.group(0)!).toList();
+    final nums2 = RegExp(
+      r'\d+',
+    ).allMatches(s2).map((m) => m.group(0)!).toList();
+    if (nums1.isEmpty || nums2.isEmpty) return s1 != s2;
+
+    final norm1 = nums1
+        .map(
+          (n) => n.length > 2 ? n.substring(n.length - 2) : n.padLeft(2, '0'),
+        )
+        .toList();
+    final norm2 = nums2
+        .map(
+          (n) => n.length > 2 ? n.substring(n.length - 2) : n.padLeft(2, '0'),
+        )
+        .toList();
+    if (norm1.length == norm2.length) {
+      for (var i = 0; i < norm1.length; i++) {
+        if (norm1[i] != norm2[i]) return true;
+      }
+      return false;
+    }
+    return s1 != s2;
+  }
+
+  static String normalizeSem(String s) {
+    final lower = s.trim().toLowerCase();
+    if (lower == '1' || lower == 'odd' || lower == 'i') return 'odd';
+    if (lower == '2' || lower == 'even' || lower == 'ii') return 'even';
+    return lower;
+  }
+
+  static bool semestersDiffer(String? s1, String? s2) {
+    if (s1 == null || s2 == null) return false;
+    return normalizeSem(s1) != normalizeSem(s2);
   }
 
   String? _extractTermsVersion(Map<String, dynamic> data) {

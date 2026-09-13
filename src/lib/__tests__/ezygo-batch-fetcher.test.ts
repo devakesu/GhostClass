@@ -131,14 +131,14 @@ describe("ezygo-batch-fetcher", () => {
     fetchEzygoData("/2", "token").catch(() => {});
     fetchEzygoData("/3", "token").catch(() => {});
 
-    // Fill queue (100)
-    for (let i = 0; i < 100; i++) {
+    // Fill queue (250)
+    for (let i = 0; i < 250; i++) {
       fetchEzygoData(`/q${i}`, "token").catch(() => {});
     }
 
-    expect(getRateLimiterStats().queueLength).toBe(100);
+    expect(getRateLimiterStats().queueLength).toBe(250);
 
-    // 101st queued request should throw
+    // 251st queued request should throw
     await expect(fetchEzygoData("/full", "token")).rejects.toThrow(
       QueueFullError,
     );
@@ -184,7 +184,7 @@ describe("ezygo-batch-fetcher", () => {
     expect(result).toEqual({ retried: true });
   });
 
-  it("does NOT evict from cache on NonBreakerError", async () => {
+  it("evicts from cache on NonBreakerError so subsequent requests can re-attempt", async () => {
     (egressFetch as any).mockResolvedValue({
       ok: false,
       status: 404,
@@ -195,11 +195,38 @@ describe("ezygo-batch-fetcher", () => {
       NonBreakerError,
     );
 
-    // Subsequent calls for same key should return the SAME rejected promise
-    const p2 = fetchEzygoData("/404", "token");
-    await expect(p2).rejects.toThrow(NonBreakerError);
+    // Subsequent calls for same key should re-attempt since rejected promises are evicted
+    (egressFetch as any).mockResolvedValue({
+      ok: true,
+      text: () => Promise.resolve('{"found":true}'),
+    });
 
-    expect(egressFetch).toHaveBeenCalledTimes(1);
+    const p2 = await fetchEzygoData("/404", "token");
+    expect(p2).toEqual({ found: true });
+    expect(egressFetch).toHaveBeenCalledTimes(2);
+  });
+
+  it("never caches default_semester or default_academic_year endpoints", async () => {
+    (egressFetch as any).mockImplementation((endpoint: string) => {
+      if (endpoint.includes("default_semester")) {
+        return Promise.resolve({
+          ok: true,
+          text: () => Promise.resolve("even"),
+        });
+      }
+      return Promise.resolve({
+        ok: true,
+        text: () => Promise.resolve("2024-25"),
+      });
+    });
+
+    const sem1 = await fetchEzygoData("/user/setting/default_semester", "token");
+    const sem2 = await fetchEzygoData("/user/setting/default_semester", "token");
+
+    expect(sem1).toBe("even");
+    expect(sem2).toBe("even");
+    // Should NOT be cached - each call triggers egressFetch
+    expect(egressFetch).toHaveBeenCalledTimes(2);
   });
 
   it("falls back to raw text if JSON parse fails", async () => {

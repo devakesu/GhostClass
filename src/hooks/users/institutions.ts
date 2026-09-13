@@ -5,6 +5,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import axiosInstance from "@/lib/axios";
 import { Institution } from "@/types";
 import { retryOnce } from "@/lib/query-utils";
+import { resetWorkingSummaryEndpoint } from "@/hooks/courses/attendance";
 
 /**
  * React Query hook for fetching user's enrolled institutions.
@@ -133,6 +134,7 @@ export function useUpdateDefaultInstitutionUser() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["defaultInstitutionUser"] });
       queryClient.invalidateQueries({ queryKey: ["user"] });
+      resetWorkingSummaryEndpoint();
     },
   });
 }

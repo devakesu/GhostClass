@@ -177,13 +177,15 @@ class DioService {
   }
 
   Future<void> _addSecurityHeaders(RequestOptions options) async {
+    if (AppConfig.bypassAppCheck) {
+      return;
+    }
     try {
       final useLimited = options.extra['useLimitedToken'] == true;
 
       // Deduplicate parallel token requests to prevent "Too many attempts"
       String? appCheckToken;
       if (useLimited) {
-        var isNew = false;
         if (_limitedTokenFetchInFlight == null) {
           _limitedTokenRequestCount++;
           AppLogger.d(
@@ -192,26 +194,13 @@ class DioService {
           _limitedTokenFetchInFlight = _fetchAppCheckTokenWithRetry(
             limited: true,
           );
-          isNew = true;
         }
-        appCheckToken = await _limitedTokenFetchInFlight!.timeout(
-          AppConfig.defaultTimeout,
-        );
-        if (isNew) {
-          AppLogger.safeUnawait(
-            Future.delayed(const Duration(seconds: 30), () {
-              _limitedTokenFetchInFlight = null;
-            }).catchError(
-              (Object e, StackTrace st) {
-                AppLogger.e(
-                  'DioService: delayed clear of limited token fetch failed',
-                  e,
-                  st,
-                );
-              },
-            ),
-            'DioService: delayed clear limited token fetch',
+        try {
+          appCheckToken = await _limitedTokenFetchInFlight!.timeout(
+            AppConfig.defaultTimeout,
           );
+        } finally {
+          _limitedTokenFetchInFlight = null;
         }
       } else {
         var isNew = false;

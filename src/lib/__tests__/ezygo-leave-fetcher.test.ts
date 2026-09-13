@@ -61,6 +61,15 @@ describe("ezygo-leave-fetcher", () => {
 
       expect(logger.error).toHaveBeenCalled();
     });
+
+    it("propagates NonBreakerError directly without wrapping in generic Error", async () => {
+      const { NonBreakerError } = await import("../circuit-breaker");
+      const error = new NonBreakerError("Queue capacity exceeded");
+      vi.mocked(fetchEzygoData).mockRejectedValue(error);
+
+      await expect(fetchLeaveData(token)).rejects.toThrow(error);
+      expect(logger.error).toHaveBeenCalled();
+    });
   });
 
   describe("fetchLeaveAttendanceDetails", () => {

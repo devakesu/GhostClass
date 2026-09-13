@@ -1,5 +1,6 @@
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter/foundation.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/services/logger.dart';
 
 /// SecurityInitializer
@@ -31,13 +32,18 @@ class SecurityInitializer {
   /// [FirebaseAppCheck.instance] is used.
   static Future<void> initialize({
     FirebaseAppCheck? appCheck,
-    bool isDebug = kDebugMode,
+    bool isDebug = !kReleaseMode,
     ActivateFn? activateOverride,
 
     /// Optional resolver for the `FirebaseAppCheck` instance. Tests can
     /// provide this to avoid referencing the static `FirebaseAppCheck.instance`.
     FirebaseAppCheck Function()? instanceResolver,
   }) async {
+    if (AppConfig.bypassAppCheck) {
+      AppLogger.i('🛡️ [SECURITY] App Check bypassed via compile-time flag.');
+      return;
+    }
+
     final instanceIfProvided = appCheck;
     final resolveInstance =
         instanceResolver ?? (() => FirebaseAppCheck.instance);

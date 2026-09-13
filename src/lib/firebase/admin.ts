@@ -37,10 +37,13 @@ export function getAppCheck(): AppCheckVerifier | null {
     }
 
     return {
-      async verifyToken(token: string) {
+      async verifyToken(token: string, options?: { consume?: boolean }) {
         try {
           const appCheckService = getAdminAppCheck(firebaseApp);
-          const decodedToken = await appCheckService.verifyToken(token);
+          const decodedToken = await appCheckService.verifyToken(
+            token,
+            options,
+          );
           return {
             appId: decodedToken.appId,
             token: decodedToken.token,

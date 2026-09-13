@@ -30,9 +30,9 @@ class MyHttpOverrides extends HttpOverrides {
     final client = super.createHttpClient(context)
       ..connectionTimeout = AppConfig.defaultTimeout;
 
-    // In debug mode, we allow untrusted certificates ONLY if they match our expected hostname.
+    // In dev and profile modes, we allow untrusted certificates ONLY if they match our expected hostname.
     // In release mode, standard certificate validation is enforced.
-    if (kDebugMode) {
+    if (!kReleaseMode) {
       client.badCertificateCallback = NetworkUtils.validateCertificateHostname;
     }
 
@@ -90,9 +90,9 @@ void main() async {
     (options) {
       options
         ..dsn = AppConfig.sentryDsn
-        ..tracesSampleRate = kDebugMode ? 1.0 : 0.1
+        ..tracesSampleRate = !kReleaseMode ? 1.0 : 0.1
         ..release = 'ghostclass@${AppConfig.appVersion}'
-        ..environment = kDebugMode ? 'development' : 'production'
+        ..environment = !kReleaseMode ? 'development' : 'production'
         ..attachStacktrace = true
         ..enableAutoPerformanceTracing = true;
     },

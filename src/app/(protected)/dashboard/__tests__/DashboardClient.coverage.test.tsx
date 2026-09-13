@@ -71,6 +71,7 @@ vi.mock("@tanstack/react-query", () => ({
     refetchQueries: vi.fn().mockResolvedValue({}),
     cancelQueries: vi.fn(),
     setQueryData: vi.fn(),
+    getQueryData: vi.fn(),
   })),
 }));
 

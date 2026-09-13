@@ -70,7 +70,7 @@ const SESSION_COOKIE_NAMES = [
   "authjs.session-token",
 ];
 
-async function getSessionIdFromCookie(): Promise<string | null> {
+export async function getSessionIdFromCookie(): Promise<string | null> {
   const cookieStore = await cookies();
 
   for (const cookieName of SESSION_COOKIE_NAMES) {

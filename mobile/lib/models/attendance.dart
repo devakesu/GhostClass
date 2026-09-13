@@ -188,16 +188,17 @@ enum AttendanceStatus {
   absent(111),
   otherLeave(112),
   dutyLeave(225),
+  unknown(0),
   ;
 
   const AttendanceStatus(this.code);
   final int code;
 
   static AttendanceStatus fromCode(Object? code) {
-    final intCode = toInt(code) ?? 110;
+    final intCode = toInt(code);
     return AttendanceStatus.values.firstWhere(
       (e) => e.code == intCode,
-      orElse: () => AttendanceStatus.present,
+      orElse: () => AttendanceStatus.unknown,
     );
   }
 

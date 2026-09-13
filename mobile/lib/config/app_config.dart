@@ -43,8 +43,7 @@ class AppConfig {
 
   /// The Supabase Origin used to bypass "Forbidden: missing Origin header" errors.
   /// Spoofed to match the official app domain.
-  static String get supabaseOrigin =>
-      AppSecrets.isDev ? 'https://localhost:3000' : webUrl;
+  static String get supabaseOrigin => webUrl;
 
   // ─── Backend & Bridge Config ───────────────────────────────────────────────
 
@@ -55,9 +54,19 @@ class AppConfig {
         : AppSecrets.ghostclassApiUrlProd,
   );
 
-  /// Default network timeout duration (45s debug / 25s release).
+  /// Default network timeout duration (45s dev/profile / 25s release).
   static Duration get defaultTimeout =>
-      kDebugMode ? const Duration(seconds: 45) : const Duration(seconds: 25);
+      !kReleaseMode ? const Duration(seconds: 45) : const Duration(seconds: 25);
+
+  /// Whether App Check is bypassed (e.g. for profiling or local emulator development).
+  /// Can be forced via --dart-define=BYPASS_APP_CHECK=true or --dart-define=DISABLE_APP_CHECK=true.
+  ///
+  /// CRITICAL SECURITY: Strictly disabled in release builds (!kReleaseMode).
+  /// In release mode, the AOT compiler eliminates the bypass branch completely.
+  static bool get bypassAppCheck =>
+      !kReleaseMode &&
+      (const bool.fromEnvironment('BYPASS_APP_CHECK') ||
+          const bool.fromEnvironment('DISABLE_APP_CHECK'));
 
   /// The EzyGo authentication root.
   static String get ezygoAuthUrl => _d(AppSecrets.ezygoAuthUrl);
@@ -81,7 +90,7 @@ class AppConfig {
 
   /// Current application version (derived from Infisical compilation injection).
   static String get appVersion =>
-      const String.fromEnvironment('APP_VERSION', defaultValue: '4.6.1');
+      const String.fromEnvironment('APP_VERSION', defaultValue: '4.6.2');
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>

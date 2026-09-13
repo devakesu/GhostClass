@@ -1,5 +1,6 @@
 import 'package:firebase_app_check/firebase_app_check.dart';
 import 'package:flutter_test/flutter_test.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/security_initializer.dart';
 import 'package:mocktail/mocktail.dart';
 
@@ -120,5 +121,9 @@ void main() {
     verify(
       () => mock.activate(providerApple: any(named: 'providerApple')),
     ).called(1);
+  });
+
+  test('AppConfig.bypassAppCheck defaults to false in standard test run', () {
+    expect(AppConfig.bypassAppCheck, isFalse);
   });
 }

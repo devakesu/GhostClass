@@ -49,18 +49,6 @@ class _DisableAwareCourseCardState
     return '${widget.selectedYear}-${widget.selectedSemester}';
   }
 
-  bool get _isDisabled {
-    final semKey = _semesterKey;
-    final code = _courseCode;
-    if (semKey == null || code == null) return false;
-    final disabled =
-        ref.read(authProvider).value?.settings.disabledCourses[semKey] ?? {};
-    final stdCode = DashboardStats.standardize(code);
-    return disabled.keys.any(
-      (key) => DashboardStats.standardize(key) == stdCode,
-    );
-  }
-
   String? get _disableReason {
     final semKey = _semesterKey;
     final code = _courseCode;
@@ -277,6 +265,23 @@ class _DisableAwareCourseCardState
 
   @override
   Widget build(BuildContext context) {
+    final disabledCourses = ref.watch(
+      authProvider.select((val) => val.value?.settings.disabledCourses),
+    );
+    final semKey = _semesterKey;
+    final code = _courseCode;
+    final disabled = (semKey != null && disabledCourses != null)
+        ? (disabledCourses[semKey] ?? {})
+        : <String, String>{};
+    final stdCourseCode = code != null
+        ? DashboardStats.standardize(code)
+        : null;
+    final isDisabled =
+        stdCourseCode != null &&
+        disabled.keys.any(
+          (key) => DashboardStats.standardize(key) == stdCourseCode,
+        );
+
     final user = ref.watch(authProvider).value;
     final userSettings = user?.settings;
     final courseTargets = userSettings?.courseTargets ?? {};
@@ -300,17 +305,17 @@ class _DisableAwareCourseCardState
     );
 
     return Opacity(
-      opacity: _isDisabled ? 0.62 : 1,
+      opacity: isDisabled ? 0.62 : 1,
       child: CourseCard(
         course: widget.course,
         stat: widget.stat,
         bunkResult: courseBunkResult,
         bunkEnabled: widget.bunkEnabled,
-        isEnabled: !_isDisabled,
+        isEnabled: !isDisabled,
         onToggleTap: _courseCode == null
             ? null
             : () async {
-                if (_isDisabled) {
+                if (isDisabled) {
                   await _showEnableDialog();
                 } else {
                   await _showDisableDialog();

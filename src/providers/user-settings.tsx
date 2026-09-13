@@ -29,6 +29,7 @@ import { toast } from "sonner";
 import * as Sentry from "@sentry/nextjs";
 import { logger } from "@/lib/logger";
 import { disabledCoursesSchema } from "@/lib/validation/text";
+import { resetWorkingSummaryEndpoint } from "@/hooks/courses/attendance";
 
 // ---------------------------------------------------------------------------
 // Types & Constants
@@ -149,6 +150,47 @@ const loadPrefetchedSettings = (
   }
 };
 
+function syncStorageItem(key: string, val: string) {
+  if (localStorage.getItem(key) !== val) {
+    localStorage.setItem(key, val);
+    if (key.startsWith("showBunkCalc_")) {
+      window.dispatchEvent(
+        new CustomEvent("bunkCalcToggle", { detail: val === "true" }),
+      );
+    }
+  }
+}
+
+function getInitialMigrationPayload(
+  prefetchedSettings: {
+    bunk_calculator_enabled?: boolean;
+    target_percentage?: number;
+    disabled_courses?: Record<string, Record<string, string>>;
+  } | null,
+) {
+  const legacyBunk = localStorage.getItem("showBunkCalc");
+  const legacyTarget = localStorage.getItem("targetPercentage");
+
+  const initialBunk = legacyBunk !== null
+    ? legacyBunk === "true"
+    : (prefetchedSettings?.bunk_calculator_enabled ?? true);
+  const initialTarget = legacyTarget !== null
+    ? normalizeTarget(parseInt(legacyTarget, 10))
+    : (prefetchedSettings?.target_percentage ??
+      DEFAULT_TARGET_PERCENTAGE);
+  const initialDisabled = prefetchedSettings?.disabled_courses ?? {};
+
+  // Cleanup legacy keys if they existed
+  if (legacyBunk !== null) localStorage.removeItem("showBunkCalc");
+  if (legacyTarget !== null) localStorage.removeItem("targetPercentage");
+
+  return {
+    bunk_calculator_enabled: initialBunk,
+    target_percentage: initialTarget,
+    disabled_courses: initialDisabled,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Provider Hook
 // ---------------------------------------------------------------------------
@@ -164,6 +206,12 @@ function useUserSettingsState() {
   // Use a ref to track the user ID synchronously during events to avoid
   // closure staleness before the next render cycle.
   const currentUserIdRef = useRef<string | null>(null);
+  const hasMigratedRef = useRef(false);
+
+  // Reset migration flag when user identity switches
+  useEffect(() => {
+    hasMigratedRef.current = false;
+  }, [userId]);
 
   // Subscribe to auth state changes to re-fetch settings on login/logout
   useEffect(() => {
@@ -178,7 +226,7 @@ function useUserSettingsState() {
 
         if (
           event === "SIGNED_IN" || event === "INITIAL_SESSION" ||
-          event === "TOKEN_REFRESHED" || event === "USER_UPDATED" ||
+          event === "USER_UPDATED" ||
           event === "PASSWORD_RECOVERY"
         ) {
           setUserId(currentUserId);
@@ -190,6 +238,13 @@ function useUserSettingsState() {
           }
           // Always remove the null-user cache to ensure clean state
           queryClient.removeQueries({ queryKey: ["userSettings", null] });
+          if (event === "SIGNED_IN") {
+            resetWorkingSummaryEndpoint();
+          }
+        } else if (event === "TOKEN_REFRESHED") {
+          // Token refresh rotates credentials without mutating user profile;
+          // do not invalidate queries to avoid refetch storms and overwriting optimistic UI state.
+          setUserId(currentUserId);
         } else if (event === "SIGNED_OUT") {
           // Clear local storage keys for the user who just logged out
           if (previousUserId) {
@@ -198,6 +253,8 @@ function useUserSettingsState() {
             localStorage.removeItem(`disabledCourses_${previousUserId}`);
           }
           setUserId(null);
+          hasMigratedRef.current = false;
+          resetWorkingSummaryEndpoint();
           queryClient.removeQueries({ queryKey: ["userSettings"] });
         }
       },
@@ -304,37 +361,21 @@ function useUserSettingsState() {
   // Effects: Sync DB -> LocalStorage & Initialization
   // ---------------------------------------------------------------------------
 
+  const { mutate: executeMutation, isPending: isMutationPending } = mutation;
+
   useEffect(() => {
     if (
-      !userId || isLoading || mutation.isPending || dbSettings === undefined
+      !userId || isLoading || isMutationPending || dbSettings === undefined
     ) return;
 
     try {
       // 1. If DB has no record for this user, create one using local preferences (migration)
       //    or defaults (new user).
       if (dbSettings === null) {
-        const legacyBunk = localStorage.getItem("showBunkCalc");
-        const legacyTarget = localStorage.getItem("targetPercentage");
-
-        const initialBunk = legacyBunk !== null
-          ? legacyBunk === "true"
-          : (prefetchedSettings?.bunk_calculator_enabled ?? true);
-        const initialTarget = legacyTarget !== null
-          ? normalizeTarget(parseInt(legacyTarget, 10))
-          : (prefetchedSettings?.target_percentage ??
-            DEFAULT_TARGET_PERCENTAGE);
-        const initialDisabled = prefetchedSettings?.disabled_courses ?? {};
-
-        mutation.mutate({
-          bunk_calculator_enabled: initialBunk,
-          target_percentage: initialTarget,
-          disabled_courses: initialDisabled,
-        });
-
-        // Cleanup legacy keys if they existed
-        if (legacyBunk !== null) localStorage.removeItem("showBunkCalc");
-        if (legacyTarget !== null) localStorage.removeItem("targetPercentage");
-
+        if (!hasMigratedRef.current) {
+          hasMigratedRef.current = true;
+          executeMutation(getInitialMigrationPayload(prefetchedSettings));
+        }
         return;
       }
 
@@ -345,28 +386,16 @@ function useUserSettingsState() {
 
       // 3. Sync DB settings to user-scoped localStorage keys.
       //    This powers Stage 2 hydration on the next app load.
-      const sync = (key: string, val: string) => {
-        if (localStorage.getItem(key) !== val) {
-          localStorage.setItem(key, val);
-          // Dispatch a custom event for parts of the app that don't use this context
-          if (key.startsWith("showBunkCalc_")) {
-            window.dispatchEvent(
-              new CustomEvent("bunkCalcToggle", { detail: val === "true" }),
-            );
-          }
-        }
-      };
-
-      sync(
+      syncStorageItem(
         `showBunkCalc_${userId}`,
         String(dbSettings.bunk_calculator_enabled),
       );
-      sync(`targetPercentage_${userId}`, String(dbSettings.target_percentage));
-      sync(
+      syncStorageItem(`targetPercentage_${userId}`, String(dbSettings.target_percentage));
+      syncStorageItem(
         `disabledCourses_${userId}`,
         JSON.stringify(dbSettings.disabled_courses),
       );
-      sync(
+      syncStorageItem(
         `courseTargets_${userId}`,
         JSON.stringify(dbSettings.course_targets || {}),
       );
@@ -374,7 +403,7 @@ function useUserSettingsState() {
       // Non-fatal error; just log to dev console
       logger.dev("Error during storage sync:", err);
     }
-  }, [dbSettings, userId, isLoading, mutation, prefetchedSettings]);
+  }, [dbSettings, userId, isLoading, isMutationPending, executeMutation, prefetchedSettings]);
 
   // ---------------------------------------------------------------------------
   // Public API

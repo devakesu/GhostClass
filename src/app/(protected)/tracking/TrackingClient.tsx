@@ -153,7 +153,7 @@ const parseDateValue = (dateStr: string) => {
       `${norm.slice(0, 4)}-${norm.slice(4, 6)}-${norm.slice(6, 8)}`,
     ).getTime();
   }
-  return new Date().getTime();
+  return 0; // Deterministic fallback
 };
 
 function getCorrectionStatusText(
@@ -1397,7 +1397,10 @@ export default function TrackingClient() {
     isLoading: isDataLoading,
     isError: isTrackingError,
     refetch: refetchTrackingData,
-  } = useTrackingData(enabled ? profile : null);
+  } = useTrackingData(enabled ? profile : null, {
+    semester: semesterData || undefined,
+    year: academicYearData || undefined,
+  });
   const {
     data: attendanceData,
     isError: isAttendanceError,
@@ -1453,19 +1456,22 @@ export default function TrackingClient() {
     },
     onSuccess: async (data) => {
       const removed = data.deletions ?? 0;
-      if (removed > 0) {
-        toast.info("Data Synced", {
-          description: `${removed} outdated record${
-            removed === 1 ? "" : "s"
-          } removed.`,
-        });
+      const updated = data.updates ?? 0;
+      if (removed > 0 || updated > 0) {
+        if (removed > 0) {
+          toast.info("Data Synced", {
+            description: `${removed} outdated record${
+              removed === 1 ? "" : "s"
+            } removed.`,
+          });
+        }
+        await Promise.all([
+          refetchTrackingData(),
+          refetchCount(),
+          refetchAttendance(),
+          refetchCourses(),
+        ]);
       }
-      await Promise.all([
-        refetchTrackingData(),
-        refetchCount(),
-        refetchAttendance(),
-        refetchCourses(),
-      ]);
     },
   });
 

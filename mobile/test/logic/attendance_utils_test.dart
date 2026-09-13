@@ -2,6 +2,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
+import 'package:ghostclass/providers/academic_provider.dart';
 
 void main() {
   group('Attendance Utils - toRoman', () {
@@ -397,6 +398,83 @@ void main() {
 
       final list = [rB, rA]..sort(compareTrackingRecords);
       expect(list.map((r) => r.id).toList(), [10, 11]);
+    });
+  });
+
+  group('Attendance Utils - Academic Rollover Detection', () {
+    test('yearSegmentsMatch matches exact and 2-digit vs 4-digit years', () {
+      expect(yearSegmentsMatch('2024', '2024'), true);
+      expect(yearSegmentsMatch('2024', '24'), true);
+      expect(yearSegmentsMatch('24', '2024'), true);
+      expect(yearSegmentsMatch('2024', '25'), false);
+      expect(yearSegmentsMatch('2024', '2025'), false);
+    });
+
+    test('yearsDiffer returns false for equivalent academic years', () {
+      expect(yearsDiffer('2024-2025', '2024-25'), false);
+      expect(yearsDiffer('2024-25', '2024-2025'), false);
+      expect(yearsDiffer('2024/2025', '2024-25'), false);
+      expect(yearsDiffer('2024-2025', '2024-2025'), false);
+      expect(yearsDiffer('2024-25', '2025-26'), true);
+      expect(yearsDiffer('2023-24', '2024-25'), true);
+      expect(yearsDiffer(null, '2024-25'), false);
+      expect(yearsDiffer('2024-25', null), false);
+    });
+
+    test('semestersDiffer handles odd/1 and even/2 equivalencies', () {
+      expect(semestersDiffer('odd', '1'), false);
+      expect(semestersDiffer('1', 'odd'), false);
+      expect(semestersDiffer('ODD', 'odd'), false);
+      expect(semestersDiffer('even', '2'), false);
+      expect(semestersDiffer('2', 'even'), false);
+      expect(semestersDiffer('EVEN', 'even'), false);
+      expect(semestersDiffer('odd', 'even'), true);
+      expect(semestersDiffer('1', '2'), true);
+      expect(semestersDiffer(null, 'odd'), false);
+      expect(semestersDiffer('even', null), false);
+    });
+
+    test(
+      'hasAcademicRollover flags true only on actual semester/year shifts',
+      () {
+        expect(
+          hasAcademicRollover(
+            oldSemester: 'odd',
+            oldYear: '2024-2025',
+            newSemester: '1',
+            newYear: '2024-25',
+          ),
+          false,
+        );
+        expect(
+          hasAcademicRollover(
+            oldSemester: 'odd',
+            oldYear: '2024-25',
+            newSemester: 'even',
+            newYear: '2024-25',
+          ),
+          true,
+        );
+        expect(
+          hasAcademicRollover(
+            oldSemester: 'even',
+            oldYear: '2024-25',
+            newSemester: 'odd',
+            newYear: '2025-26',
+          ),
+          true,
+        );
+      },
+    );
+
+    test('AcademicState.hasRollover integrates correctly', () {
+      const current = AcademicState(semester: 'odd', year: '2024-2025');
+      const equivalent = AcademicState(semester: '1', year: '2024-25');
+      const nextSem = AcademicState(semester: 'even', year: '2024-2025');
+
+      expect(current.hasRollover(null), false);
+      expect(current.hasRollover(equivalent), false);
+      expect(current.hasRollover(nextSem), true);
     });
   });
 }

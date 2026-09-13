@@ -1,8 +1,8 @@
 import crypto from "node:crypto";
-import { cookies as nextCookies, headers as nextHeaders } from "next/headers";
+import { headers as nextHeaders } from "next/headers";
 import { getAppCheck } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logger";
-import { validateCsrfToken } from "@/lib/security/csrf";
+import { getSessionIdFromCookie, validateCsrfToken } from "@/lib/security/csrf";
 import { NextRequest, NextResponse } from "next/server";
 import { getClientIp } from "@/lib/utils.server";
 import { redis } from "@/lib/redis";
@@ -94,7 +94,7 @@ export interface AuthResult {
 
 async function verifyCsrfTokenWithSessionBinding(
   headerList: Headers,
-  sessionId?: string,
+  sessionId?: string | null,
 ): Promise<{ isValid: boolean; error?: string }> {
   const csrfToken = headerList.get("x-csrf-token");
   if (!csrfToken) return { isValid: false, error: "Missing CSRF token" };
@@ -216,9 +216,7 @@ async function verifyAppCheckAuth(
 async function verifyCsrfAuth(
   headerList: Headers,
 ): Promise<AuthResult> {
-  const cookieStore = await nextCookies();
-  const sessionId = (cookieStore.get("__Secure-authjs.session-token") ||
-    cookieStore.get("authjs.session-token"))?.value;
+  const sessionId = await getSessionIdFromCookie();
   const res = await verifyCsrfTokenWithSessionBinding(headerList, sessionId);
   if (!res.isValid) {
     return {

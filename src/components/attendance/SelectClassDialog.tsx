@@ -24,6 +24,7 @@ import {
   getAvailableClassesAction,
   selectUserClassAction,
 } from "@/app/actions/user";
+import { getCsrfToken } from "@/lib/axios";
 import { handleLogout } from "@/lib/security/auth";
 
 interface SelectClassDialogProps {
@@ -77,7 +78,8 @@ export function SelectClassDialog({
 
     setIsSubmitting(true);
     try {
-      await selectUserClassAction(selectedClassId);
+      const csrfToken = getCsrfToken();
+      await selectUserClassAction(selectedClassId, csrfToken || undefined);
       toast.success("Class assigned successfully!");
       // Invalidate profile query to update UI state
       queryClient.invalidateQueries({ queryKey: ["profile"] });

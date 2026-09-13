@@ -4,6 +4,7 @@ import { getAuthTokenWithFallback } from "@/lib/security/auth-cookie";
 import { withSecurity } from "@/lib/security/app-check";
 import {
   getAllowedHosts,
+  isLoopbackHost,
   resolveRequestHostname,
 } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
@@ -82,15 +83,15 @@ function validateOrigin(
   if (isPublic || isMobileApp || !IS_PRODUCTION) return null;
 
   const allowedHosts = getAllowedHosts();
+  const requestHostname = resolveRequestHostname(req);
   const origin = req.headers.get("origin");
 
   if (!origin) {
     const isRead = req.method === "GET" || req.method === "HEAD";
     const secFetchSite = req.headers.get("sec-fetch-site")?.toLowerCase();
-    const requestHostname = resolveRequestHostname(req);
     if (
       isRead && secFetchSite === "same-origin" && !!requestHostname &&
-      allowedHosts?.has(requestHostname)
+      (allowedHosts?.has(requestHostname) || isLoopbackHost(requestHostname))
     ) {
       return null;
     }
@@ -103,7 +104,9 @@ function validateOrigin(
 
   try {
     const originHostname = new URL(origin).hostname.toLowerCase();
-    if (!allowedHosts?.has(originHostname)) {
+    const isAllowed = allowedHosts?.has(originHostname) ||
+      (isLoopbackHost(originHostname) && isLoopbackHost(requestHostname));
+    if (!isAllowed) {
       logger.warn("Origin validation failed", {
         origin: originHostname,
         path: fullPath,
@@ -169,6 +172,14 @@ function validateProxyRequestPath(
     return {
       fullPath: "",
       errorResponse: NextResponse.json({ message: "Missing path" }, {
+        status: 400,
+      }),
+    };
+  }
+  if (path.some((s) => s === ".." || s === "." || s.includes("/") || s.includes("\\"))) {
+    return {
+      fullPath: "",
+      errorResponse: NextResponse.json({ message: "Invalid path segment" }, {
         status: 400,
       }),
     };
@@ -308,9 +319,20 @@ async function handleBatchedEgress(
         ...(clientUserAgent ? { "user-agent": clientUserAgent } : {}),
       },
     );
+    const isSettingPath =
+      fullPath.includes("default_semester") ||
+      fullPath.includes("default_academic_year") ||
+      fullPath.includes("user/setting");
+    const settingHeaders: Record<string, string> = isSettingPath
+      ? {
+        "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
+        "pragma": "no-cache",
+        "expires": "0",
+      }
+      : {};
     return NextResponse.json(data, {
       status: 200,
-      headers: getEgressHeaders({}, undefined, "batched"),
+      headers: getEgressHeaders(settingHeaders, undefined, "batched"),
     });
   } catch (err) {
     logger.warn(`Batch failed for ${fullPath}`, err);
@@ -441,6 +463,17 @@ function handleProxyResultResponse(
   fullPath: string,
 ): NextResponse {
   const sanitizedHeaders = getSanitizedHeaders(result.res.headers);
+  const isSettingPath =
+    fullPath.includes("default_semester") ||
+    fullPath.includes("default_academic_year") ||
+    fullPath.includes("user/setting");
+  if (isSettingPath) {
+    sanitizedHeaders["cache-control"] =
+      "no-store, no-cache, must-revalidate, proxy-revalidate";
+    sanitizedHeaders["pragma"] = "no-cache";
+    sanitizedHeaders["expires"] = "0";
+  }
+
   if (!result.res.ok) {
     const isRateLimit = result.res.status === 429;
     if (isRateLimit) {

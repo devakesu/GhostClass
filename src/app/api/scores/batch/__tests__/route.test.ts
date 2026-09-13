@@ -22,6 +22,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/lib/security/auth-cookie", () => ({
   getAuthTokenServer: vi.fn().mockResolvedValue("test-token"),
+  getAuthTokenWithFallback: vi.fn().mockResolvedValue("test-token"),
 }));
 
 vi.mock("@/lib/ezygo-batch-fetcher", () => ({
@@ -117,7 +118,7 @@ describe("POST /api/scores/batch", () => {
 
   it("returns 401 if unauthorized", async () => {
     const { createClient } = await import("@/lib/supabase/server");
-    vi.mocked(createClient).mockReturnValue({
+    vi.mocked(createClient).mockReturnValueOnce({
       auth: {
         getUser: vi.fn().mockResolvedValue({
           data: { user: null },
@@ -133,5 +134,21 @@ describe("POST /api/scores/batch", () => {
 
     const res = await POST(req, {});
     expect(res.status).toBe(401);
+  });
+
+  it("returns 401 if token is missing", async () => {
+    const { getAuthTokenWithFallback } = await import(
+      "@/lib/security/auth-cookie"
+    );
+    vi.mocked(getAuthTokenWithFallback).mockResolvedValueOnce(undefined);
+
+    const req = new NextRequest("http://localhost/api/scores/batch", {
+      method: "POST",
+      body: JSON.stringify({ examIds: [1] }),
+    });
+
+    const res = await POST(req, {});
+    expect(res.status).toBe(401);
+    expect((await res.json()).error).toBe("EzyGo token missing");
   });
 });

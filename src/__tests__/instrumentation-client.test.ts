@@ -37,6 +37,11 @@ describe("Instrumentation Client", () => {
 
     const options = vi.mocked(Sentry.init).mock.calls[0][0] as any;
     expect(options.integrations).toHaveLength(1);
+    expect(Sentry.replayIntegration).toHaveBeenCalledWith({
+      maskAllText: true,
+      blockAllMedia: true,
+      maskAllInputs: true,
+    });
     expect(options.tracesSampleRate).toBe(0.1);
     expect(options.replaysSessionSampleRate).toBe(0.1);
     expect(options.replaysOnErrorSampleRate).toBe(0.5); // 0.1 * 5

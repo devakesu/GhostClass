@@ -488,5 +488,59 @@ void main() {
         expect(mathStat.finalTotal, 2);
       },
     );
+
+    test('conservatively floors percentages without false round-up', () {
+      final studentData = <String, Map<String, AttendanceSession>>{};
+      // 187 present, 63 absent -> 187/250 = 74.8%
+      final startPresent = DateTime(2026);
+      for (var i = 0; i < 187; i++) {
+        final d = startPresent.add(Duration(days: i));
+        final dateKey =
+            '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        studentData[dateKey] = {
+          's1': const AttendanceSession(
+            course: '1',
+            attendance: 110,
+            session: '1',
+            classType: 'Lecture',
+          ),
+        };
+      }
+      final startAbsent = startPresent.add(const Duration(days: 187));
+      for (var i = 0; i < 63; i++) {
+        final d = startAbsent.add(Duration(days: i));
+        final dateKey =
+            '${d.year}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+        studentData[dateKey] = {
+          's1': const AttendanceSession(
+            course: '1',
+            attendance: 111,
+            session: '1',
+            classType: 'Lecture',
+          ),
+        };
+      }
+
+      final stats = DashboardStats.calculate(
+        attendanceData: AttendanceReportDetailed(
+          courses: const {
+            '1': AttendanceCourse(id: 1, name: 'Math', code: 'MATH101'),
+          },
+          studentAttendanceData: studentData,
+          attendanceDates: {for (final k in studentData.keys) k: true},
+        ),
+        trackingRecords: const [],
+        selectedSemester: 'all',
+        selectedYear: 'all',
+        allCourses: const [CourseDetails(id: 1, name: 'Math', code: 'MATH101')],
+      );
+
+      expect(stats.finalPresent, 187);
+      expect(stats.finalTotal, 250);
+      expect(stats.rawPercentage, 74.8);
+      // Floor ensures 74% rather than false compliance 75%
+      expect(stats.percentage, 74);
+      expect(stats.officialPercentage, 74);
+    });
   });
 }

@@ -1,7 +1,12 @@
 import { renderHook, waitFor } from "@testing-library/react";
 vi.unmock("../use-sync-on-mount");
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { _resetModuleState, useSyncOnMount } from "../use-sync-on-mount";
+import {
+  _resetModuleState,
+  hasSyncActivity,
+  hasSyncChanges,
+  useSyncOnMount,
+} from "../use-sync-on-mount";
 import { logger } from "@/lib/logger";
 import axios from "@/lib/axios";
 
@@ -266,6 +271,29 @@ describe("useSyncOnMount", () => {
         return originalReadyState;
       },
       configurable: true,
+    });
+  });
+
+  describe("hasSyncChanges and hasSyncActivity", () => {
+    it("returns false for empty or null sync response", () => {
+      expect(hasSyncChanges(null)).toBe(false);
+      expect(hasSyncChanges(undefined)).toBe(false);
+      expect(hasSyncChanges({ success: true, processed: 5 })).toBe(false);
+      expect(hasSyncActivity(null)).toBe(false);
+      expect(hasSyncActivity(undefined)).toBe(false);
+      expect(hasSyncActivity({ success: true, processed: 5 })).toBe(false);
+    });
+
+    it("hasSyncChanges detects deletions or updates", () => {
+      expect(hasSyncChanges({ success: true, deletions: 1 })).toBe(true);
+      expect(hasSyncChanges({ success: true, updates: 2 })).toBe(true);
+      expect(hasSyncChanges({ success: true, conflicts: 1 })).toBe(false);
+    });
+
+    it("hasSyncActivity detects deletions, updates, or conflicts", () => {
+      expect(hasSyncActivity({ success: true, deletions: 1 })).toBe(true);
+      expect(hasSyncActivity({ success: true, updates: 2 })).toBe(true);
+      expect(hasSyncActivity({ success: true, conflicts: 1 })).toBe(true);
     });
   });
 });

@@ -47,12 +47,20 @@ export function useCourseLookup({
 
       // 4. Fallback to attendanceData courses
       const altCourses = attendanceData?.courses;
-      const hasAlt = altCourses &&
-        typeof altCourses === "object" &&
-        Object.prototype.hasOwnProperty.call(altCourses, id);
+      if (altCourses && typeof altCourses === "object") {
+        if (Object.prototype.hasOwnProperty.call(altCourses, id)) {
+          const direct = Reflect.get(altCourses, id);
+          if (direct?.code) return normalize(direct.code);
+        }
 
-      const altCourse = hasAlt ? Reflect.get(altCourses, id) : undefined;
-      return normalize(altCourse?.code ?? id);
+        const altCourse = Object.entries(altCourses).find(
+          ([key, c]) =>
+            String(key) === id ||
+            (c.code && normalize(c.code) === normalizedInput),
+        )?.[1];
+        if (altCourse?.code) return normalize(altCourse.code);
+      }
+      return normalize(id);
     },
     [attendanceData, coursesData, classCourses],
   );
@@ -85,12 +93,20 @@ export function useCourseLookup({
 
       // 4. Fallback to attendanceData courses
       const altCourses = attendanceData?.courses;
-      const hasAlt = altCourses &&
-        typeof altCourses === "object" &&
-        Object.prototype.hasOwnProperty.call(altCourses, id);
+      if (altCourses && typeof altCourses === "object") {
+        if (Object.prototype.hasOwnProperty.call(altCourses, id)) {
+          const direct = Reflect.get(altCourses, id);
+          if (direct?.name) return direct.name;
+        }
 
-      const altCourse = hasAlt ? Reflect.get(altCourses, id) : undefined;
-      return altCourse?.name ?? id;
+        const altCourse = Object.entries(altCourses).find(
+          ([key, c]) =>
+            String(key) === id ||
+            (c.code && normalize(c.code) === normalizedInput),
+        )?.[1];
+        if (altCourse?.name) return altCourse.name;
+      }
+      return id;
     },
     [attendanceData, coursesData, classCourses],
   );

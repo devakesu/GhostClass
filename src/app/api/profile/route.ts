@@ -9,6 +9,7 @@ import {
 } from "@/lib/security/auth-cookie";
 import {
   getAllowedHosts,
+  isLoopbackHost,
   resolveRequestHostname,
 } from "@/lib/security/origin-validation";
 import { logger } from "@/lib/logger";
@@ -41,13 +42,13 @@ function validateRequestOrigin(req: NextRequest): NextResponse | null {
       headers: { "Cache-Control": "no-store" },
     });
   }
+  const requestHostname = resolveRequestHostname(req);
   const origin = req.headers.get("origin");
   if (!origin) {
     const secFetchSite = req.headers.get("sec-fetch-site")?.toLowerCase();
-    const requestHostname = resolveRequestHostname(req);
     if (
       !(secFetchSite === "same-origin" && !!requestHostname &&
-        allowedHosts.has(requestHostname))
+        (allowedHosts.has(requestHostname) || isLoopbackHost(requestHostname)))
     ) {
       return NextResponse.json({ error: "Origin required" }, {
         status: 400,
@@ -55,10 +56,19 @@ function validateRequestOrigin(req: NextRequest): NextResponse | null {
       });
     }
   } else {
-    const originHostname = new URL(origin).hostname.toLowerCase();
-    if (!allowedHosts.has(originHostname)) {
-      return NextResponse.json({ error: "Forbidden" }, {
-        status: 403,
+    try {
+      const originHostname = new URL(origin).hostname.toLowerCase();
+      const isAllowed = allowedHosts.has(originHostname) ||
+        (isLoopbackHost(originHostname) && isLoopbackHost(requestHostname));
+      if (!isAllowed) {
+        return NextResponse.json({ error: "Forbidden" }, {
+          status: 403,
+          headers: { "Cache-Control": "no-store" },
+        });
+      }
+    } catch {
+      return NextResponse.json({ error: "Invalid origin header format" }, {
+        status: 400,
         headers: { "Cache-Control": "no-store" },
       });
     }
@@ -334,8 +344,12 @@ const getHandler = async (req: NextRequest) => {
     );
   }
 
-  const originErr = validateRequestOrigin(req);
-  if (originErr) return originErr;
+  // Enforce same-origin checks for browser/cookie flows; skip for bearer flows.
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    const originErr = validateRequestOrigin(req);
+    if (originErr) return originErr;
+  }
 
   const supabaseAdmin = getAdminClient();
   const { user, isUpstreamError } = await authenticateUser(req, supabaseAdmin);
