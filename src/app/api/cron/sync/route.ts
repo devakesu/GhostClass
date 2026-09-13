@@ -86,6 +86,7 @@ interface AttendanceConflictProps {
   dashboardUrl: string;
   markedAttendance?: string;
   isDutyLeave?: boolean;
+  remarks?: string | null;
 }
 
 interface CourseMetadata {
@@ -472,11 +473,15 @@ function handleCourseMismatch(
     attendanceLabel = "Medically Excused";
   }
 
+  const remarksSuffix = item.remarks?.trim()
+    ? ` Your Manual Record Remarks: ${item.remarks.trim()}`
+    : "";
+
   notifications.push({
     auth_user_id: user.auth_id,
     title: "Course Mismatch 💀",
     description:
-      `Course mismatch on ${item.date} (Session ${romanSession}). Manual: ${manualCourseLabel}, Official: ${officialCourseLabel}.`,
+      `Course mismatch on ${item.date} (Session ${romanSession}). Manual: ${manualCourseLabel}, Official: ${officialCourseLabel}.${remarksSuffix}`,
     topic: `conflict-course-${key}`,
   });
   emails.push({
@@ -552,12 +557,15 @@ function handleAttendanceStatus(
     if (item.status === "extra") {
       toUpdateStatus.push(item.id);
       const isDL = trackerCode === 225;
+      const remarksSuffix = item.remarks?.trim()
+        ? ` Your Manual Record Remarks: ${item.remarks.trim()}`
+        : "";
       if (isDL) {
         notifications.push({
           auth_user_id: user.auth_id,
           title: "Apply for DL! 📝",
           description:
-            `Your extra DL entry for ${courseLabel} on ${item.date} (Session ${romanSession}) is now updated as absent. You can now apply for duty leave.`,
+            `Your extra DL entry for ${courseLabel} on ${item.date} (Session ${romanSession}) is now updated as absent. You can now apply for duty leave.${remarksSuffix}`,
           topic: `conflict-dl-${key}`,
         });
         emails.push({
@@ -570,6 +578,7 @@ function handleAttendanceStatus(
             dashboardUrl,
             markedAttendance: "Duty Leave",
             isDutyLeave: true,
+            remarks: item.remarks,
           },
         });
       } else {
@@ -577,7 +586,7 @@ function handleAttendanceStatus(
           auth_user_id: user.auth_id,
           title: "Attendance Conflict 💀",
           description:
-            `Conflict: Marked present for ${courseLabel} on ${item.date} (Session ${romanSession}) but official record is absent.`,
+            `Conflict: Marked present for ${courseLabel} on ${item.date} (Session ${romanSession}) but official record is absent.${remarksSuffix}`,
           topic: `conflict-${key}`,
         });
         emails.push({
@@ -590,6 +599,7 @@ function handleAttendanceStatus(
             dashboardUrl,
             markedAttendance: "Present",
             isDutyLeave: false,
+            remarks: item.remarks,
           },
         });
       }

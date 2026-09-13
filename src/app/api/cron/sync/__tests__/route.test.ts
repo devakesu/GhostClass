@@ -18,6 +18,10 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { sendEmail } from "@/lib/email";
+import {
+  renderAttendanceConflictEmail,
+  renderCourseMismatchEmail,
+} from "@/lib/email-templates";
 
 // Mock server-only package so Vitest's jsdom environment doesn't reject it.
 // Must be declared before any module that transitively imports server-only.
@@ -535,11 +539,56 @@ describe("Cron sync — official absent, tracker extra (self-mark present) → c
     expect(notifications[0].title).toBe("Attendance Conflict 💀");
     expect(notifications[0].topic).toContain("conflict-");
 
+    expect(notifications[0].description).not.toContain(
+      "Your Manual Record Remarks:",
+    );
+
     // Verify email was sent
     expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
       to: MOCK_USER_ROW.email,
       subject: "Attendance Conflict 💀",
     }));
+  });
+
+  it("appends manual record remarks to notification description and forwards to email on conflict", async () => {
+    const { notificationInsertSpy } = buildAdminMock({
+      trackerData: [
+        {
+          id: 104,
+          course: "1001",
+          date: "2025-12-31",
+          session: "I",
+          attendance: "110",
+          status: "extra",
+          remarks: "Attended lab exam",
+        },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2025-12-31": { "1": ezygoSession(1, 111, 1001) },
+    });
+
+    const res = await GET(makeCronRequest("testuser"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.conflicts).toBe(1);
+
+    expect(notificationInsertSpy).toHaveBeenCalledOnce();
+    const [notifications] = notificationInsertSpy.mock.calls[0];
+    expect(notifications[0].title).toBe("Attendance Conflict 💀");
+    expect(notifications[0].description).toContain(
+      "Your Manual Record Remarks: Attended lab exam",
+    );
+
+    expect(renderAttendanceConflictEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        remarks: "Attended lab exam",
+      }),
+    );
   });
 });
 
@@ -1387,7 +1436,14 @@ describe("Cron sync — extra Duty Leave entry when official is absent", () => {
     expect(notifications[0].title).toBe("Apply for DL! 📝");
     expect(notifications[0].topic).toBe("conflict-dl-20260728|II");
     expect(notifications[0].description).toBe(
-      "Your extra DL entry for Mathematics For Computer And Information Science-3 (GAMAT301) on 2026-07-28 (Session II) is now updated as absent. You can now apply for duty leave.",
+      "Your extra DL entry for Mathematics For Computer And Information Science-3 (GAMAT301) on 2026-07-28 (Session II) is now updated as absent. You can now apply for duty leave. Your Manual Record Remarks: Attended hackathon",
+    );
+
+    expect(renderAttendanceConflictEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        remarks: "Attended hackathon",
+        isDutyLeave: true,
+      }),
     );
 
     // Verify email with DL subject
@@ -1443,6 +1499,56 @@ describe("Cron sync — course name and code formatting across messages", () => 
     expect(notifications[0].title).toBe("Course Mismatch 💀");
     expect(notifications[0].description).toBe(
       "Course mismatch on 2026-07-28 (Session II). Manual: Statistical Methods Lab (PCCBL308), Official: Mathematics For Computer And Information Science-3 (GAMAT301).",
+    );
+  });
+
+  it("appends manual record remarks in course mismatch notification and email", async () => {
+    const { notificationInsertSpy } = buildAdminMock({
+      trackerData: [
+        {
+          id: 502,
+          course: "PCCBL308",
+          date: "2026-07-28",
+          session: "II",
+          attendance: "110",
+          status: "extra",
+          remarks: "Attended substitute lecture",
+        },
+      ],
+      courseMappings: [
+        {
+          ezygo_id: 1001,
+          course_name: "MATHEMATICS FOR COMPUTER AND INFORMATION SCIENCE-3",
+          university_code: "GAMAT301",
+        },
+        {
+          ezygo_id: 1002,
+          course_name: "STATISTICAL METHODS LAB",
+          university_code: "PCCBL308",
+        },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2026-07-28": { "2": ezygoSession(2, 110, 1001) },
+    });
+
+    const res = await GET(makeCronRequest("testuser"));
+    expect(res.status).toBe(200);
+
+    expect(notificationInsertSpy).toHaveBeenCalledOnce();
+    const [notifications] = notificationInsertSpy.mock.calls[0];
+    expect(notifications[0].title).toBe("Course Mismatch 💀");
+    expect(notifications[0].description).toBe(
+      "Course mismatch on 2026-07-28 (Session II). Manual: Statistical Methods Lab (PCCBL308), Official: Mathematics For Computer And Information Science-3 (GAMAT301). Your Manual Record Remarks: Attended substitute lecture",
+    );
+
+    expect(renderCourseMismatchEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        remarks: "Attended substitute lecture",
+      }),
     );
   });
 });

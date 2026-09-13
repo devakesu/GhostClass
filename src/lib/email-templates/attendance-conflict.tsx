@@ -25,6 +25,7 @@ interface AttendanceConflictEmailProps {
   dashboardUrl: string;
   markedAttendance?: string;
   isDutyLeave?: boolean;
+  remarks?: string | null;
 }
 
 export const AttendanceConflictEmail = ({
@@ -35,6 +36,7 @@ export const AttendanceConflictEmail = ({
   dashboardUrl,
   markedAttendance,
   isDutyLeave,
+  remarks,
 }: AttendanceConflictEmailProps) => (
   <Html>
     <Head />
@@ -64,7 +66,6 @@ export const AttendanceConflictEmail = ({
           </Text>
 
           <Section style={emailStyles.conflictBox}>
-            {/* eslint-disable-next-line sonarjs/table-header -- Email table uses label/value format without <th> */}
             <table style={tableStyles.table}>
               <tbody>
                 <tr>
@@ -89,6 +90,16 @@ export const AttendanceConflictEmail = ({
                     </span>
                   </td>
                 </tr>
+                {remarks && remarks.trim()
+                  ? (
+                    <tr>
+                      <td style={tableStyles.cellLabel}>
+                        📝 Your Manual Record Remarks:
+                      </td>
+                      <td style={tableStyles.cellValueBold}>{remarks.trim()}</td>
+                    </tr>
+                  )
+                  : null}
                 <tr>
                   <td style={tableStyles.cellLabelLast}>🏫 Official</td>
                   <td style={tableStyles.cellValueWithBadgeLast}>

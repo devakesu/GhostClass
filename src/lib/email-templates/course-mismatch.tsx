@@ -78,11 +78,13 @@ export const CourseMismatchEmail = ({
                   <td style={tableStyles.cellLabel}>✅ Your Status</td>
                   <td style={tableStyles.cellValueBold}>{attendance}</td>
                 </tr>
-                {remarks
+                {remarks && remarks.trim()
                   ? (
                     <tr>
-                      <td style={tableStyles.cellLabel}>📝 Your Remarks</td>
-                      <td style={tableStyles.cellValueBold}>{remarks}</td>
+                      <td style={tableStyles.cellLabel}>
+                        📝 Your Manual Record Remarks:
+                      </td>
+                      <td style={tableStyles.cellValueBold}>{remarks.trim()}</td>
                     </tr>
                   )
                   : null}

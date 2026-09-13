@@ -116,6 +116,22 @@ describe("Email Render Functions (index.tsx)", () => {
     expect(html).toContain("Attendance Conflict Detected");
   });
 
+  it("renders attendance conflict email html with remarks", async () => {
+    const html = await renderAttendanceConflictEmail({
+      username: "Jane",
+      courseLabel: "Math 101",
+      date: "2023-10-01",
+      session: "Morning",
+      dashboardUrl: "https://example.com",
+      remarks: "Attended extra tutorial class",
+    });
+    expect(html).toContain("Jane");
+    expect(html).toContain("Math 101");
+    expect(html).toContain("Attendance Conflict Detected");
+    expect(html).toContain("Your Manual Record Remarks:");
+    expect(html).toContain("Attended extra tutorial class");
+  });
+
   it("renders duty leave conflict email html with appropriate messaging", async () => {
     const html = await renderAttendanceConflictEmail({
       username: "Jane",
@@ -125,12 +141,15 @@ describe("Email Render Functions (index.tsx)", () => {
       dashboardUrl: "https://example.com",
       markedAttendance: "Duty Leave",
       isDutyLeave: true,
+      remarks: "Sports meet participation",
     });
     expect(html).toContain("Jane");
     expect(html).toContain("Mathematics (GAMAT301)");
     expect(html).toContain("Duty Leave Update — Apply for DL");
     expect(html).toContain("apply for official duty leave");
     expect(html).toContain("Duty Leave");
+    expect(html).toContain("Your Manual Record Remarks:");
+    expect(html).toContain("Sports meet participation");
   });
 
   it("renders course mismatch email html", async () => {
@@ -142,9 +161,12 @@ describe("Email Render Functions (index.tsx)", () => {
       courseLabel: "PHYS101",
       dashboardUrl: "https://example.com",
       attendance: "Present",
+      remarks: "Lab session swap",
     });
     expect(html).toContain("Jane");
     expect(html).toContain("Course Mismatch Detected");
+    expect(html).toContain("Your Manual Record Remarks:");
+    expect(html).toContain("Lab session swap");
   });
 
   it("renders revision class email html", async () => {
