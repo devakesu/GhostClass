@@ -209,20 +209,112 @@ async function fetchEzygoResource(
   }
 }
 
+async function purgeStaleCronToken(
+  user: UserSyncData,
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+  reason: string,
+  err?: unknown,
+): Promise<{ expired: true }> {
+  logger.warn(
+    `[cron/sync] ${reason} for ${redact("username", user.username)} (${
+      redact("id", user.auth_id)
+    }) — purging stale token`,
+    err,
+  );
+  await supabaseAdmin.from("users").update({
+    ezygo_token: null,
+    ezygo_iv: null,
+    last_synced_at: new Date().toISOString(),
+  }).eq("auth_id", user.auth_id);
+  return { expired: true };
+}
+
+async function resolveDecryptedToken(
+  user: UserSyncData,
+  isCron: boolean,
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+): Promise<{ token: string } | { expired: true }> {
+  let decryptedToken: string | null = null;
+  try {
+    decryptedToken = decrypt({
+      iv: user.ezygo_iv,
+      content: user.ezygo_token,
+    });
+  } catch (decErr) {
+    if (isCron) {
+      return purgeStaleCronToken(
+        user,
+        supabaseAdmin,
+        "Token decryption failed",
+        decErr,
+      );
+    }
+    throw decErr;
+  }
+
+  if (!decryptedToken) {
+    if (isCron) {
+      return purgeStaleCronToken(
+        user,
+        supabaseAdmin,
+        "Decryption returned empty token",
+      );
+    }
+    throw new Error("Decryption failed");
+  }
+
+  return { token: decryptedToken };
+}
+
+async function attemptCookieFallback(
+  user: UserSyncData,
+  currentDecryptedToken: string,
+  supabaseAdmin: ReturnType<typeof getAdminClient>,
+): Promise<{ token: string; res: Response } | null> {
+  const cookieToken = await getAuthTokenServer();
+  if (!cookieToken || cookieToken === currentDecryptedToken) return null;
+
+  const res = await fetchEzygoResource(
+    "attendancereports/student/detailed",
+    cookieToken,
+    "POST",
+    {},
+  );
+  if (res.ok) {
+    const { iv, content } = encrypt(cookieToken);
+    await supabaseAdmin.from("users").update({
+      ezygo_token: content,
+      ezygo_iv: iv,
+    }).eq("auth_id", user.auth_id);
+    return { token: cookieToken, res };
+  }
+  return null;
+}
+
 async function getValidTokenAndAttendance(
   user: UserSyncData,
   isCron: boolean,
   supabaseAdmin: ReturnType<typeof getAdminClient>,
-): Promise<{
-  token: string;
-  officialData: OfficialAttendanceData;
-  officialCourses?: Record<string, unknown>;
-}> {
-  let decryptedToken = decrypt({
-    iv: user.ezygo_iv,
-    content: user.ezygo_token,
-  });
-  if (!decryptedToken) throw new Error("Decryption failed");
+): Promise<
+  | {
+    expired: false;
+    token: string;
+    officialData: OfficialAttendanceData;
+    officialCourses?: Record<string, unknown>;
+  }
+  | {
+    expired: true;
+  }
+> {
+  const tokenResolution = await resolveDecryptedToken(
+    user,
+    isCron,
+    supabaseAdmin,
+  );
+  if ("expired" in tokenResolution) {
+    return tokenResolution;
+  }
+  let decryptedToken = tokenResolution.token;
 
   let attRes = await fetchEzygoResource(
     "attendancereports/student/detailed",
@@ -231,23 +323,22 @@ async function getValidTokenAndAttendance(
     {},
   );
 
-  if (attRes.status === 401 && !isCron) {
-    const cookieToken = await getAuthTokenServer();
-    if (cookieToken && cookieToken !== decryptedToken) {
-      attRes = await fetchEzygoResource(
-        "attendancereports/student/detailed",
-        cookieToken,
-        "POST",
-        {},
+  if (attRes.status === 401) {
+    if (isCron) {
+      return purgeStaleCronToken(
+        user,
+        supabaseAdmin,
+        "EzyGo token expired (401)",
       );
-      if (attRes.ok) {
-        decryptedToken = cookieToken;
-        const { iv, content } = encrypt(decryptedToken);
-        await supabaseAdmin.from("users").update({
-          ezygo_token: content,
-          ezygo_iv: iv,
-        }).eq("auth_id", user.auth_id);
-      }
+    }
+    const fallback = await attemptCookieFallback(
+      user,
+      decryptedToken,
+      supabaseAdmin,
+    );
+    if (fallback) {
+      decryptedToken = fallback.token;
+      attRes = fallback.res;
     }
   }
 
@@ -265,6 +356,7 @@ async function getValidTokenAndAttendance(
   if (!officialParse.success) throw new Error("Invalid attendance data shape");
 
   return {
+    expired: false,
     token: decryptedToken,
     officialData: officialParse.data,
     officialCourses: attData?.courses,
@@ -720,12 +812,17 @@ async function syncUser(
   const dashboardUrl = `${appUrl}/dashboard`;
 
   try {
-    const { officialData, officialCourses } = await getValidTokenAndAttendance(
+    const tokenResult = await getValidTokenAndAttendance(
       user,
       isCron,
       supabaseAdmin,
     );
 
+    if (tokenResult.expired) {
+      return stats;
+    }
+
+    const { officialData, officialCourses } = tokenResult;
     stats.processed = 1;
 
     const { data: trackerData } = await supabaseAdmin
@@ -1012,7 +1109,12 @@ export const GET = withSecurity(async (req, { authType }) => {
       overallStats.errors += userStats.errors;
     }
 
-    const successFlag = overallStats.errors === 0;
+    const isBatchCron = auth.isCron && !searchParams.get("username");
+    // In batch cron mode, consider the run successful if at least one user processed
+    // or if there were no errors at all. Only fail the whole batch with 500 if every user errored.
+    const successFlag = isBatchCron
+      ? (overallStats.processed > 0 || overallStats.errors === 0)
+      : overallStats.errors === 0;
     return NextResponse.json({ success: successFlag, ...overallStats }, {
       status: successFlag ? 200 : 500,
     });

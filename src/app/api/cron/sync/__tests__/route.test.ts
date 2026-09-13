@@ -1446,3 +1446,112 @@ describe("Cron sync — course name and code formatting across messages", () => 
     );
   });
 });
+
+// ---------------------------------------------------------------------------
+
+describe("Cron sync — Stale / expired token handling (401 & decryption)", () => {
+  it("purges stale token from database and does not fail batch when EzyGo returns 401 in cron mode", async () => {
+    const spies = buildAdminMock({
+      usersData: [
+        {
+          ...MOCK_USER_ROW,
+          auth_id: "u-expired",
+          username: "expired_user",
+          ezygo_token: "encrypted-token-blob",
+        },
+      ],
+    });
+
+    // Attendance API returns 401 Unauthorized
+    mockFetch.mockResolvedValueOnce(
+      new Response(JSON.stringify({ message: "Invalid or expired token" }), {
+        status: 401,
+      }),
+    );
+
+    const req = makeCronRequest();
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.errors).toBe(0);
+    expect(body.processed).toBe(0);
+
+    // Verify token was purged
+    const updateCalls = spies.usersUpdateSpy.mock.calls;
+    const purgeCall = updateCalls.find((call) => call[0]?.ezygo_token === null);
+    expect(purgeCall).toBeDefined();
+    expect(purgeCall?.[0].ezygo_iv).toBeNull();
+  });
+
+  it("purges corrupt token from database when decryption fails in cron mode", async () => {
+    const { decrypt } = await import("@/lib/crypto");
+    vi.mocked(decrypt).mockImplementationOnce(() => {
+      throw new Error("Decryption failed");
+    });
+
+    const spies = buildAdminMock({
+      usersData: [
+        {
+          ...MOCK_USER_ROW,
+          auth_id: "u-corrupt",
+          username: "corrupt_user",
+          ezygo_token: "corrupt-invalid-token",
+          ezygo_iv: "invalid-iv",
+        },
+      ],
+    });
+
+    const req = makeCronRequest();
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.errors).toBe(0);
+
+    // Verify token was purged
+    const updateCalls = spies.usersUpdateSpy.mock.calls;
+    const purgeCall = updateCalls.find((call) => call[0]?.ezygo_token === null);
+    expect(purgeCall).toBeDefined();
+    expect(purgeCall?.[0].ezygo_iv).toBeNull();
+  });
+
+  it("returns 200 with partial success in batch cron mode when at least one user succeeds", async () => {
+    buildAdminMock({
+      usersData: [
+        {
+          ...MOCK_USER_ROW,
+          auth_id: "u1",
+          username: "user1",
+        },
+        {
+          ...MOCK_USER_ROW,
+          auth_id: "u2",
+          username: "user2",
+        },
+      ],
+      trackerData: [],
+    });
+
+    // User 1 succeeds
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({});
+
+    // User 2 fails with 502
+    mockFetch.mockResolvedValueOnce(
+      new Response("Bad Gateway", { status: 502 }),
+    );
+
+    const req = makeCronRequest();
+    const res = await GET(req);
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.success).toBe(true);
+    expect(body.processed).toBe(1);
+    expect(body.errors).toBe(1);
+  });
+});
