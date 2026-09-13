@@ -1004,8 +1004,8 @@ export default function ScoresClient() {
     }
   }, [batchQuery.data, queryClient, semesterData, academicYearData]);
 
-  // Block render until exams list + batch details have settled.
-  const isLoading = examsLoading || batchQuery.isPending;
+  // Progressive render: unblock page shell as soon as exams list is available
+  const isLoading = (examsLoading && !exams) || (!exams && !isError);
 
   /**
    * Map of examId → computed total score from examanswers.
@@ -1271,11 +1271,14 @@ export default function ScoresClient() {
               size="sm"
               className="text-muted-foreground hover:text-foreground h-8 w-8 p-0"
               onClick={() => refetch()}
-              disabled={isFetching}
+              disabled={isFetching || batchQuery.isFetching}
               aria-label="Refresh internal marks"
             >
               <RefreshCw
-                className={cn("h-4 w-4", isFetching && "animate-spin")}
+                className={cn(
+                  "h-4 w-4",
+                  (isFetching || batchQuery.isFetching) && "animate-spin",
+                )}
                 aria-hidden="true"
               />
             </Button>
@@ -1304,8 +1307,19 @@ export default function ScoresClient() {
           </motion.div>
         )}
 
+        {/* Pending batch query placeholder if 0 items resolved so far */}
+        {!isError && !isLoading && batchQuery.isPending && filtered.length === 0 && (
+          <div className="flex flex-col items-center gap-3 py-16 text-center">
+            <RefreshCw
+              className="h-8 w-8 text-primary animate-spin"
+              aria-hidden="true"
+            />
+            <p className="text-sm text-muted-foreground">Loading marks...</p>
+          </div>
+        )}
+
         {/* Empty state */}
-        {!isError && !isLoading && filtered.length === 0 && (
+        {!isError && !isLoading && !batchQuery.isPending && filtered.length === 0 && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

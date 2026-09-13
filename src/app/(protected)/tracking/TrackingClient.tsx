@@ -1453,19 +1453,22 @@ export default function TrackingClient() {
     },
     onSuccess: async (data) => {
       const removed = data.deletions ?? 0;
-      if (removed > 0) {
-        toast.info("Data Synced", {
-          description: `${removed} outdated record${
-            removed === 1 ? "" : "s"
-          } removed.`,
-        });
+      const updated = data.updates ?? 0;
+      if (removed > 0 || updated > 0) {
+        if (removed > 0) {
+          toast.info("Data Synced", {
+            description: `${removed} outdated record${
+              removed === 1 ? "" : "s"
+            } removed.`,
+          });
+        }
+        await Promise.all([
+          refetchTrackingData(),
+          refetchCount(),
+          refetchAttendance(),
+          refetchCourses(),
+        ]);
       }
-      await Promise.all([
-        refetchTrackingData(),
-        refetchCount(),
-        refetchAttendance(),
-        refetchCourses(),
-      ]);
     },
   });
 

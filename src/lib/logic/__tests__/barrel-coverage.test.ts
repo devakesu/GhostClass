@@ -5,9 +5,12 @@ import {
   calculateCurrentAcademicInfo,
   getOfficialSessionRaw,
   getReconciledStats,
+  hasAcademicRollover,
   isAbsent,
   isLogicModuleLoaded,
   isPositive,
+  semestersDiffer,
+  yearsDiffer,
 } from "../index";
 
 describe("Logic Barrel Coverage", () => {
@@ -19,6 +22,9 @@ describe("Logic Barrel Coverage", () => {
     expect(typeof getReconciledStats).toBe("function");
     expect(typeof calculateAttendance).toBe("function");
     expect(typeof calculateCurrentAcademicInfo).toBe("function");
+    expect(typeof yearsDiffer).toBe("function");
+    expect(typeof semestersDiffer).toBe("function");
+    expect(typeof hasAcademicRollover).toBe("function");
     expect(isLogicModuleLoaded()).toBe(true);
   });
 });

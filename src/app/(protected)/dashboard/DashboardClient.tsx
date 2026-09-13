@@ -40,7 +40,11 @@ import {
   useSetSemester,
 } from "@/hooks/users/settings";
 import { logger } from "@/lib/logger";
-import { calculateCurrentAcademicInfo } from "@/lib/logic/academic";
+import {
+  calculateCurrentAcademicInfo,
+  semestersDiffer,
+  yearsDiffer,
+} from "@/lib/logic/academic";
 import { calculateAttendance } from "@/lib/logic/bunk";
 import { normalizeCourseCode } from "@/lib/utils";
 import { useAttendanceSettings } from "@/providers/attendance-settings";
@@ -540,6 +544,25 @@ export default function DashboardClient({
   const profile = rawProfile as UserProfile | undefined;
   const queryClient = useQueryClient();
   const prevIsProfileFetchingRef = useRef(false);
+  const initialClass = initialProfile?.class as
+    | { id?: string | number; name?: string; sem?: string; year?: string }
+    | null
+    | undefined;
+  const appliedProfileRef = useRef<{
+    semester?: string | null;
+    year?: string | null;
+    classId?: string | number | null;
+    className?: string | null;
+  } | null>(
+    initialProfile
+      ? {
+        semester: initialProfile.current_semester || initialClass?.sem || null,
+        year: initialProfile.current_year || initialClass?.year || null,
+        classId: initialClass?.id ?? null,
+        className: initialClass?.name ?? null,
+      }
+      : null,
+  );
 
   // The force variant uses its own ["profile", "synced"] query key to avoid
   // deduplication with the navbar's no-force fetch. Once the EzyGo sync resolves,
@@ -550,7 +573,7 @@ export default function DashboardClient({
       queryClient.setQueryData(["profile"], rawProfile);
 
       const userClass = rawProfile.class as
-        | { sem?: string; year?: string }
+        | { id?: string | number; name?: string; sem?: string; year?: string }
         | null
         | undefined;
       if (userClass) {
@@ -565,17 +588,56 @@ export default function DashboardClient({
   }, [rawProfile, queryClient]);
 
   useEffect(() => {
-    if (prevIsProfileFetchingRef.current && !isFetchingProfile) {
-      logger.info(
-        "[Dashboard] Profile sync completed. Invalidating attendance, courses, and class courses to force fresh load.",
-      );
-      queryClient.invalidateQueries({ queryKey: ["courses"] });
-      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
-      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
-      queryClient.invalidateQueries({ queryKey: ["class_courses"] });
+    if (prevIsProfileFetchingRef.current && !isFetchingProfile && rawProfile) {
+      const userClass = rawProfile.class as
+        | { id?: string | number; name?: string; sem?: string; year?: string }
+        | null
+        | undefined;
+      const newSem = rawProfile.current_semester || userClass?.sem || null;
+      const newYear = rawProfile.current_year || userClass?.year || null;
+      const newClassId = userClass?.id ?? null;
+      const newClassName = userClass?.name ?? null;
+
+      const prev = appliedProfileRef.current;
+      const academicChanged = prev
+        ? semestersDiffer(prev.semester, newSem) ||
+          yearsDiffer(prev.year, newYear)
+        : false;
+      const classChanged = prev
+        ? (prev.classId != null &&
+          newClassId != null &&
+          prev.classId !== newClassId) ||
+          (prev.className != null &&
+            newClassName != null &&
+            prev.className !== newClassName)
+        : false;
+
+      if (academicChanged || classChanged) {
+        logger.info(
+          `[Dashboard] Academic context or class changed on profile sync (sem: ${prev?.semester}->${newSem}, year: ${prev?.year}->${newYear}). Invalidating queries.`,
+        );
+        queryClient.invalidateQueries({ queryKey: ["courses"] });
+        queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+        queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
+        queryClient.invalidateQueries({ queryKey: ["class_courses"] });
+        queryClient.invalidateQueries({ queryKey: ["course_instructors"] });
+        queryClient.invalidateQueries({ queryKey: ["track_data"] });
+        queryClient.invalidateQueries({ queryKey: ["count"] });
+      } else {
+        logger.dev(
+          "[Dashboard] Profile sync completed with matching academic context and class. Preserving cache without redundant refetches.",
+        );
+      }
+
+      appliedProfileRef.current = {
+        semester: newSem,
+        year: newYear,
+        classId: newClassId,
+        className: newClassName,
+      };
     }
     prevIsProfileFetchingRef.current = isFetchingProfile;
-  }, [isFetchingProfile, queryClient]);
+  }, [isFetchingProfile, rawProfile, queryClient]);
   const setSemesterMutation = useSetSemester({ skipInvalidations: true });
   const setAcademicYearMutation = useSetAcademicYear({
     skipInvalidations: true,
@@ -1169,9 +1231,9 @@ export default function DashboardClient({
     isLoadingAttendance ||
     (isAllCourseDetailsEnabled && isLoadingAllCourseSummaries);
 
-  const isGlobalLoading = isLoadingProfile ||
+  const isGlobalLoading = (isLoadingProfile && !profile) ||
     isUpdating ||
-    isSettingsLoading ||
+    (isSettingsLoading && !userSettings && !initialProfile?.settings) ||
     setSemesterMutation.isPending ||
     setAcademicYearMutation.isPending ||
     isShifting;

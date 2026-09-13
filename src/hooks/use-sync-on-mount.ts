@@ -110,6 +110,20 @@ function handleSyncError(
   });
 }
 
+export function hasSyncChanges(data?: SyncResponse | null): boolean {
+  if (!data) return false;
+  return (data.deletions ?? 0) > 0 || (data.updates ?? 0) > 0;
+}
+
+export function hasSyncActivity(data?: SyncResponse | null): boolean {
+  if (!data) return false;
+  return (
+    (data.deletions ?? 0) > 0 ||
+    (data.updates ?? 0) > 0 ||
+    (data.conflicts ?? 0) > 0
+  );
+}
+
 export function useSyncOnMount({
   username,
   userId,
@@ -156,9 +170,11 @@ export function useSyncOnMount({
 
       // mark settled and clear failure state on success
       setSyncSettled(true);
-      setSyncFailed(false);
+      if (status < 400) {
+        setSyncFailed(false);
+      }
 
-      if (status === 207) {
+      if (status === 207 || (status >= 500 && status < 600)) {
         captureSentryMessage(`Partial sync failure in ${sentryLocation}`, {
           level: "warning",
           tags: {
@@ -168,10 +184,7 @@ export function useSyncOnMount({
           extra: { userId: redact("id", String(userId)), response: data },
         });
         onPartialSyncRef.current?.(data);
-      } else if (
-        data.success &&
-        (data.deletions ?? 0) + (data.conflicts ?? 0) + (data.updates ?? 0) > 0
-      ) {
+      } else if (data.success && hasSyncActivity(data)) {
         onSuccessRef.current?.(data);
       }
     };
@@ -233,6 +246,17 @@ export function useSyncOnMount({
         if (isCleanedUp) return;
         // mark failure for callers that need to know
         setSyncFailed(true);
+        if (
+          isAxiosError(error) &&
+          (error.response?.status === 500 || error.response?.status === 207) &&
+          error.response?.data &&
+          typeof error.response.data === "object"
+        ) {
+          finalizeSync(
+            error.response.status,
+            error.response.data as SyncResponse,
+          );
+        }
         handleSyncError(error, sentryLocation, sentryTag, userId, setIsSyncing);
       } finally {
         if (!isCleanedUp) {
