@@ -88,6 +88,22 @@ describe("useCourseLookup", () => {
     expect(result.current.getCourseNameById("3")).toBe("Physics");
   });
 
+  it("should fallback to attendanceData for course name by course code", () => {
+    const { result } = renderHook(() =>
+      useCourseLookup({ attendanceData: mockAttendanceData })
+    );
+    expect(result.current.getCourseNameById("PH101")).toBe("Physics");
+    expect(result.current.getCourseNameById(" ph 101 ")).toBe("Physics");
+  });
+
+  it("should fallback to attendanceData for course code by course code", () => {
+    const { result } = renderHook(() =>
+      useCourseLookup({ attendanceData: mockAttendanceData })
+    );
+    expect(result.current.getCourseCodeById("PH101")).toBe("PH101");
+    expect(result.current.getCourseCodeById(" ph 101 ")).toBe("PH101");
+  });
+
   it("should return id if no name found", () => {
     const { result } = renderHook(() => useCourseLookup({}));
     expect(result.current.getCourseNameById("unknown")).toBe("unknown");

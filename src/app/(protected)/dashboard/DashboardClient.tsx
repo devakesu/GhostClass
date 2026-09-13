@@ -276,6 +276,7 @@ function useDashboardSyncFailureToast(
 }
 
 async function executeAcademicChange(params: {
+  queryClient: ReturnType<typeof useQueryClient>;
   pendingChange: AcademicPeriod | null;
   profileUsername: string | undefined;
   isUpdating: boolean;
@@ -301,6 +302,7 @@ async function executeAcademicChange(params: {
   academicShiftLockRef: MutableRefObject<boolean>;
 }) {
   const {
+    queryClient,
     pendingChange,
     profileUsername,
     isUpdating,
@@ -336,6 +338,10 @@ async function executeAcademicChange(params: {
       });
     }
 
+    // Explicitly update setting queries in cache immediately
+    queryClient.setQueryData(["semester"], pendingChange.semester);
+    queryClient.setQueryData(["academic-year"], pendingChange.year);
+
     try {
       await refetchProfile();
     } catch (err) {
@@ -344,6 +350,23 @@ async function executeAcademicChange(params: {
 
     setSelectedSemester(pendingChange.semester);
     setSelectedYear(pendingChange.year);
+
+    // Revalidate all term-dependent queries across all pages
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ["courses"] }),
+      queryClient.invalidateQueries({ queryKey: ["attendance-report"] }),
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] }),
+      queryClient.invalidateQueries({ queryKey: ["class_courses"] }),
+      queryClient.invalidateQueries({ queryKey: ["course_instructors"] }),
+      queryClient.invalidateQueries({ queryKey: ["track_data"] }),
+      queryClient.invalidateQueries({ queryKey: ["count"] }),
+      queryClient.invalidateQueries({ queryKey: ["tracking_count"] }),
+      queryClient.invalidateQueries({ queryKey: ["exams"] }),
+      queryClient.invalidateQueries({ queryKey: ["exam-answers"] }),
+      queryClient.invalidateQueries({ queryKey: ["exam-questions"] }),
+      queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] }),
+      queryClient.invalidateQueries({ queryKey: ["student_leaves"] }),
+    ]);
   } catch (error) {
     logger.error("Update Failed:", error);
     toast.error("Failed to update settings");
@@ -577,11 +600,16 @@ export default function DashboardClient({
         | null
         | undefined;
       if (userClass) {
-        if (userClass.sem) {
-          queryClient.setQueryData(["semester"], userClass.sem);
+        const existingSem = queryClient.getQueryData?.(["semester"]);
+        const existingYear = queryClient.getQueryData?.(["academic-year"]);
+        const preferredSem = rawProfile.current_semester || userClass.sem;
+        const preferredYear = rawProfile.current_year || userClass.year;
+
+        if (!existingSem && preferredSem) {
+          queryClient.setQueryData(["semester"], preferredSem);
         }
-        if (userClass.year) {
-          queryClient.setQueryData(["academic-year"], userClass.year);
+        if (!existingYear && preferredYear) {
+          queryClient.setQueryData(["academic-year"], preferredYear);
         }
       }
     }
@@ -971,33 +999,22 @@ export default function DashboardClient({
 
   useEffect(() => {
     if (selectedSemester !== null || selectedYear !== null) {
-      // Invalidate all active queries affected by the semester/year shift.
-      // Since they are now active under the new term parameters, this forces them
-      // to reload the fresh data.
-      queryClient.invalidateQueries({
-        queryKey: ["courses", currentSem, currentYear],
-        exact: true,
-      });
-      queryClient.invalidateQueries({
-        queryKey: ["attendance-report", currentSem, currentYear],
-        exact: true,
-      });
+      // Invalidate all active queries affected by the semester/year shift across the application.
+      queryClient.invalidateQueries({ queryKey: ["courses"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report"] });
+      queryClient.invalidateQueries({ queryKey: ["attendance-report-all"] });
       queryClient.invalidateQueries({ queryKey: ["class_courses"] });
-      queryClient.invalidateQueries({
-        queryKey: ["course_instructors", currentSem, currentYear],
-        exact: true,
-      });
+      queryClient.invalidateQueries({ queryKey: ["course_instructors"] });
       queryClient.invalidateQueries({ queryKey: ["track_data"] });
       queryClient.invalidateQueries({ queryKey: ["count"] });
-      queryClient.invalidateQueries({
-        queryKey: ["exams", currentSem, currentYear],
-        exact: true,
-      });
+      queryClient.invalidateQueries({ queryKey: ["tracking_count"] });
+      queryClient.invalidateQueries({ queryKey: ["exams"] });
       queryClient.invalidateQueries({ queryKey: ["exam-answers"] });
       queryClient.invalidateQueries({ queryKey: ["exam-questions"] });
       queryClient.invalidateQueries({ queryKey: ["exam-details-batch"] });
+      queryClient.invalidateQueries({ queryKey: ["student_leaves"] });
     }
-  }, [selectedSemester, selectedYear, currentSem, currentYear, queryClient]);
+  }, [selectedSemester, selectedYear, queryClient]);
 
   const { disabledCodes } = useDisabledCourses({
     academicYear: currentYear,
@@ -1039,6 +1056,7 @@ export default function DashboardClient({
 
   const handleConfirmChange = async () => {
     await executeAcademicChange({
+      queryClient,
       pendingChange,
       profileUsername: profile?.username,
       isUpdating,

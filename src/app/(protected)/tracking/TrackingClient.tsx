@@ -1397,7 +1397,10 @@ export default function TrackingClient() {
     isLoading: isDataLoading,
     isError: isTrackingError,
     refetch: refetchTrackingData,
-  } = useTrackingData(enabled ? profile : null);
+  } = useTrackingData(enabled ? profile : null, {
+    semester: semesterData || undefined,
+    year: academicYearData || undefined,
+  });
   const {
     data: attendanceData,
     isError: isAttendanceError,

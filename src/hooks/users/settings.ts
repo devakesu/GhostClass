@@ -25,14 +25,44 @@ export type UserSettings = {
 // Shared retry logic for settings queries — skip all 4xx, retry twice for 5xx/network
 const settingsRetryFn = makeRetryFn(2);
 
-function extractClassField<T extends string>(
-  uClass: { sem?: string; year?: string } | null | undefined,
+function extractAcademicField<T extends string>(
+  profile: UserProfile | null | undefined,
   field: "sem" | "year",
 ): T | null {
-  if (!uClass) return null;
-  if (field === "sem" && uClass.sem) return uClass.sem as T;
-  if (field === "year" && uClass.year) return uClass.year as T;
+  if (!profile) return null;
+  if (field === "sem") {
+    if (profile.current_semester) return profile.current_semester as T;
+    const uClass = profile.class as { sem?: string } | null | undefined;
+    if (uClass?.sem) return uClass.sem as T;
+  }
+  if (field === "year") {
+    if (profile.current_year) return profile.current_year as T;
+    const uClass = profile.class as { year?: string } | null | undefined;
+    if (uClass?.year) return uClass.year as T;
+  }
   return null;
+}
+
+async function fetchSettingWithFallback<T extends string>(
+  queryClient: ReturnType<typeof useQueryClient>,
+  field: "sem" | "year",
+  apiCall: () => Promise<T | null>,
+): Promise<T | null> {
+  try {
+    const result = await apiCall();
+    if (result != null) return result;
+  } catch (error: unknown) {
+    if (isAxiosError(error) && error.response?.status === 404) {
+      const cachedProfile = queryClient.getQueryData<UserProfile>(["profile"]) ||
+        queryClient.getQueryData<UserProfile>(["profile", "synced"]);
+      return extractAcademicField<T>(cachedProfile, field);
+    }
+    throw error;
+  }
+
+  const cachedProfile = queryClient.getQueryData<UserProfile>(["profile"]) ||
+    queryClient.getQueryData<UserProfile>(["profile", "synced"]);
+  return extractAcademicField<T>(cachedProfile, field);
 }
 
 async function resolveSettingFromProfileQuery<T extends string>(
@@ -40,17 +70,6 @@ async function resolveSettingFromProfileQuery<T extends string>(
   field: "sem" | "year",
   fallbackApiCall: () => Promise<T | null>,
 ): Promise<T | null> {
-  const cachedProfile = queryClient.getQueryData<UserProfile>(["profile"]) ||
-    queryClient.getQueryData<UserProfile>(["profile", "synced"]);
-  const userClass = cachedProfile?.class as
-    | { sem?: string; year?: string }
-    | null
-    | undefined;
-  const cachedValue = extractClassField<T>(userClass, field);
-  if (cachedValue) {
-    return cachedValue;
-  }
-
   const syncedState = queryClient.getQueryState(["profile", "synced"]);
   const normalState = queryClient.getQueryState(["profile"]);
   const isSyncedPending = syncedState && syncedState.status === "pending";
@@ -71,20 +90,22 @@ async function resolveSettingFromProfileQuery<T extends string>(
             unsubscribe();
             isSettled = true;
             const profile = event.query.state.data as UserProfile | null;
-            const uClass = profile?.class as
-              | { sem?: string; year?: string }
-              | null
-              | undefined;
-            const value = extractClassField<T>(uClass, field);
-            if (value) {
-              resolve(value);
+            const liveValue = field === "sem"
+              ? (profile?.current_semester as T | null | undefined)
+              : (profile?.current_year as T | null | undefined);
+            if (liveValue) {
+              resolve(liveValue);
             } else {
-              fallbackApiCall().then(resolve).catch(() => resolve(null));
+              fetchSettingWithFallback(queryClient, field, fallbackApiCall)
+                .then(resolve)
+                .catch(() => resolve(null));
             }
           } else if (event.query.state.status === "error") {
             unsubscribe();
             isSettled = true;
-            fallbackApiCall().then(resolve).catch(() => resolve(null));
+            fetchSettingWithFallback(queryClient, field, fallbackApiCall)
+              .then(resolve)
+              .catch(() => resolve(null));
           }
         }
       });
@@ -92,13 +113,15 @@ async function resolveSettingFromProfileQuery<T extends string>(
       setTimeout(() => {
         if (!isSettled) {
           unsubscribe();
-          fallbackApiCall().then(resolve).catch(() => resolve(null));
+          fetchSettingWithFallback(queryClient, field, fallbackApiCall)
+            .then(resolve)
+            .catch(() => resolve(null));
         }
       }, 30000);
     });
   }
 
-  return fallbackApiCall();
+  return fetchSettingWithFallback(queryClient, field, fallbackApiCall);
 }
 
 export const useFetchSemester = () => {
@@ -108,15 +131,8 @@ export const useFetchSemester = () => {
     queryKey: ["semester"],
     queryFn: async () => {
       return resolveSettingFromProfileQuery(queryClient, "sem", async () => {
-        try {
-          const res = await axios.get("/user/setting/default_semester");
-          return res.data;
-        } catch (error: unknown) {
-          if (isAxiosError(error) && error.response?.status === 404) {
-            return null;
-          }
-          throw error;
-        }
+        const res = await axios.get("/user/setting/default_semester");
+        return res.data;
       });
     },
     retry: settingsRetryFn,
@@ -132,15 +148,8 @@ export const useFetchAcademicYear = () => {
     queryKey: ["academic-year"],
     queryFn: async () => {
       return resolveSettingFromProfileQuery(queryClient, "year", async () => {
-        try {
-          const res = await axios.get("/user/setting/default_academic_year");
-          return res.data;
-        } catch (error: unknown) {
-          if (isAxiosError(error) && error.response?.status === 404) {
-            return null;
-          }
-          throw error;
-        }
+        const res = await axios.get("/user/setting/default_academic_year");
+        return res.data;
       });
     },
     retry: settingsRetryFn,
