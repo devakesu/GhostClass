@@ -203,7 +203,7 @@ RUN if [ ! -f "public/sw.js" ]; then \
 RUN find .next -exec touch -d "@${SOURCE_DATE_EPOCH}" {} +
 
 # 3. Normalize absolute paths in standalone server
-RUN sed -i 's|/app/|/|g' .next/standalone/server.js
+RUN sed -i -E 's|(process\.env\.NEXT_PRIVATE_STANDALONE_DIR[ =]+["'"'"'])/app/?(["'"'"'])|\1/\2|g' .next/standalone/server.js
 
 # ===============================
 # 3. Runtime layer
@@ -249,7 +249,17 @@ WORKDIR /app
 RUN addgroup --system --gid 1001 nodejs && \
     adduser --system --uid 1001 nextjs && \
     apk add --no-cache curl wget tar && \
-    wget -qO- https://github.com/Infisical/cli/releases/download/v0.43.84/cli_0.43.84_linux_amd64.tar.gz | tar -xz -C /usr/local/bin infisical
+    set -eu; \
+    ARCH=$(uname -m); \
+    case "${ARCH}" in \
+      x86_64) INF_ARCH="amd64"; EXPECTED_SHA="64a47155083c7b8042de64e67eee5629bf894903c102f7239f69c7ed93fdbfc5" ;; \
+      aarch64|arm64) INF_ARCH="arm64"; EXPECTED_SHA="28c3593bb14e4739f00058419304f6ffeb94741114efcc4208d74bdfc4ea881f" ;; \
+      *) echo "Unsupported arch: ${ARCH}"; exit 1 ;; \
+    esac; \
+    wget -O /tmp/infisical.tar.gz "https://github.com/Infisical/cli/releases/download/v0.43.84/cli_0.43.84_linux_${INF_ARCH}.tar.gz" && \
+    echo "${EXPECTED_SHA}  /tmp/infisical.tar.gz" | sha256sum -c - && \
+    tar -xz -C /usr/local/bin -f /tmp/infisical.tar.gz infisical && \
+    rm -f /tmp/infisical.tar.gz
 
 # Core Next.js output
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./

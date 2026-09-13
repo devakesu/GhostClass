@@ -107,7 +107,7 @@ describe("utils.ts", () => {
       expect(normalizeDate("2024-01-15T10:00:00Z")).toBe("20240115");
 
       const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
-      expect(normalizeDate("not-a-date")).toBe("");
+      expect(normalizeDate("not-a-date")).toBe("not-a-date");
       expect(spy).toHaveBeenCalled();
     });
   });
@@ -183,8 +183,10 @@ describe("utils.ts", () => {
       expect(getSessionNumber("IX")).toBe(9);
       expect(getSessionNumber("")).toBe(999);
     });
-    it("returns empty string for non-numeric date parts in DD/MM/YYYY", () => {
-      expect(normalizeDate("12/AA/2024")).toBe("");
+    it("preserves raw string for non-numeric date parts in DD/MM/YYYY to avoid key collision", () => {
+      const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+      expect(normalizeDate("12/AA/2024")).toBe("12/AA/2024");
+      expect(spy).toHaveBeenCalled();
     });
   });
 
@@ -263,6 +265,9 @@ describe("utils.ts", () => {
       expect(generateSlotKey(101, "2024-01-15", 1)).toBe("101_20240115_I");
       expect(generateSlotKey("CS101", "2024-01-15", "iii")).toBe(
         "CS101_20240115_III",
+      );
+      expect(generateSlotKey("CS101", "custom-date", "1")).toBe(
+        "CS101_custom-date_I",
       );
     });
   });

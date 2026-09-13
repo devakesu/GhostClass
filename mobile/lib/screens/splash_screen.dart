@@ -204,12 +204,9 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     );
   }
 
-  void _prewarmAppData({
+  void _prewarmCriticalData({
     required Future<dynamic> dashboardFuture,
     required Future<dynamic> trackingFuture,
-    required Future<dynamic> leaveFuture,
-    required Future<dynamic> scoreFuture,
-    required Future<dynamic> notificationsFuture,
   }) {
     void prewarm(Future<dynamic> future, String label) {
       AppLogger.safeUnawait(
@@ -223,11 +220,6 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     prewarm(dashboardFuture, 'dashboard');
     WidgetsBinding.instance.addPostFrameCallback((_) {
       prewarm(trackingFuture, 'tracking');
-      prewarm(leaveFuture, 'leave');
-      Future.delayed(const Duration(milliseconds: 150), () {
-        prewarm(scoreFuture, 'scores');
-        prewarm(notificationsFuture, 'notifications');
-      });
     });
   }
 
@@ -474,23 +466,22 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       if (finalUser.termsAccepted) {
         final dashboardFuture = ref.read(dashboardProvider.future);
         final trackingFuture = ref.read(trackingProvider.future);
-        final leaveFuture = ref.read(leaveProvider.future);
-        final scoreFuture = ref.read(scoreProvider.future);
-        final notificationsFuture = ref.read(notificationsProvider.future);
+
+        _prewarmCriticalData(
+          dashboardFuture: dashboardFuture,
+          trackingFuture: trackingFuture,
+        );
 
         _startPushInitInBackgroundAfterSplash(pushService);
+        final refContainer = ProviderScope.containerOf(context);
         context.go('/dashboard');
         AppLogger.safeUnawait(
-          Future<void>.microtask(() async {
-            _triggerCronSyncAndPrewarm(
+          Future<void>.delayed(const Duration(seconds: 3), () async {
+            _triggerDeferredPreloads(
+              container: refContainer,
               user: finalUser,
               apiService: apiService,
               token: token,
-              dashboardFuture: dashboardFuture,
-              trackingFuture: trackingFuture,
-              leaveFuture: leaveFuture,
-              scoreFuture: scoreFuture,
-              notificationsFuture: notificationsFuture,
             );
             _startPostNavigationPreloads(
               apiService: apiService,
@@ -533,17 +524,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     }
   }
 
-  void _triggerCronSyncAndPrewarm({
+  void _triggerDeferredPreloads({
+    required ProviderContainer container,
     required AuthenticatedUser user,
     required ApiService apiService,
     required String? token,
-    required Future<dynamic> dashboardFuture,
-    required Future<dynamic> trackingFuture,
-    required Future<dynamic> leaveFuture,
-    required Future<dynamic> scoreFuture,
-    required Future<dynamic> notificationsFuture,
   }) {
-    // 1. Trigger Cron Sync in parallel
+    // 1. Trigger Cron Sync deferred in background
     if (token != null) {
       AppLogger.safeUnawait(
         apiService
@@ -554,7 +541,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
                   'SplashScreen: Background cron sync reported changes ($result). '
                   'Invalidating all screen providers.',
                 );
-                ref
+                container
                     .read(profileHydrationServiceProvider.notifier)
                     .handleCronSyncResult(result);
               }
@@ -566,14 +553,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       );
     }
 
-    // 2. Prewarm all other screen queries
-    _prewarmAppData(
-      dashboardFuture: dashboardFuture,
-      trackingFuture: trackingFuture,
-      leaveFuture: leaveFuture,
-      scoreFuture: scoreFuture,
-      notificationsFuture: notificationsFuture,
-    );
+    // 2. Prewarm deferred screen queries
+    void prewarm(Future<dynamic> future, String label) {
+      AppLogger.safeUnawait(
+        future.catchError((Object e, StackTrace st) {
+          AppLogger.e('SplashScreen: $label prewarm failed', e, st);
+        }),
+        'SplashScreen: $label prewarm',
+      );
+    }
+
+    prewarm(container.read(leaveProvider.future), 'leave');
+    prewarm(container.read(scoreProvider.future), 'scores');
+    prewarm(container.read(notificationsProvider.future), 'notifications');
   }
 
   @override

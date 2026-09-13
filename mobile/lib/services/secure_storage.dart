@@ -1,11 +1,16 @@
 import 'dart:convert';
+import 'dart:io';
 
+import 'package:crypto/crypto.dart';
+import 'package:encrypt/encrypt.dart' as enc;
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:ghostclass/models/user.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/services/logger.dart';
+import 'package:path/path.dart' as p;
+import 'package:path_provider/path_provider.dart';
 
 /// Keys for all secure storage entries.
 /// Centralised here so key names never drift across the codebase.
@@ -21,6 +26,7 @@ abstract final class _Keys {
   static const academicState = 'academic_state';
   static const fcmToken = 'fcm_token';
   static const attestationResult = 'attestation_result';
+  static const cacheEncryptionKey = 'cache_encryption_key';
 }
 
 /// Wraps [FlutterSecureStorage] with typed helpers.
@@ -28,18 +34,74 @@ abstract final class _Keys {
 /// All values are encrypted at rest via AES on Android (Keystore) and
 /// Keychain on iOS/macOS — no plaintext is ever written to disk.
 class SecureStorageService {
-  SecureStorageService([FlutterSecureStorage? storage])
-    : _storage =
-          storage ??
-          const FlutterSecureStorage(
-            iOptions: IOSOptions(
-              accessibility: KeychainAccessibility.first_unlock,
-            ),
-          );
+  SecureStorageService([
+    FlutterSecureStorage? storage,
+    Directory? cacheDirOverride,
+  ]) : _storage =
+           storage ??
+           const FlutterSecureStorage(
+             iOptions: IOSOptions(
+               accessibility: KeychainAccessibility.first_unlock,
+             ),
+           ),
+       _cacheDirOverride = cacheDirOverride;
+
   final FlutterSecureStorage _storage;
+  final Directory? _cacheDirOverride;
+  enc.Key? _cachedAesKey;
 
   @visibleForTesting
   FlutterSecureStorage get storage => _storage;
+
+  Future<enc.Key> _getOrCreateCacheKey() async {
+    if (_cachedAesKey != null) return _cachedAesKey!;
+    try {
+      final existing = await _safeRead(key: _Keys.cacheEncryptionKey);
+      if (existing != null && existing.isNotEmpty) {
+        _cachedAesKey = enc.Key.fromBase64(existing);
+        return _cachedAesKey!;
+      }
+    } on Object catch (_) {}
+
+    final randomKey = enc.Key.fromSecureRandom(32);
+    try {
+      await _safeWrite(
+        key: _Keys.cacheEncryptionKey,
+        value: randomKey.base64,
+      );
+    } on Object catch (e) {
+      AppLogger.w('SecureStorage: Could not persist cache encryption key: $e');
+    }
+    _cachedAesKey = randomKey;
+    return randomKey;
+  }
+
+  Future<Directory> _getCacheDirectory() async {
+    final override = _cacheDirOverride;
+    if (override != null) {
+      if (!override.existsSync()) {
+        override.createSync(recursive: true);
+      }
+      return override;
+    }
+    Directory? baseDir;
+    try {
+      baseDir = await getApplicationSupportDirectory();
+    } on Object catch (_) {
+      baseDir = Directory.systemTemp;
+    }
+    final cacheDir = Directory(p.join(baseDir.path, 'ghostclass_enc_cache'));
+    if (!cacheDir.existsSync()) {
+      cacheDir.createSync(recursive: true);
+    }
+    return cacheDir;
+  }
+
+  Future<File> _getCacheFile(String key) async {
+    final dir = await _getCacheDirectory();
+    final hash = sha256.convert(utf8.encode(key)).toString();
+    return File(p.join(dir.path, 'cache_$hash.bin'));
+  }
 
   // ─── Safe Storage Helpers ──────────────────────────────────────────────────
 
@@ -224,7 +286,8 @@ class SecureStorageService {
 
   // ─── Generic TTL Cache ──────────────────────────────────────────────────
 
-  /// Persists any JSON-serializable data with a TTL.
+  /// Persists generic JSON-serializable API responses to an AES-GCM encrypted file,
+  /// reserving FlutterSecureStorage exclusively for encryption keys, tokens, and credentials.
   Future<void> saveCachedData(
     String key,
     dynamic data, {
@@ -235,11 +298,61 @@ class SecureStorageService {
       'data': data,
       'expiry': expiry,
     };
-    await _safeWrite(key: 'cache_$key', value: jsonEncode(payload));
+    try {
+      final keyBytes = await _getOrCreateCacheKey();
+      final iv = enc.IV.fromSecureRandom(12); // Standard 96-bit AES-GCM IV
+      final encrypter = enc.Encrypter(enc.AES(keyBytes, mode: enc.AESMode.gcm));
+      final jsonStr = jsonEncode(payload);
+      final encrypted = encrypter.encrypt(jsonStr, iv: iv);
+
+      final combined = Uint8List.fromList([...iv.bytes, ...encrypted.bytes]);
+      final file = await _getCacheFile(key);
+      await file.writeAsBytes(combined, flush: true);
+    } on Object catch (e, st) {
+      AppLogger.e(
+        'SecureStorage: Error writing encrypted cache file for $key',
+        e,
+        st,
+      );
+    }
   }
 
   /// Returns cached data if it exists and has not expired.
+  /// Checks AES-GCM encrypted file cache first, then falls back to legacy secure storage.
   Future<dynamic> getCachedData(String key) async {
+    try {
+      final file = await _getCacheFile(key);
+      if (file.existsSync()) {
+        final bytes = await file.readAsBytes();
+        if (bytes.length > 12) {
+          final ivBytes = bytes.sublist(0, 12);
+          final cipherBytes = bytes.sublist(12);
+          final keyBytes = await _getOrCreateCacheKey();
+          final encrypter = enc.Encrypter(
+            enc.AES(keyBytes, mode: enc.AESMode.gcm),
+          );
+          final decrypted = encrypter.decrypt(
+            enc.Encrypted(cipherBytes),
+            iv: enc.IV(ivBytes),
+          );
+          final decoded = jsonDecode(decrypted) as Map<String, dynamic>;
+          final expiry = decoded['expiry'] as int;
+          if (DateTime.now().millisecondsSinceEpoch > expiry) {
+            try {
+              await file.delete();
+            } on Object catch (_) {}
+            return null;
+          }
+          return decoded['data'];
+        }
+      }
+    } on Object catch (e) {
+      AppLogger.d(
+        'SecureStorage: Error reading encrypted cache file for $key: $e',
+      );
+    }
+
+    // Fallback: check legacy secure storage cache
     final raw = await _safeRead(key: 'cache_$key');
     if (raw == null) return null;
     try {
@@ -298,15 +411,55 @@ class SecureStorageService {
 
   Future<void> deleteSecure(String key) => _safeDelete(key: key);
 
-  Future<void> deleteCachedData(String key) => _safeDelete(key: 'cache_$key');
+  Future<void> deleteCachedData(String key) async {
+    try {
+      final file = await _getCacheFile(key);
+      if (file.existsSync()) {
+        await file.delete();
+      }
+    } on Object catch (_) {}
+    await _safeDelete(key: 'cache_$key');
+  }
 
   // ─── Full Clear ──────────────────────────────────────────────────────────
 
   /// Deletes every key managed by this service. Should be called on logout.
-  Future<void> clearAll() => _safeDeleteAll();
+  Future<void> clearAll() async {
+    try {
+      final dir = await _getCacheDirectory();
+      if (dir.existsSync()) {
+        final entities = dir.listSync();
+        for (final entity in entities) {
+          if (entity is File && entity.path.endsWith('.bin')) {
+            try {
+              entity.deleteSync();
+            } on Object catch (_) {}
+          }
+        }
+      }
+    } on Object catch (_) {}
+    _cachedAesKey = null;
+    await _safeDeleteAll();
+  }
 
-  /// Deletes all cached keys starting with "cache_" from secure storage.
+  /// Deletes all cached keys starting with "cache_" from secure storage and encrypted file cache.
   Future<void> clearAllCachedData() async {
+    try {
+      final dir = await _getCacheDirectory();
+      if (dir.existsSync()) {
+        final entities = dir.listSync();
+        for (final entity in entities) {
+          if (entity is File && entity.path.endsWith('.bin')) {
+            try {
+              entity.deleteSync();
+            } on Object catch (_) {}
+          }
+        }
+      }
+    } on Object catch (e) {
+      AppLogger.e('SecureStorage: Error clearing cache files', e);
+    }
+
     try {
       final all = await _storage.readAll();
       await Future.wait(

@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 import { NextRequest } from "next/server";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthTokenServer } from "@/lib/security/auth-cookie";
+import { getAuthTokenWithFallback } from "@/lib/security/auth-cookie";
 import { fetchEzygoData } from "@/lib/ezygo-batch-fetcher";
 import { proxyRateLimiter } from "@/lib/ratelimit";
 
@@ -18,6 +18,7 @@ vi.mock("@/lib/supabase/server", () => ({
 
 vi.mock("@/lib/security/auth-cookie", () => ({
   getAuthTokenServer: vi.fn(() => "token-123"),
+  getAuthTokenWithFallback: vi.fn(() => Promise.resolve("token-123")),
 }));
 
 vi.mock("@/lib/ezygo-batch-fetcher", () => ({
@@ -101,7 +102,7 @@ describe("POST /api/attendance/summary-batch", () => {
 
   it("returns 401 when token is missing", async () => {
     const { POST } = await import("../route");
-    vi.mocked(getAuthTokenServer).mockResolvedValueOnce(undefined);
+    vi.mocked(getAuthTokenWithFallback).mockResolvedValueOnce(undefined);
     const req = new NextRequest(
       "http://localhost/api/attendance/summary-batch",
       { method: "POST" },

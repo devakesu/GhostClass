@@ -60,6 +60,7 @@ class EzygoBatchFetcher {
   DateTime? _lastCircuitBreakerLog;
   final Map<String, DateTime> _lastEndpointCall = {};
   static const Duration _perEndpointThrottle = Duration(milliseconds: 100);
+  DateTime? _outageTimestamp;
 
   int _generation = 0;
 
@@ -105,34 +106,41 @@ class EzygoBatchFetcher {
     // 0.5. Circuit Breaker: If an outage is active, block ALL network requests immediately.
     // This state is only cleared when the user manually presses 'Retry' (clearAll()).
     if (_getOutage()) {
-      // Ensure the UI state is definitely true if we are blocking
-      _setOutage(true);
-
-      // Throttle the warning log to once per minute to avoid console flooding
-      const logThrottle = Duration(minutes: 1);
-      final now = DateTime.now();
-      if (_lastCircuitBreakerLog == null ||
-          now.difference(_lastCircuitBreakerLog!) > logThrottle) {
-        _lastCircuitBreakerLog = now;
-        AppLogger.e(
-          'EzygoBatchFetcher: CIRCUIT BREAKER ACTIVE. Blocking network request logic for $path',
-        );
+      if (_outageTimestamp != null &&
+          DateTime.now().difference(_outageTimestamp!) >
+              const Duration(seconds: 60)) {
+        _setOutage(false);
+        _outageTimestamp = null;
       } else {
-        AppLogger.d(
-          'EzygoBatchFetcher: CIRCUIT BREAKER THROTTLED. Blocking $path',
+        // Ensure the UI state is definitely true if we are blocking
+        _setOutage(true);
+
+        // Throttle the warning log to once per minute to avoid console flooding
+        const logThrottle = Duration(minutes: 1);
+        final now = DateTime.now();
+        if (_lastCircuitBreakerLog == null ||
+            now.difference(_lastCircuitBreakerLog!) > logThrottle) {
+          _lastCircuitBreakerLog = now;
+          AppLogger.e(
+            'EzygoBatchFetcher: CIRCUIT BREAKER ACTIVE. Blocking network request logic for $path',
+          );
+        } else {
+          AppLogger.d(
+            'EzygoBatchFetcher: CIRCUIT BREAKER THROTTLED. Blocking $path',
+          );
+        }
+
+        throw DioException(
+          requestOptions: RequestOptions(path: path),
+          type: DioExceptionType.cancel,
+          message: 'EzyGo Outage Lock: Please press retry to attempt recovery.',
+          response: Response<dynamic>(
+            requestOptions: RequestOptions(path: path),
+            statusCode: 503,
+            statusMessage: 'Service Unavailable (Outage Lock)',
+          ),
         );
       }
-
-      throw DioException(
-        requestOptions: RequestOptions(path: path),
-        type: DioExceptionType.cancel,
-        message: 'EzyGo Outage Lock: Please press retry to attempt recovery.',
-        response: Response<dynamic>(
-          requestOptions: RequestOptions(path: path),
-          statusCode: 503,
-          statusMessage: 'Service Unavailable (Outage Lock)',
-        ),
-      );
     }
 
     // 1. Check local cache (LRU-lite)
@@ -219,6 +227,7 @@ class EzygoBatchFetcher {
             // NEGATIVE CACHE (Circuit Breaker):
             // Remember 5xx failures briefly to prevent Request Storms.
             _setOutage(true);
+            _outageTimestamp = DateTime.now();
             _putCache(
               cacheKey,
               _CacheEntry(
@@ -240,6 +249,7 @@ class EzygoBatchFetcher {
             e.type == DioExceptionType.receiveTimeout ||
             e.type == DioExceptionType.connectionError) {
           _setOutage(true);
+          _outageTimestamp = DateTime.now();
           // Short error TTL for transient network issues to recover faster
           if (e.response != null && _generation == startGeneration) {
             _putCache(
@@ -313,6 +323,7 @@ class EzygoBatchFetcher {
     _inFlight.clear();
     if (setOutageState) {
       _setOutage(false);
+      _outageTimestamp = null;
     }
     _generation++;
 

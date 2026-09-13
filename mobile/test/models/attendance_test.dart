@@ -126,10 +126,8 @@ void main() {
       expect(AttendanceStatus.fromCode(111), AttendanceStatus.absent);
       expect(AttendanceStatus.fromCode(112), AttendanceStatus.otherLeave);
       expect(AttendanceStatus.fromCode(225), AttendanceStatus.dutyLeave);
-      expect(
-        AttendanceStatus.fromCode(999),
-        AttendanceStatus.present,
-      ); // default
+      expect(AttendanceStatus.fromCode(999), AttendanceStatus.unknown);
+      expect(AttendanceStatus.fromCode(null), AttendanceStatus.unknown);
     });
 
     test('positive and negative getters work', () {
@@ -137,6 +135,8 @@ void main() {
       expect(AttendanceStatus.present.isNegative, false);
       expect(AttendanceStatus.absent.isPositive, false);
       expect(AttendanceStatus.absent.isNegative, true);
+      expect(AttendanceStatus.unknown.isPositive, false);
+      expect(AttendanceStatus.unknown.isNegative, false);
     });
   });
 }

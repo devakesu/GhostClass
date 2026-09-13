@@ -277,22 +277,37 @@ void main() {
         () => mockStorage.delete(key: any(named: 'key')),
       ).thenAnswer((_) async {});
 
-      // Test write
+      // Test write & read back from AES-GCM encrypted file storage
       await service.saveCachedData('key', 'test_data');
-
-      // Test read non-expired
-      when(
-        () => mockStorage.read(key: any(named: 'key')),
-      ).thenAnswer((_) async => jsonEncode(payload));
       final res = await service.getCachedData('key');
       expect(res, 'test_data');
 
-      // Test read expired
+      // Test expired encrypted file cache
+      await service.saveCachedData(
+        'expired_key',
+        'expired_data',
+        ttl: const Duration(seconds: -10),
+      );
+      final expiredRes = await service.getCachedData('expired_key');
+      expect(expiredRes, isNull);
+
+      // Clean up written file for testing legacy fallback
+      await service.deleteCachedData('key');
+      verify(() => mockStorage.delete(key: 'cache_key')).called(1);
+
+      // Test read legacy fallback (non-expired in secure storage)
+      when(
+        () => mockStorage.read(key: any(named: 'key')),
+      ).thenAnswer((_) async => jsonEncode(payload));
+      final legacyRes = await service.getCachedData('key');
+      expect(legacyRes, 'test_data');
+
+      // Test read legacy fallback (expired in secure storage)
       when(
         () => mockStorage.read(key: any(named: 'key')),
       ).thenAnswer((_) async => jsonEncode(expiredPayload));
-      final expiredRes = await service.getCachedData('key');
-      expect(expiredRes, isNull);
+      final expiredLegacyRes = await service.getCachedData('key');
+      expect(expiredLegacyRes, isNull);
       verify(() => mockStorage.delete(key: 'cache_key')).called(1);
 
       // Test read null

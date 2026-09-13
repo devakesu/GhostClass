@@ -7,6 +7,12 @@ vi.mock("@/lib/firebase/admin", () => ({
   getAppCheck: vi.fn(),
 }));
 
+vi.mock("@/lib/ratelimit", () => ({
+  authRateLimiter: {
+    limit: vi.fn().mockResolvedValue({ success: true }),
+  },
+}));
+
 describe("GET /api/security/attestation", () => {
   beforeEach(() => {
     vi.clearAllMocks();
@@ -215,5 +221,22 @@ describe("GET /api/security/attestation", () => {
 
     expect(data.minVersion).toBe("4.3.0");
     expect(data.latestVersion).toBe("4.3.0");
+  });
+
+  it("returns 429 when rate limit is exceeded", async () => {
+    const { authRateLimiter } = await import("@/lib/ratelimit");
+    vi.mocked(authRateLimiter.limit).mockResolvedValueOnce({ success: false } as any);
+
+    const req = new NextRequest("http://localhost/api/security/attestation", {
+      method: "GET",
+      headers: {
+        "x-forwarded-for": "203.0.113.1",
+      },
+    });
+
+    const res = await GET(req);
+    expect(res.status).toBe(429);
+    const data = await res.json();
+    expect(data.error).toBe("Too many attestation requests. Please try again later.");
   });
 });

@@ -270,9 +270,9 @@ class DashboardStats {
     final activeCourses = activeCodes.length;
 
     return DashboardStats(
-      percentage: rawPercentage.round(),
+      percentage: rawPercentage.floor(),
       rawPercentage: rawPercentage,
-      officialPercentage: rawOfficialPercentage.round(),
+      officialPercentage: rawOfficialPercentage.floor(),
       rawOfficialPercentage: rawOfficialPercentage,
       officialPresent: officialPresent,
       corrPresent: corrPresent,

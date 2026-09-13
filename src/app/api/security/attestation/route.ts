@@ -1,5 +1,7 @@
-import { NextResponse } from "next/server";
+import { type NextRequest, NextResponse } from "next/server";
 import { verifyAppCheckToken } from "@/lib/security/app-check";
+import { authRateLimiter } from "@/lib/ratelimit";
+import { getClientIp } from "@/lib/utils.server";
 
 export const dynamic = "force-dynamic";
 
@@ -24,7 +26,18 @@ function isVersionOlder(current: string, target: string): boolean {
  * Returns the decoded attestation details for the current request.
  * This is used by the mobile app to show build transparency details.
  */
-export async function GET(req: Request) {
+export async function GET(req: Request | NextRequest) {
+  const ip = getClientIp(req.headers);
+  if (ip) {
+    const { success } = await authRateLimiter.limit(`attestation_${ip}`);
+    if (!success) {
+      return NextResponse.json(
+        { error: "Too many attestation requests. Please try again later." },
+        { status: 429 },
+      );
+    }
+  }
+
   const result = await verifyAppCheckToken(req);
 
   // Extract non-sensitive details for transparency

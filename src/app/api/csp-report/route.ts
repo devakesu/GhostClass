@@ -12,6 +12,8 @@
 
 import { NextRequest, NextResponse } from "next/server";
 import { logger } from "@/lib/logger";
+import { cspReportRateLimiter } from "@/lib/ratelimit";
+import { getClientIp } from "@/lib/utils.server";
 
 export const dynamic = "force-dynamic";
 
@@ -92,6 +94,14 @@ export function GET() {
 }
 
 export async function POST(req: NextRequest) {
+  const ip = getClientIp(req.headers);
+  if (ip) {
+    const { success } = await cspReportRateLimiter.limit(`csp_report_${ip}`);
+    if (!success) {
+      return new NextResponse(null, { status: 429 });
+    }
+  }
+
   const contentType = req.headers.get("content-type") ?? "";
   const isAccepted = ACCEPTED_CONTENT_TYPES.some((t) =>
     contentType.includes(t)

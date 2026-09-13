@@ -52,6 +52,7 @@ dependencies:
   markdown: any
   package_info_plus: ^10.2.1
   path: ^1.9.1
+  path_provider: ^2.1.5
   permission_handler: ^13.0.0
   pointycastle: ^3.9.1
   riverpod_annotation: ^4.0.2

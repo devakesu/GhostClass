@@ -230,7 +230,8 @@ class _AttendanceCalendarScreenState
 
     for (final list in track.groupedByCourse.values) {
       for (final r in list) {
-        final d = DateTime.tryParse(r.date);
+        final norm = _normalizeTrackingDate(r.date);
+        final d = norm != null ? DateTime.tryParse(norm) : null;
         if (d != null) {
           if (d.isAfter(latest)) {
             latest = d;
@@ -242,6 +243,30 @@ class _AttendanceCalendarScreenState
 
     return found ? latest : DateTime.now();
   }
+}
+
+String? _normalizeTrackingDate(String? raw) {
+  if (raw == null) return null;
+  final trimmed = raw.trim();
+  if (trimmed.isEmpty) return null;
+  if (RegExp(r'^\d{4}-\d{2}-\d{2}').hasMatch(trimmed)) {
+    return trimmed.substring(0, 10);
+  }
+  if (RegExp(r'^\d{8}$').hasMatch(trimmed)) {
+    return '${trimmed.substring(0, 4)}-${trimmed.substring(4, 6)}-${trimmed.substring(6, 8)}';
+  }
+  final parsed = DateTime.tryParse(trimmed);
+  if (parsed != null) {
+    return DateFormat('yyyy-MM-dd').format(parsed);
+  }
+  return trimmed;
+}
+
+bool _datesMatch(String? d1, String? d2) {
+  if (d1 == null || d2 == null) return false;
+  final n1 = _normalizeTrackingDate(d1);
+  final n2 = _normalizeTrackingDate(d2);
+  return n1 != null && n1 == n2;
 }
 
 class _CalendarContent extends ConsumerWidget {
@@ -817,7 +842,7 @@ class _CalendarContent extends ConsumerWidget {
         final normDisplaySession = utils.normalizeSession(displaySessionName);
         final normRawSession = utils.normalizeSession(rawSessionKey);
         for (final t in trackingRecords) {
-          if (t.date != dbDate) continue;
+          if (!_datesMatch(t.date, dbDate)) continue;
           final tNorm = utils.normalizeSession(t.session);
           if (tNorm == normDisplaySession || tNorm == normRawSession) {
             override = t;
@@ -875,7 +900,7 @@ class _CalendarContent extends ConsumerWidget {
       final safeId = entry.key;
       final trGroup = entry.value;
       for (final tr in trGroup) {
-        if (tr.date == dbDate && tr.status == 'extra') {
+        if (_datesMatch(tr.date, dbDate) && tr.status == 'extra') {
           final trNormSession = utils.normalizeSession(tr.session);
           final canonicalEntryCourse = canonicalTrackerCourseCode(
             resolvedCode: utils.resolveCourseDisplayCode(
@@ -974,6 +999,8 @@ class _CalendarContent extends ConsumerWidget {
         return 'Other Leave';
       case AttendanceStatus.present:
         return 'Present';
+      case AttendanceStatus.unknown:
+        return 'Unknown';
     }
   }
 
@@ -988,6 +1015,8 @@ class _CalendarContent extends ConsumerWidget {
         return ghostColors?.accentBlue ?? const Color(0xFF3B82F6);
       case AttendanceStatus.present:
         return ghostColors?.successGreen ?? const Color(0xFF10B981);
+      case AttendanceStatus.unknown:
+        return Colors.grey;
     }
   }
 }

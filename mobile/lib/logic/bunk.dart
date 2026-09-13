@@ -12,12 +12,14 @@ class AttendanceResult {
     required this.targetPercentage,
     required this.isExact,
     required this.isBorderline,
+    this.isUnreachable = false,
   });
   final int canBunk;
   final int requiredToAttend;
   final double targetPercentage;
   final bool isExact;
   final bool isBorderline;
+  final bool isUnreachable;
 }
 
 /// Calculates the number of classes a user can miss (bunk) or needs to attend
@@ -58,10 +60,11 @@ AttendanceResult calculateAttendance(
       // Impossible to reach 100% if missed any class
       return AttendanceResult(
         canBunk: 0,
-        requiredToAttend: 0x7FFFFFFF, // int.maxValue / unreachable
+        requiredToAttend: -1,
         targetPercentage: safeTarget,
         isExact: false,
         isBorderline: false,
+        isUnreachable: true,
       );
     }
     final required = ((safeTarget * total - 100 * present) / (100 - safeTarget))

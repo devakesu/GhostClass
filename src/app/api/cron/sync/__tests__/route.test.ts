@@ -97,6 +97,14 @@ vi.mock("@/lib/ratelimit", () => ({
 // ---------------------------------------------------------------------------
 // Email / template mocks
 // ---------------------------------------------------------------------------
+const mockSendPushNotification = vi.fn().mockResolvedValue({
+  success: true,
+  messageId: "msg-1",
+});
+vi.mock("@/lib/notifications/push", () => ({
+  sendPushNotification: (...args: any[]) => mockSendPushNotification(...args),
+}));
+
 vi.mock(
   "@/lib/email",
   () => ({ sendEmail: vi.fn().mockResolvedValue(undefined) }),
@@ -265,6 +273,7 @@ function buildAdminMock(opts: {
   const notificationInsertSpy = vi.fn().mockResolvedValue({ error: null });
   const usersUpdateSpy = vi.fn().mockReturnValue({
     eq: vi.fn().mockResolvedValue({ error: null }),
+    in: vi.fn().mockResolvedValue({ error: null }),
   });
 
   const usersEqSpy = vi.fn().mockImplementation(() => {
@@ -339,6 +348,11 @@ function buildAdminMock(opts: {
 beforeEach(async () => {
   vi.resetModules();
   vi.clearAllMocks();
+  mockCreateClient.mockResolvedValue({
+    auth: {
+      getUser: vi.fn().mockResolvedValue({ data: { user: null } }),
+    },
+  });
   (mockFetch as any)._courses = undefined;
   (mockFetch as any)._roles = undefined;
   (mockFetch as any)._attendance = undefined;
@@ -953,6 +967,127 @@ describe("GET /api/cron/sync — Batch & Auth modes", () => {
     expect(spies.usersQuerySpy).toHaveBeenCalledWith("users");
     expect(spies.usersEqSpy).toHaveBeenCalledWith("auth_id", "u-auth");
   });
+
+  it("syncs the authenticated user when called with user Bearer token (JWT fall-through without app-check)", async () => {
+    mockCreateClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "u-auth-bearer" } },
+          error: null,
+        }),
+      },
+    } as any);
+
+    const spies = buildAdminMock({
+      usersData: [{ ...MOCK_USER_ROW, auth_id: "u-auth-bearer" }],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({});
+
+    // Standard Bearer auth header - NOT cron secret and NOT app-check
+    const req = new NextRequest("http://localhost/api/cron/sync", {
+      headers: { Authorization: "Bearer valid-user-jwt-token" },
+    });
+
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.processed).toBe(1);
+    expect(spies.usersQuerySpy).toHaveBeenCalledWith("users");
+    expect(spies.usersEqSpy).toHaveBeenCalledWith("auth_id", "u-auth-bearer");
+  });
+
+  it("leases users immediately by updating last_synced_at via .in(...) in cron mode", async () => {
+    const mockUsers = [
+      { ...MOCK_USER_ROW, auth_id: "u1", username: "user1" },
+      { ...MOCK_USER_ROW, auth_id: "u2", username: "user2" },
+    ];
+
+    const spies = buildAdminMock({
+      usersData: mockUsers,
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({});
+
+    const req = new NextRequest("http://localhost/api/cron/sync", {
+      headers: { Authorization: "Bearer cron-secret" },
+    });
+    const res = await GET(req);
+    expect(res.status).toBe(200);
+
+    const usersUpdateCall = spies.usersUpdateSpy.mock.results[0]?.value;
+    expect(usersUpdateCall.in).toHaveBeenCalledWith("auth_id", ["u1", "u2"]);
+  });
+
+  it("skips execution when another cron job holds the distributed redis lock", async () => {
+    const { redis } = await import("@/lib/redis");
+    await redis.set("cron:sync:lock", "locked");
+
+    const req = new NextRequest("http://localhost/api/cron/sync", {
+      headers: { Authorization: "Bearer cron-secret" },
+    });
+    const res = await GET(req);
+    const data = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(data.skipped).toBe(true);
+    expect(data.message).toMatch(/already in progress/i);
+
+    // Clean up lock
+    await redis.del("cron:sync:lock");
+  });
+
+  it("purges dead FCM registration token from database when push returns isTerminal: true", async () => {
+    mockSendPushNotification.mockResolvedValueOnce({
+      success: false,
+      error: "Registration token is no longer valid",
+      isTerminal: true,
+    });
+
+    const spies = buildAdminMock({
+      usersData: [
+        {
+          ...MOCK_USER_ROW,
+          auth_id: "u-dead-fcm",
+          fcm_token: "dead-device-token",
+        },
+      ],
+      trackerData: [
+        {
+          id: 103,
+          course: "1001",
+          date: "2025-12-31",
+          session: "I",
+          attendance: "110",
+          status: "extra",
+        },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2025-12-31": { "1": ezygoSession(1, 111, 1001) },
+    });
+
+    const req = new NextRequest(
+      "http://localhost/api/cron/sync?username=testuser",
+      {
+        headers: { Authorization: "Bearer cron-secret" },
+      },
+    );
+    const res = await GET(req);
+    const body = await res.json();
+    expect(res.status).toBe(200);
+    expect(body.conflicts).toBe(1);
+
+    expect(spies.usersUpdateSpy).toHaveBeenCalledWith({ fcm_token: null });
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -1172,8 +1307,8 @@ describe("Cron sync — invalid CRON_SECRET → 401", () => {
     });
 
     const res = await GET(req);
-    // Wrong secret is immediately rejected with 403 before any rate limiting.
-    expect(res.status).toBe(403);
+    // Wrong secret falls through to Supabase user JWT verification, which fails with 401
+    expect(res.status).toBe(401);
   });
 });
 

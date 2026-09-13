@@ -19,9 +19,23 @@ function createRedisClient(): Redis {
           store.has(key) ? (store.get(key) as unknown as TData) : null,
         );
       },
-      set: <TData>(key: string, value: TData): Promise<"OK" | TData | null> => {
+      set: <TData>(
+        key: string,
+        value: TData,
+        opts?: { nx?: boolean; ex?: number },
+      ): Promise<"OK" | TData | null> => {
+        if (opts?.nx && store.has(key)) {
+          return Promise.resolve(null);
+        }
         store.set(key, String(value));
         return Promise.resolve("OK");
+      },
+      del: (...keys: string[]): Promise<number> => {
+        let count = 0;
+        for (const key of keys) {
+          if (store.delete(key)) count++;
+        }
+        return Promise.resolve(count);
       },
       incr: (key: string): Promise<number> => {
         const cur = parseInt(store.get(key) ?? "0", 10) || 0;

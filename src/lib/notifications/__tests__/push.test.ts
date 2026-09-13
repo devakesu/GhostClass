@@ -71,6 +71,7 @@ describe("sendPushNotification", () => {
     });
     expect(result.success).toBe(false);
     expect(result.error).toBe("Network timeout");
+    expect(result.isTerminal).toBe(false);
     expect(logger.error).toHaveBeenCalled();
   });
 
@@ -86,5 +87,6 @@ describe("sendPushNotification", () => {
     });
     expect(result.success).toBe(false);
     expect(result.error).toBe("Invalid token");
+    expect(result.isTerminal).toBe(true);
   });
 });

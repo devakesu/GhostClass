@@ -21,6 +21,8 @@ export interface PushNotificationResult {
   messageId?: string;
   /** Error message details if dispatch failed */
   error?: string;
+  /** Whether the error is terminal (e.g., invalid/unregistered token) requiring token cleanup */
+  isTerminal?: boolean;
 }
 
 function sanitizePayload(
@@ -73,7 +75,7 @@ export async function sendPushNotification({
         location: "sendPushNotification",
       },
     });
-    return { success: false, error: errorMsg };
+    return { success: false, error: errorMsg, isTerminal: false };
   }
 
   try {
@@ -132,6 +134,10 @@ export async function sendPushNotification({
       },
     });
 
-    return { success: false, error: errorMsg };
+    return {
+      success: false,
+      error: errorMsg,
+      isTerminal: isTerminalTokenError,
+    };
   }
 }

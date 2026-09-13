@@ -206,17 +206,16 @@ export const normalizeDate = (date: string | Date): string => {
     return `${y}${m}${d}`;
   }
 
-  const parts = parseDateParts(String(date).trim());
+  const raw = String(date).trim();
+  if (raw.length === 0) return "";
+
+  const parts = parseDateParts(raw);
   if (parts) return `${parts.y}${parts.m}${parts.d}`;
 
   console.warn(
-    `[normalizeDate] Unrecognised date format "${
-      String(
-        date,
-      ).trim()
-    }". Expected YYYYMMDD, YYYY-MM-DD, ISO 8601, DD-MM-YYYY, or DD/MM/YYYY. Returning "" to avoid incorrect slot keys.`,
+    `[normalizeDate] Unrecognised date format "${raw}". Expected YYYYMMDD, YYYY-MM-DD, ISO 8601, DD-MM-YYYY, or DD/MM/YYYY. Preserving raw string to prevent key collision.`,
   );
-  return "";
+  return raw;
 };
 
 /**

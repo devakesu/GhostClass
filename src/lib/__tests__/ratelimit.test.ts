@@ -24,12 +24,14 @@ describe("ratelimit.ts", () => {
       profileRateLimiter,
       authRateLimiter,
       proxyRateLimiter,
+      cspReportRateLimiter,
     } = await import("../ratelimit");
     expect(syncRateLimiter).toBeDefined();
     expect(contactRateLimiter).toBeDefined();
     expect(profileRateLimiter).toBeDefined();
     expect(authRateLimiter).toBeDefined();
     expect(proxyRateLimiter).toBeDefined();
+    expect(cspReportRateLimiter).toBeDefined();
 
     const { logger } = await import("@/lib/logger");
     expect(logger.dev).toHaveBeenCalledWith(

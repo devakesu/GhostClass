@@ -405,5 +405,25 @@ void main() {
         expect(observer.disposedProviders.contains(academicProvider), true);
       },
     );
+
+    test(
+      'ProfileHydrationService semestersDiffer normalizes canonical semester representations',
+      () {
+        expect(ProfileHydrationService.semestersDiffer('odd', '1'), false);
+        expect(ProfileHydrationService.semestersDiffer('odd', 'i'), false);
+        expect(ProfileHydrationService.semestersDiffer('ODD', 'odd'), false);
+        expect(ProfileHydrationService.semestersDiffer('even', '2'), false);
+        expect(ProfileHydrationService.semestersDiffer('even', 'ii'), false);
+        expect(ProfileHydrationService.semestersDiffer('EVEN', 'even'), false);
+
+        expect(ProfileHydrationService.semestersDiffer('odd', 'even'), true);
+        expect(ProfileHydrationService.semestersDiffer('1', '2'), true);
+        expect(ProfileHydrationService.semestersDiffer('odd', '2'), true);
+        expect(ProfileHydrationService.semestersDiffer('even', '1'), true);
+
+        expect(ProfileHydrationService.semestersDiffer(null, 'odd'), false);
+        expect(ProfileHydrationService.semestersDiffer('odd', null), false);
+      },
+    );
   });
 }

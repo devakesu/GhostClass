@@ -150,6 +150,33 @@ if (!Number.isFinite(PROXY_WINDOW) || PROXY_WINDOW < 1 || PROXY_WINDOW > 3600) {
   );
 }
 
+// CSP report rate limits (used by unauthenticated /api/csp-report endpoint)
+const CSP_REPORT_LIMIT = parseInt(
+  process.env.CSP_REPORT_RATE_LIMIT_REQUESTS || "10",
+  10,
+);
+const CSP_REPORT_WINDOW = parseInt(
+  process.env.CSP_REPORT_RATE_LIMIT_WINDOW || "60",
+  10,
+);
+
+if (
+  !Number.isFinite(CSP_REPORT_LIMIT) || CSP_REPORT_LIMIT < 1 ||
+  CSP_REPORT_LIMIT > 1000
+) {
+  throw new Error(
+    `CSP_REPORT_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`,
+  );
+}
+if (
+  !Number.isFinite(CSP_REPORT_WINDOW) || CSP_REPORT_WINDOW < 1 ||
+  CSP_REPORT_WINDOW > 3600
+) {
+  throw new Error(
+    `CSP_REPORT_RATE_LIMIT_WINDOW must be between 1-3600 seconds, got: [value redacted]`,
+  );
+}
+
 // Log configuration (logger.dev handles environment-specific suppression)
 logger.dev(
   `[Rate Limit] sync=${SYNC_LIMIT}/${SYNC_WINDOW}s  contact=${CONTACT_LIMIT}/${CONTACT_WINDOW}s`,
@@ -157,6 +184,9 @@ logger.dev(
 logger.dev(`[Profile Rate Limit] ${PROFILE_LIMIT}/${PROFILE_WINDOW}s`);
 logger.dev(`[Auth Rate Limit] ${AUTH_LIMIT} requests per ${AUTH_WINDOW}s`);
 logger.dev(`[Proxy Rate Limit] ${PROXY_LIMIT} requests per ${PROXY_WINDOW}s`);
+logger.dev(
+  `[CSP Report Rate Limit] ${CSP_REPORT_LIMIT} requests per ${CSP_REPORT_WINDOW}s`,
+);
 
 // Create rate limiter instances once at module load time.
 // Separate prefixes ensure that contact-form traffic cannot starve the cron-sync
@@ -196,6 +226,13 @@ const proxyLimiter = new Ratelimit({
   prefix: "@ghostclass/proxy-ratelimit",
 });
 
+const cspReportLimiter = new Ratelimit({
+  redis: redis,
+  limiter: Ratelimit.slidingWindow(CSP_REPORT_LIMIT, `${CSP_REPORT_WINDOW} s`),
+  analytics: true,
+  prefix: "@ghostclass/csp-report-ratelimit",
+});
+
 /** Rate limiter for cron sync endpoint */
 export const syncRateLimiter = syncLimiter;
 
@@ -210,3 +247,6 @@ export const authRateLimiter = authLimiter;
 
 /** Higher-throughput rate limiter for backend proxy routes */
 export const proxyRateLimiter = proxyLimiter;
+
+/** Rate limiter for unauthenticated CSP violation reports */
+export const cspReportRateLimiter = cspReportLimiter;

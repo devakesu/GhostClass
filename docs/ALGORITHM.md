@@ -24,7 +24,7 @@ function calculateAttendance(present, total, targetPercentage):
 
 3. **Below Target - Calculate Required Classes**
    - If `currentPercentage < (target - epsilon)`:
-     - If `target >= 100`: `requiredToAttend = Infinity` (cannot reach 100% if any class missed)
+     - If `target >= 100`: `requiredToAttend = -1`, `isUnreachable = true` (cannot reach 100% if any class missed)
      - Else: `required = ceil((target * total - 100 * present) / (100 - target))`
      - Result: `requiredToAttend = required`
 
@@ -37,8 +37,9 @@ function calculateAttendance(present, total, targetPercentage):
 5. **Edge States**
    - **Borderline**: If `canBunk == 0` (above target but cannot skip a full class yet)
    - **Exact**: If `abs(currentPercentage - target) < epsilon`
+   - **Unreachable**: If `target >= 100` and `present < total` (`requiredToAttend = -1`, `isUnreachable = true`)
 
-return { canBunk, requiredToAttend, isExact, isBorderline }
+return { canBunk, requiredToAttend, isExact, isBorderline, isUnreachable }
 ```
 
 ### Formula Derivation

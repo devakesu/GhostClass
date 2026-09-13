@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 import { verifyAppCheckToken, withSecurity } from "../app-check";
 import { getAppCheck } from "@/lib/firebase/admin";
 import { cookies, headers } from "next/headers";
-import { validateCsrfToken } from "@/lib/security/csrf";
+import { getSessionIdFromCookie, validateCsrfToken } from "@/lib/security/csrf";
 import { getClientIp } from "@/lib/utils.server";
 
 // Create a stable mock result that we can control
@@ -33,6 +33,7 @@ vi.mock("@sentry/nextjs", () => ({
 
 vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: vi.fn(),
+  getSessionIdFromCookie: vi.fn(),
 }));
 
 vi.mock("@/lib/redis", () => ({
@@ -66,6 +67,7 @@ describe("app-check logic", () => {
     vi.mocked(cookies).mockResolvedValue({
       get: vi.fn().mockReturnValue(null),
     } as any);
+    vi.mocked(getSessionIdFromCookie).mockResolvedValue(null);
 
     // Reset rate limit to success by default
     rateLimitMock.success = true;
@@ -134,9 +136,7 @@ describe("app-check logic", () => {
       process.env.VITEST = "false";
       const h = new Headers({ "x-csrf-token": "token123" });
       vi.mocked(headers).mockResolvedValue(h);
-      vi.mocked(cookies).mockResolvedValue({
-        get: vi.fn().mockReturnValue({ value: "session-actual" }),
-      } as any);
+      vi.mocked(getSessionIdFromCookie).mockResolvedValue("session-actual");
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
       const { redis } = await import("@/lib/redis");
       vi.mocked(redis.get).mockResolvedValue("session-expected");
@@ -148,6 +148,43 @@ describe("app-check logic", () => {
       const res = await wrapped(req as any, { params: {} });
 
       expect(res.status).toBe(403);
+    });
+
+    it("enforces session binding for Supabase sessions", async () => {
+      process.env.VITEST = "false";
+      const h = new Headers({ "x-csrf-token": "token123" });
+      vi.mocked(headers).mockResolvedValue(h);
+      vi.mocked(getSessionIdFromCookie).mockResolvedValue("sb-cookie-auth-token-xyz");
+      vi.mocked(validateCsrfToken).mockResolvedValue(true);
+      const { redis } = await import("@/lib/redis");
+      vi.mocked(redis.get).mockResolvedValue("sb-cookie-auth-token-mismatch");
+
+      const wrapped = withSecurity(
+        vi.fn().mockResolvedValue(new Response("ok")),
+      );
+      const req = new Request("https://test.com", { headers: h });
+      const res = await wrapped(req as any, { params: {} });
+
+      expect(res.status).toBe(403);
+    });
+
+    it("succeeds when Supabase session matches bound CSRF session", async () => {
+      process.env.VITEST = "false";
+      const h = new Headers({ "x-csrf-token": "token123" });
+      vi.mocked(headers).mockResolvedValue(h);
+      vi.mocked(getSessionIdFromCookie).mockResolvedValue("sb-cookie-auth-token-xyz");
+      vi.mocked(validateCsrfToken).mockResolvedValue(true);
+      const { redis } = await import("@/lib/redis");
+      vi.mocked(redis.get).mockResolvedValue("sb-cookie-auth-token-xyz");
+
+      const wrapped = withSecurity(
+        vi.fn().mockResolvedValue(new Response("ok")),
+      );
+      const req = new Request("https://test.com", { headers: h });
+      const res = await wrapped(req as any, { params: {} });
+
+      expect(res.status).toBe(200);
+      expect(await res.text()).toBe("ok");
     });
   });
 

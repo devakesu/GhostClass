@@ -105,8 +105,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     }
     _lastClassId = classId;
 
-    // Invalidate cache if academic changed
-    if (_lastAcademic != null && _lastAcademic != academic) {
+    // Invalidate cache if academic rollover occurred
+    if (_lastAcademic != null && _lastAcademic!.hasRollover(academic)) {
       _cachedCourses = null;
       _cachedAttendance = null;
       _cachedInstructors = null;

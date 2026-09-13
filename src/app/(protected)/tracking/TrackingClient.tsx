@@ -153,7 +153,7 @@ const parseDateValue = (dateStr: string) => {
       `${norm.slice(0, 4)}-${norm.slice(4, 6)}-${norm.slice(6, 8)}`,
     ).getTime();
   }
-  return new Date().getTime();
+  return 0; // Deterministic fallback
 };
 
 function getCorrectionStatusText(

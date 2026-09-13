@@ -339,5 +339,52 @@ void main() {
         ).called(2);
       },
     );
+
+    test(
+      'sets outage on 5xx and blocks subsequent immediate requests',
+      () async {
+        final fetcher = createFetcher();
+        final res500 = Response<dynamic>(
+          requestOptions: RequestOptions(path: '/test'),
+          statusCode: 500,
+        );
+        final res200 = Response<dynamic>(
+          requestOptions: RequestOptions(path: '/test2'),
+          statusCode: 200,
+          data: {'ok': true},
+        );
+
+        when(
+          () => mockDio.request<dynamic>(
+            '/test',
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer((_) async => res500);
+
+        when(
+          () => mockDio.request<dynamic>(
+            '/test2',
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer((_) async => res200);
+
+        await fetcher.fetch(path: '/test', token: 'token');
+        expect(outageState, true);
+
+        // Immediately blocked by outage lock
+        await expectLater(
+          fetcher.fetch(path: '/test2', token: 'token'),
+          throwsA(
+            isA<DioException>().having(
+              (e) => e.response?.statusCode,
+              'statusCode',
+              503,
+            ),
+          ),
+        );
+      },
+    );
   });
 }

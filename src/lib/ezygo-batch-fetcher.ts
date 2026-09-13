@@ -14,6 +14,7 @@ import "server-only";
 import { LRUCache } from "lru-cache";
 import { logger } from "./logger";
 import { ezygoCircuitBreaker, NonBreakerError } from "./circuit-breaker";
+export { NonBreakerError } from "./circuit-breaker";
 import { createHash } from "node:crypto";
 import { egressFetch } from "./utils.server";
 
@@ -88,7 +89,7 @@ const requestCache = new LRUCache<string, Promise<unknown>>({
 // This is conservative but safe - increase only if you verify EzyGo's limits
 let activeRequests = 0;
 const MAX_CONCURRENT = 3; // Conservative: 3 concurrent requests from single IP
-const MAX_QUEUE_SIZE = 100; // Prevent unbounded queue growth
+const MAX_QUEUE_SIZE = 250; // Accommodate burst leave application requests
 const QUEUE_TIMEOUT_MS = 30000; // 30 seconds max wait time in queue
 
 // Use a counter for unique queue item identification
@@ -236,7 +237,13 @@ export function fetchEzygoData<T>(
   // and keeps raw tokens/bodies out of long-lived cache key / LRU structures, while
   // still using serializedBody transiently for the request. Explicitly encode body
   // presence to distinguish undefined from {} or other falsy values.
-  const tokenHash = createHash("sha256").update(token).digest("hex");
+  const isInstitutional =
+    normalizedEndpoint.includes("institution/setting") ||
+    normalizedEndpoint.includes("attendancetypes") ||
+    normalizedEndpoint.includes("usersubgroups");
+  const tokenHash = isInstitutional
+    ? "GLOBAL_INSTITUTION"
+    : createHash("sha256").update(token).digest("hex");
   const serializedBody = body !== undefined ? JSON.stringify(body) : undefined;
   const bodyHash = serializedBody
     ? createHash("sha256").update(serializedBody).digest("hex")
@@ -384,11 +391,8 @@ export function fetchEzygoData<T>(
 
       resolveDeferred(result);
     } catch (error) {
-      // Only evict transient failures from cache to allow immediate retries
-      // NonBreakerErrors (401/403/404 + config errors) represent permanent/config errors that shouldn't be retried
-      if (!(error instanceof NonBreakerError)) {
-        requestCache.delete(cacheKey);
-      }
+      // Always evict rejected promises so subsequent requests can re-attempt
+      requestCache.delete(cacheKey);
       rejectDeferred(error as Error);
     } finally {
       releaseSlot(slotGeneration);

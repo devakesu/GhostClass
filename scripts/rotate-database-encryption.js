@@ -235,14 +235,25 @@ async function processUsersBatch(usersBatch, supabase, env, stats) {
 
     if (modified) {
       // Execute an atomic transaction update pushing fresh Initialisation Vectors and ciphertext
-      const { error: updateError } = await supabase
+      // Optimistic concurrency control: check the existing IV before writing to prevent stale overwrites
+      let query = supabase
         .from("users")
         .update(updates)
         .eq("id", userRow.id);
 
+      if (userRow.ezygo_iv) {
+        query = query.eq("ezygo_iv", userRow.ezygo_iv);
+      }
+
+      const { data, error: updateError } = await query.select("id");
+
       if (updateError) {
         console.error(
           `${colors.red}❌ Failed persisting updates for Record ID ${userRow.id}: ${updateError.message}${colors.reset}`,
+        );
+      } else if (data && data.length === 0) {
+        console.warn(
+          `${colors.yellow}⚠️ Concurrency conflict: Record ID ${userRow.id} was updated concurrently. Skipping stale overwrite.${colors.reset}`,
         );
       } else {
         stats.rowsModified += 1;
@@ -280,7 +291,7 @@ async function executeRotation() {
   };
 
   const limit = 100;
-  let offset = 0;
+  let lastSeenId = null;
   let hasMoreRecords = true;
 
   console.log(
@@ -288,11 +299,17 @@ async function executeRotation() {
   );
 
   while (hasMoreRecords) {
-    const { data: usersBatch, error: fetchError } = await supabase
+    let query = supabase
       .from("users")
       .select("*")
       .order("id", { ascending: true })
-      .range(offset, offset + limit - 1);
+      .limit(limit);
+
+    if (lastSeenId !== null) {
+      query = query.gt("id", lastSeenId);
+    }
+
+    const { data: usersBatch, error: fetchError } = await query;
 
     if (fetchError) {
       console.error(
@@ -307,7 +324,7 @@ async function executeRotation() {
 
     await processUsersBatch(usersBatch, supabase, env, stats);
 
-    offset += usersBatch.length;
+    lastSeenId = usersBatch[usersBatch.length - 1].id;
     process.stdout.write(
       `  Processed rows: ${colors.bold}${stats.totalRowsTraversed}${colors.reset} | Upgraded rows: ${colors.bold}${colors.green}${stats.rowsModified}${colors.reset}\r`,
     );
@@ -364,3 +381,12 @@ if (require.main === module) {
     process.exit(1);
   });
 }
+
+module.exports = {
+  executeRotation,
+  processUsersBatch,
+  processUserRecord,
+  decryptPayload,
+  encryptPayload,
+  SENSITIVE_COLUMNS,
+};

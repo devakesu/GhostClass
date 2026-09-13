@@ -67,8 +67,26 @@ const CONFIG = {
   },
 };
 
-async function getSendPulseToken() {
+interface SendPulseTokenCache {
+  token: string;
+  expiresAt: number;
+}
+
+let cachedSendPulseToken: SendPulseTokenCache | null = null;
+
+/**
+ * Resets the SendPulse OAuth token cache (primarily for testing)
+ */
+export function __resetSendPulseTokenCache(): void {
+  cachedSendPulseToken = null;
+}
+
+async function getSendPulseToken(): Promise<string> {
   if (!hasSendPulse) throw new Error("SendPulse credentials not configured");
+
+  if (cachedSendPulseToken && Date.now() < cachedSendPulseToken.expiresAt) {
+    return cachedSendPulseToken.token;
+  }
 
   try {
     const res = await fetch(CONFIG.sendpulse.authUrl, {
@@ -82,6 +100,23 @@ async function getSendPulseToken() {
     });
     if (!res.ok) throw new Error(`SendPulse auth HTTP ${res.status}`);
     const data = await res.json();
+    if (!data.access_token) {
+      throw new Error("SendPulse auth response missing access_token");
+    }
+
+    // SendPulse tokens typically have 3600s lifetime. Cache with 50-minute TTL or expires_in - 5min buffer.
+    const expiresInSec = typeof data.expires_in === "number"
+      ? data.expires_in
+      : 3600;
+    const ttlMs = Math.min(
+      Math.max((expiresInSec - 300) * 1000, 60_000),
+      50 * 60 * 1000,
+    );
+    cachedSendPulseToken = {
+      token: data.access_token,
+      expiresAt: Date.now() + ttlMs,
+    };
+
     return data.access_token;
   } catch (error) {
     if (error instanceof Error) {

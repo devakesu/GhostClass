@@ -9,6 +9,7 @@ describe("calculateAttendance", () => {
       targetPercentage: 75,
       isExact: false,
       isBorderline: false,
+      isUnreachable: false,
     });
     expect(calculateAttendance(-1, 10)).toEqual({
       canBunk: 0,
@@ -16,6 +17,7 @@ describe("calculateAttendance", () => {
       targetPercentage: 75,
       isExact: false,
       isBorderline: false,
+      isUnreachable: false,
     });
     expect(calculateAttendance(11, 10)).toEqual({
       canBunk: 0,
@@ -23,6 +25,7 @@ describe("calculateAttendance", () => {
       targetPercentage: 75,
       isExact: false,
       isBorderline: false,
+      isUnreachable: false,
     });
   });
 
@@ -31,6 +34,7 @@ describe("calculateAttendance", () => {
     expect(result.isExact).toBe(true);
     expect(result.canBunk).toBe(0);
     expect(result.requiredToAttend).toBe(0);
+    expect(result.isUnreachable).toBe(false);
   });
 
   it("calculates classes required to attend when below target", () => {
@@ -41,11 +45,13 @@ describe("calculateAttendance", () => {
     const result = calculateAttendance(50, 100, 75);
     expect(result.requiredToAttend).toBe(100);
     expect(result.canBunk).toBe(0);
+    expect(result.isUnreachable).toBeUndefined();
   });
 
   it("handles 100% target separately", () => {
     const result = calculateAttendance(90, 100, 100);
-    expect(result.requiredToAttend).toBe(999);
+    expect(result.requiredToAttend).toBe(-1);
+    expect(result.isUnreachable).toBe(true);
   });
 
   it("calculates classes able to bunk when above target", () => {
@@ -81,7 +87,8 @@ describe("calculateAttendance", () => {
 
   it("should handle 100% target percentage", () => {
     const result = calculateAttendance(8, 10, 100);
-    expect(result.requiredToAttend).toBe(999);
+    expect(result.requiredToAttend).toBe(-1);
+    expect(result.isUnreachable).toBe(true);
   });
 
   it("should identify borderline attendance", () => {

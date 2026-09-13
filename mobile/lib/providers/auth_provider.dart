@@ -623,13 +623,9 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
       final storage = ref.read(secureStorageProvider);
       final ops = <Future<dynamic>>[
         ref.read(supabaseClientProvider).auth.signOut(),
+        storage.clearEzygoToken(),
+        storage.saveFcmToken(''),
       ];
-      if (force) {
-        ops.addAll([
-          storage.clearEzygoToken(),
-          storage.saveFcmToken(''),
-        ]);
-      }
       await Future.wait(ops);
     } on Object catch (e) {
       AppLogger.e('AuthNotifier: LOGOUT CLEANUP ERROR', e);

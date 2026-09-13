@@ -157,10 +157,8 @@ export async function selectUserClassAction(
   classId: string | null,
   csrfToken?: string,
 ) {
-  if (csrfToken) {
-    const isValid = await validateCsrfToken(csrfToken);
-    if (!isValid) throw new Error("Invalid security token");
-  }
+  const isValid = await validateCsrfToken(csrfToken ?? null);
+  if (!isValid) throw new Error("Invalid security token");
 
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();

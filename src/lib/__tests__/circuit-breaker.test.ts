@@ -202,4 +202,22 @@ describe("CircuitBreaker", () => {
     ).rejects.toBe("string error");
     expect((await ezygoCircuitBreaker.getStatus()).failures).toBe(1);
   });
+
+  it("synchronizes concurrent half-open transition without wiping successes", async () => {
+    // Open the breaker
+    const fn = vi.fn().mockRejectedValue(new Error("fail"));
+    for (let i = 0; i < 3; i++) {
+      await expect(ezygoCircuitBreaker.execute(fn)).rejects.toThrow();
+    }
+    vi.advanceTimersByTime(61000);
+
+    // Run 2 concurrent calls that transition and succeed
+    const results = await Promise.all([
+      ezygoCircuitBreaker.execute(() => Promise.resolve("r1")),
+      ezygoCircuitBreaker.execute(() => Promise.resolve("r2")),
+    ]);
+    expect(results).toEqual(["r1", "r2"]);
+    // Should have transitioned to CLOSED after 2 successes
+    expect((await ezygoCircuitBreaker.getStatus()).state).toBe("CLOSED");
+  });
 });

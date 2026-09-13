@@ -1,3 +1,6 @@
+severity: HIGH,CRITICAL
+exit-code: 1
+
 secret:
   skip-dirs:
     - ".devcontainer"

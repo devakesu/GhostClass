@@ -173,6 +173,14 @@ function validateProxyRequestPath(
       }),
     };
   }
+  if (path.some((s) => s === ".." || s === "." || s.includes("/") || s.includes("\\"))) {
+    return {
+      fullPath: "",
+      errorResponse: NextResponse.json({ message: "Invalid path segment" }, {
+        status: 400,
+      }),
+    };
+  }
   const fullPath = path.join("/");
   if (fullPath.includes("#") || fullPath.includes("?")) {
     return {

@@ -236,6 +236,8 @@ vi.mock("@/hooks/courses/attendance", () => ({
     data: {},
     isLoading: false,
   })),
+  resetWorkingSummaryEndpoint: vi.fn(),
+  _resetModuleState: vi.fn(),
 }));
 
 vi.mock("@/hooks/users/settings", () => ({

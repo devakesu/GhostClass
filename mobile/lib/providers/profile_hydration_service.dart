@@ -670,9 +670,16 @@ class ProfileHydrationService extends Notifier<void> {
     return s1 != s2;
   }
 
+  static String normalizeSem(String s) {
+    final lower = s.trim().toLowerCase();
+    if (lower == '1' || lower == 'odd' || lower == 'i') return 'odd';
+    if (lower == '2' || lower == 'even' || lower == 'ii') return 'even';
+    return lower;
+  }
+
   static bool semestersDiffer(String? s1, String? s2) {
     if (s1 == null || s2 == null) return false;
-    return s1.trim().toLowerCase() != s2.trim().toLowerCase();
+    return normalizeSem(s1) != normalizeSem(s2);
   }
 
   String? _extractTermsVersion(Map<String, dynamic> data) {

@@ -37,22 +37,32 @@ class NetworkUtils {
           return true;
         }
 
-        // Handle wildcards for DNS names
+        // Handle wildcards for DNS names according to RFC 6125:
+        // Wildcard must only match a single leftmost DNS label, not across labels,
+        // and cannot match a top-level domain alone (e.g. *.com is rejected).
         if (hostname.startsWith('*.')) {
-          final suffix = hostname.substring(1);
-          if (expectedHost.endsWith(suffix)) {
-            AppLogger.i(
-              'NetworkUtils: Certificate wildcard validated for $expectedHost',
-            );
-            return true;
+          final domainSuffix = hostname.substring(2);
+          if (domainSuffix.contains('.') && !domainSuffix.startsWith('.')) {
+            final dotIndex = expectedHost.indexOf('.');
+            if (dotIndex > 0) {
+              final prefix = expectedHost.substring(0, dotIndex);
+              final suffix = expectedHost.substring(dotIndex + 1);
+              if (suffix == domainSuffix && !prefix.contains('.')) {
+                AppLogger.i(
+                  'NetworkUtils: Certificate wildcard validated for $expectedHost',
+                );
+                return true;
+              }
+            }
           }
         }
       }
 
-      // Fallback for mkcert development certificates
-      if (cert.subject.contains('mkcert development certificate')) {
+      // Fallback for mkcert development certificates strictly in debug mode
+      if (kDebugMode &&
+          cert.subject.contains('mkcert development certificate')) {
         AppLogger.i(
-          'NetworkUtils: Trusted mkcert development certificate by organization name',
+          'NetworkUtils: Trusted mkcert development certificate by organization name in debug mode',
         );
         return true;
       }

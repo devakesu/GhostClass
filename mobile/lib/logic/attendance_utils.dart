@@ -104,6 +104,61 @@ Map<String, String> calculateCurrentAcademicInfo({
   return {'current_semester': currentSemester, 'current_year': currentYearStr};
 }
 
+/// Checks whether two 2-digit/4-digit year segments refer to the same year (e.g. "24" and "2024").
+bool yearSegmentsMatch(String n1, String n2) {
+  if (n1 == n2) return true;
+  return (n1.length == 2 && n2.length == 4 && n2.endsWith(n1)) ||
+      (n2.length == 2 && n1.length == 4 && n1.endsWith(n2));
+}
+
+/// Normalizes and compares two academic years to avoid false-positive rollover detection.
+/// Matches e.g. "2025-2026", "25-26", "2025-26".
+bool yearsDiffer(String? y1, String? y2) {
+  if (y1 == null || y2 == null) return false;
+  final s1 = y1.trim();
+  final s2 = y2.trim();
+  if (s1 == s2) return false;
+
+  final nums1 = RegExp(r'\d+').allMatches(s1).map((m) => m.group(0)!).toList();
+  final nums2 = RegExp(r'\d+').allMatches(s2).map((m) => m.group(0)!).toList();
+
+  if (nums1.isNotEmpty && nums1.length == nums2.length) {
+    var allMatch = true;
+    for (var i = 0; i < nums1.length; i++) {
+      if (!yearSegmentsMatch(nums1[i], nums2[i])) {
+        allMatch = false;
+        break;
+      }
+    }
+    if (allMatch) return false;
+  }
+  return true;
+}
+
+/// Normalizes and compares two academic semesters (e.g. "even" vs "EVEN", "1" vs "odd").
+bool semestersDiffer(String? s1, String? s2) {
+  if (s1 == null || s2 == null) return false;
+  String normalize(String s) {
+    final trimmed = s.trim().toLowerCase();
+    if (trimmed.contains('odd') || trimmed == '1') return 'odd';
+    if (trimmed.contains('even') || trimmed == '2') return 'even';
+    return trimmed;
+  }
+
+  return normalize(s1) != normalize(s2);
+}
+
+/// Determines whether an academic rollover has occurred between two periods.
+bool hasAcademicRollover({
+  String? oldSemester,
+  String? oldYear,
+  String? newSemester,
+  String? newYear,
+}) {
+  return semestersDiffer(oldSemester, newSemester) ||
+      yearsDiffer(oldYear, newYear);
+}
+
 /// Normalizes various date formats into a standard YYYYMMDD string.
 String normalizeDate(dynamic date) {
   if (date == null) return '';

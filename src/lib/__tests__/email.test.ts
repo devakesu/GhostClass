@@ -475,4 +475,55 @@ describe("email.ts", () => {
     expect(res.success).toBe(false);
     expect(res.error).toContain("Secondary raw fail");
   });
+
+  it("caches SendPulse OAuth token across multiple emails and does not re-fetch", async () => {
+    vi.resetModules();
+    vi.stubEnv("NEXT_PUBLIC_APP_EMAIL", "example.com");
+    vi.stubEnv("BREVO_API_KEY", "");
+    vi.stubEnv("SENDPULSE_CLIENT_ID", "sp-id");
+    vi.stubEnv("SENDPULSE_CLIENT_SECRET", "sp-secret");
+
+    let oauthFetchCount = 0;
+    let emailSendCount = 0;
+
+    global.fetch = vi.fn().mockImplementation(async (url: string) => {
+      if (url.includes("oauth")) {
+        oauthFetchCount++;
+        return {
+          ok: true,
+          json: async () => ({ access_token: "cached-sp-token", expires_in: 3600 }),
+        };
+      }
+      if (url.includes("smtp/emails")) {
+        emailSendCount++;
+        return {
+          ok: true,
+          json: async () => ({ id: `sp-msg-${emailSendCount}` }),
+        };
+      }
+      return { ok: true, json: async () => ({}) };
+    });
+
+    const { sendEmail, __resetSendPulseTokenCache } = await import("../email");
+    __resetSendPulseTokenCache();
+
+    // First send: should fetch OAuth token once
+    const res1 = await sendEmail(mockProps);
+    expect(res1.success).toBe(true);
+    expect(oauthFetchCount).toBe(1);
+    expect(emailSendCount).toBe(1);
+
+    // Second send: should reuse cached token without another oauth fetch
+    const res2 = await sendEmail(mockProps);
+    expect(res2.success).toBe(true);
+    expect(oauthFetchCount).toBe(1);
+    expect(emailSendCount).toBe(2);
+
+    // Reset cache and send again: should trigger a new oauth fetch
+    __resetSendPulseTokenCache();
+    const res3 = await sendEmail(mockProps);
+    expect(res3.success).toBe(true);
+    expect(oauthFetchCount).toBe(2);
+    expect(emailSendCount).toBe(3);
+  });
 });

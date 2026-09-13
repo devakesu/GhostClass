@@ -75,6 +75,7 @@ class CircuitBreaker {
   private localLastFailTime = 0;
   private localSuccessCount = 0;
   private localHalfOpenInFlight = 0;
+  private halfOpenTransitionPromise: Promise<CircuitState> | null = null;
 
   private lastRedisCheck = 0;
   private readonly redisCheckInterval = 5000; // 5 seconds
@@ -192,12 +193,18 @@ class CircuitBreaker {
     }
   }
 
-  private async persistHalfOpenInFlight(): Promise<void> {
-    await this.setRedisValue(
-      "circuit:half_open_in_flight",
-      this.localHalfOpenInFlight,
-    );
+  private async incrHalfOpenInFlight(): Promise<number> {
+    this.localHalfOpenInFlight++;
+    try {
+      const res = await redis.incr("circuit:half_open_in_flight");
+      this.localHalfOpenInFlight = res;
+      return res;
+    } catch (e) {
+      logger.dev("Redis error in circuit breaker incr for half_open_in_flight", e);
+      return this.localHalfOpenInFlight;
+    }
   }
+
 
   private async decrHalfOpenInFlight(): Promise<number> {
     this.localHalfOpenInFlight = Math.max(0, this.localHalfOpenInFlight - 1);
@@ -275,14 +282,32 @@ class CircuitBreaker {
       );
     }
 
-    logger.dev("[Circuit Breaker] Transitioning to HALF_OPEN", {
-      context: "circuit-breaker",
-      timeSinceFailure,
-    });
-    await this.setState("HALF_OPEN");
-    await this.setSuccessCount(0);
-    await this.clearHalfOpenInFlight();
-    return "HALF_OPEN";
+    if (this.halfOpenTransitionPromise) {
+      return await this.halfOpenTransitionPromise;
+    }
+
+    const transitionPromise = (async (): Promise<CircuitState> => {
+      try {
+        const currentState = await this.getState();
+        if (currentState === "HALF_OPEN") {
+          return "HALF_OPEN";
+        }
+
+        logger.dev("[Circuit Breaker] Transitioning to HALF_OPEN", {
+          context: "circuit-breaker",
+          timeSinceFailure,
+        });
+        await this.setState("HALF_OPEN");
+        await this.setSuccessCount(0);
+        await this.clearHalfOpenInFlight();
+        return "HALF_OPEN";
+      } finally {
+        this.halfOpenTransitionPromise = null;
+      }
+    })();
+
+    this.halfOpenTransitionPromise = transitionPromise;
+    return await transitionPromise;
   }
 
   private async handleBreakerError(error: unknown): Promise<never> {
@@ -309,9 +334,11 @@ class CircuitBreaker {
   async execute<T>(fn: () => Promise<T>): Promise<T> {
     const state = await this.enterHalfOpenIfNeeded(await this.getState());
 
+    let claimedHalfOpenSlot = false;
     if (state === "HALF_OPEN") {
-      const inFlight = this.localHalfOpenInFlight;
-      if (inFlight >= this.halfOpenMaxRequests) {
+      const inFlight = await this.incrHalfOpenInFlight();
+      if (inFlight > this.halfOpenMaxRequests) {
+        await this.decrHalfOpenInFlight();
         logger.warn(
           "[Circuit Breaker] HALF_OPEN request limit reached - rejecting request",
           {
@@ -324,15 +351,8 @@ class CircuitBreaker {
           "Circuit breaker is testing recovery - please try again shortly.",
         );
       }
-      this.localHalfOpenInFlight = inFlight + 1;
-      await this.persistHalfOpenInFlight();
+      claimedHalfOpenSlot = true;
     }
-
-    // Capture whether this request consumed a HALF_OPEN slot before entering the
-    // try block. The finally block must use this snapshot — not this.state — because
-    // onSuccess() may have already transitioned the breaker to CLOSED by the time
-    // finally runs, which would cause the CLOSED-state branch to double-decrement.
-    const wasHalfOpen = state === "HALF_OPEN";
 
     try {
       const result = await fn();
@@ -341,10 +361,7 @@ class CircuitBreaker {
     } catch (error) {
       return this.handleBreakerError(error);
     } finally {
-      // Release HALF_OPEN slot only if this request actually claimed one.
-      // Using the wasHalfOpen snapshot avoids double-decrement when onSuccess()
-      // transitions the breaker to CLOSED before finally executes.
-      if (wasHalfOpen) {
+      if (claimedHalfOpenSlot) {
         await this.decrHalfOpenInFlight();
       }
     }

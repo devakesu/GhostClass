@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withSecurity } from "@/lib/security/app-check";
 import { createClient } from "@/lib/supabase/server";
-import { getAuthTokenServer } from "@/lib/security/auth-cookie";
+import { getAuthTokenWithFallback } from "@/lib/security/auth-cookie";
 import { fetchEzygoData } from "@/lib/ezygo-batch-fetcher";
 import { logger } from "@/lib/logger";
 import { getClientIp } from "@/lib/utils.server";
@@ -62,7 +62,7 @@ const handler = async (
   }
 
   // 3. Token check
-  const token = await getAuthTokenServer();
+  const token = await getAuthTokenWithFallback(user.id);
   if (!token) {
     return NextResponse.json({ error: "EzyGo token missing" }, { status: 401 });
   }

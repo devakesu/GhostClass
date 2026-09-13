@@ -147,10 +147,12 @@ export function setCsrfToken(token: string | null): void {
 
 let isLoggingOut401 = false;
 let isOutageDetected = false;
+let outageTimestamp: number | null = null;
 
 export const isGlobalOutageDetected = () => isOutageDetected;
 export const resetOutageDetection = () => {
   isOutageDetected = false;
+  outageTimestamp = null;
 };
 
 async function handleCsrfRetry(error: unknown) {
@@ -215,8 +217,9 @@ axiosInstance.interceptors.response.use(
       response?: { status?: number; statusText?: string };
     } | undefined;
     const status = errObj?.response?.status;
-    if ((status === 500 || status === 503) && !isOutageDetected) {
+    if (status === 503 && !isOutageDetected) {
       isOutageDetected = true;
+      outageTimestamp = Date.now();
       globalThis.dispatchEvent(
         new CustomEvent("gc:outage", {
           detail: {
@@ -269,7 +272,11 @@ async function applyInternalRequestSecurity(
 axiosInstance.interceptors.request.use(
   async (config: InternalAxiosRequestConfig) => {
     if (isOutageDetected) {
-      return Promise.reject(new Error("Active service outage"));
+      if (outageTimestamp && Date.now() - outageTimestamp > 30000) {
+        resetOutageDetection();
+      } else {
+        return Promise.reject(new Error("Active service outage"));
+      }
     }
     if (typeof window === "undefined") return config;
 
@@ -281,13 +288,13 @@ axiosInstance.interceptors.request.use(
 
     // Deduplicate slashes in the final URL (path parts)
     if (config.url) {
-      // If it's a full URL, we only deduplicate path slashes, not protocol slashes
-      if (config.url.startsWith("http")) {
-        const parts = config.url.split("://");
-        if (parts.length === 2) {
-          config.url = `${parts[0]}://${parts[1].replace(/\/+/g, "/")}`;
-        }
-      } else {
+      try {
+        const parsed = new URL(config.url, "https://dummy.local");
+        parsed.pathname = parsed.pathname.replace(/\/+/g, "/");
+        config.url = config.url.startsWith("http")
+          ? parsed.toString()
+          : `${parsed.pathname}${parsed.search}${parsed.hash}`;
+      } catch {
         config.url = config.url.replace(/\/+/g, "/");
       }
     }

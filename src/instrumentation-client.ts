@@ -10,7 +10,16 @@ Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
   // Add optional integrations for additional features
-  integrations: replayRate > 0 ? [Sentry.replayIntegration()] : [],
+  integrations:
+    replayRate > 0
+      ? [
+          Sentry.replayIntegration({
+            maskAllText: true,
+            blockAllMedia: true,
+            maskAllInputs: true,
+          }),
+        ]
+      : [],
 
   // Define how likely traces are sampled. Update this value in production, or use tracesSampler
   // for greater control.

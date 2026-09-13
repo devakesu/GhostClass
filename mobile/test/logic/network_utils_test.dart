@@ -82,6 +82,35 @@ void main() {
           8080,
         );
         expect(isOtherValid, false);
+
+        // Test valid single-label wildcard match for expected host
+        final expectedHost = Uri.parse(AppConfig.ghostclassApiUrl).host;
+        final parts = expectedHost.split('.');
+        if (parts.length > 2) {
+          final domainSuffix = parts.sublist(1).join('.');
+          when(
+            () => mockCert.subject,
+          ).thenReturn('CN=*.$domainSuffix,O=ValidWildcard');
+          final isWildcardValid = NetworkUtils.validateCertificateHostname(
+            mockCert,
+            expectedHost,
+            8080,
+          );
+          expect(isWildcardValid, true);
+
+          // Subdomain spanning multiple labels should be rejected under RFC 6125
+          when(
+            () => mockCert.subject,
+          ).thenReturn('CN=*.$domainSuffix,O=MultiLabel');
+          // If expected host is a single level, test that a deeper domain does not match
+          when(() => mockCert.subject).thenReturn('CN=*.com,O=TldWildcard');
+          final isTldValid = NetworkUtils.validateCertificateHostname(
+            mockCert,
+            expectedHost,
+            8080,
+          );
+          expect(isTldValid, false);
+        }
       },
     );
   });

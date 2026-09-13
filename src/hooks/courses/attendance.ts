@@ -31,14 +31,33 @@ function normalizeCourseDetail(raw: unknown): CourseDetail {
 /**
  * Cache the working endpoint typo variant to avoid redundant 404s/retries on load.
  * EzyGo environments usually standardize on one variant across all courses.
+ * Scoped per institution (or 'default') to prevent cross-institution pollution.
  */
-let workingSummaryEndpoint: "summery" | "summary" | null = null;
+const workingSummaryEndpoints = new Map<string, "summery" | "summary">();
 
-async function fetchCourseSummaryWithFallback(ezygoId: number) {
-  // If we already know which endpoint works, use it immediately.
-  if (workingSummaryEndpoint) {
+/**
+ * Reset cached working endpoint variant across all or a specific institution.
+ * Call this on session/auth changes or institution switches.
+ */
+export function resetWorkingSummaryEndpoint(institutionKey?: string | number) {
+  if (institutionKey !== undefined) {
+    workingSummaryEndpoints.delete(String(institutionKey));
+  } else {
+    workingSummaryEndpoints.clear();
+  }
+}
+
+async function fetchCourseSummaryWithFallback(
+  ezygoId: number,
+  institutionKey: string | number = "default",
+) {
+  const key = String(institutionKey);
+  const cachedEndpoint = workingSummaryEndpoints.get(key);
+
+  // If we already know which endpoint works for this institution, use it immediately.
+  if (cachedEndpoint) {
     return await axios.get(
-      `/attendancereports/institutionuser/courses/${ezygoId}/${workingSummaryEndpoint}`,
+      `/attendancereports/institutionuser/courses/${ezygoId}/${cachedEndpoint}`,
     );
   }
 
@@ -47,15 +66,27 @@ async function fetchCourseSummaryWithFallback(ezygoId: number) {
     const res = await axios.get(
       `/attendancereports/institutionuser/courses/${ezygoId}/summery`,
     );
-    workingSummaryEndpoint = "summery";
+    workingSummaryEndpoints.set(key, "summery");
     return res;
-  } catch (err) {
-    // If 'summery' failed, log and try 'summary' and cache the result if successful
+  } catch (err: unknown) {
+    // If 'summery' failed, log and try 'summary'
     logger?.dev?.("/summery attempt failed, falling back to /summary", err);
     const res = await axios.get(
       `/attendancereports/institutionuser/courses/${ezygoId}/summary`,
     );
-    workingSummaryEndpoint = "summary";
+
+    // Only permanently lock to 'summary' if the failure on '/summery' was specifically
+    // a 404 Not Found (meaning the typo route doesn't exist on this backend).
+    // Transient failures (502, timeouts, 500, network errors) should NOT permanently bias resolution.
+    const errorObj = err as { response?: { status?: number }; message?: string } | null;
+    const is404 =
+      errorObj?.response?.status === 404 ||
+      (typeof errorObj?.message === "string" && errorObj.message.includes("404"));
+
+    if (is404) {
+      workingSummaryEndpoints.set(key, "summary");
+    }
+
     return res;
   }
 }
@@ -69,6 +100,7 @@ async function fetchCourseDetail(
   courseId: string,
   ezygoId: number,
   courseName?: string,
+  institutionKey?: string | number,
 ): Promise<CourseDetail> {
   // If ezygoId is 0, it's a student-added "custom" course not yet official in EzyGo.
   // Return a shell CourseDetail with the provided courseName to avoid 404 spam.
@@ -86,7 +118,7 @@ async function fetchCourseDetail(
     };
   }
 
-  const res = await fetchCourseSummaryWithFallback(ezygoId);
+  const res = await fetchCourseSummaryWithFallback(ezygoId, institutionKey);
   if (!res) throw new Error("Failed to fetch course details data");
   return normalizeCourseDetail(res.data);
 }
@@ -96,12 +128,13 @@ function courseDetailQueryOptions(
   courseId: string,
   ezygoId: number,
   courseName?: string,
+  institutionKey?: string | number,
 ) {
   return {
     // Key on both courseId and ezygoId to ensure attendance details are cached
     // independently across semesters/enrollments.
     queryKey: ["attendance-report", courseId, ezygoId] as const,
-    queryFn: () => fetchCourseDetail(courseId, ezygoId, courseName),
+    queryFn: () => fetchCourseDetail(courseId, ezygoId, courseName, institutionKey),
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
   };
@@ -138,13 +171,13 @@ export const useCourseDetails = (
   courseId: string,
   ezygoId: number,
   courseName?: string,
-  options: { enabled?: boolean; staleTime?: number } = {},
+  options: { enabled?: boolean; staleTime?: number; institutionKey?: string | number } = {},
 ) => {
   return useQuery<CourseDetail>({
-    ...courseDetailQueryOptions(courseId, ezygoId, courseName),
+    ...courseDetailQueryOptions(courseId, ezygoId, courseName, options.institutionKey),
     enabled: options.enabled !== false && !!courseId,
     staleTime: options.staleTime ??
-      courseDetailQueryOptions(courseId, ezygoId, courseName).staleTime,
+      courseDetailQueryOptions(courseId, ezygoId, courseName, options.institutionKey).staleTime,
     refetchOnReconnect: true,
     refetchInterval: false,
     retry: retryTwice,
@@ -243,5 +276,5 @@ export const useAllCourseDetails = (
 
 /** TEST ONLY: Reset module-level singleton state. */
 export function _resetModuleState() {
-  workingSummaryEndpoint = null;
+  resetWorkingSummaryEndpoint();
 }
