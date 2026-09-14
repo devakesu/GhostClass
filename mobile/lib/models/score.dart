@@ -42,8 +42,11 @@ class Exam {
       pivotScore = _toDouble(pivot?['score']);
     }
 
-    final coursesList = (json['course'] as List? ?? [])
-        .map((c) => Course.fromJson(c as Map<String, dynamic>))
+    final rawCourses =
+        json['course'] as List? ?? json['courses'] as List? ?? [];
+    final coursesList = rawCourses
+        .whereType<Map<dynamic, dynamic>>()
+        .map((c) => Course.fromJson(c.cast<String, dynamic>()))
         .toList();
 
     final settingsMap = json['settings'] as Map<String, dynamic>? ?? {};
@@ -97,12 +100,21 @@ class Course {
   });
 
   factory Course.fromJson(Map<String, dynamic> json) {
+    var sem = json['academic_semester'] as String?;
+    var year = json['academic_year'] as String?;
+
+    final subgroup = json['usersubgroup'];
+    if (subgroup is Map<dynamic, dynamic>) {
+      sem ??= subgroup['academic_semester']?.toString();
+      year ??= subgroup['academic_year']?.toString();
+    }
+
     return Course(
       id: toInt(json['id']) ?? 0,
       name: json['name'] as String? ?? 'Unknown',
       code: json['code'] as String?,
-      academicYear: json['academic_year'] as String?,
-      academicSemester: json['academic_semester'] as String?,
+      academicYear: year,
+      academicSemester: sem,
     );
   }
   final int id;

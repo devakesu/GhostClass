@@ -54,6 +54,10 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
   bool _needsRevalidate = true;
   bool _isDisposed = false;
+  // Buffers a tracking update that arrived while the dashboard was in a
+  // loading state (e.g. during pull-to-refresh). Applied immediately after
+  // the build/refresh completes to avoid the "tracking appears then goes" bug.
+  TrackingState? _pendingTrackingFromListener;
 
   @override
   FutureOr<DashboardData> build() async {
@@ -172,43 +176,49 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       }
     }
 
-    // Seamlessly update active dashboard state when tracking finishes background revalidation
+    // Seamlessly update dashboard state when tracking changes.
+    // If dashboard is currently loading or courses are not yet resolved, buffer
+    // the update and apply it immediately once the build completes.
     ref.listen<AsyncValue<TrackingState>>(trackingProvider, (previous, next) {
       final nextTracking = next.value;
-      if (nextTracking != null && state.hasValue) {
-        final currentAcademic = ref.read(academicProvider).value;
-        if (currentAcademic == _lastAcademic) {
-          // Accept tracking updates whether or not we have in-memory cached
-          // courses/attendance — on cold start these are populated after the
-          // first _fetchAndProcess completes and we must still merge records.
-          final courses = _cachedCourses;
-          final attendance = _cachedAttendance;
-          if (courses != null && attendance != null) {
-            if (nextTracking.officialReport != null) {
-              _cachedAttendance = nextTracking.officialReport;
-            }
-            final trackingList = nextTracking.groupedByCourse.values
-                .expand((e) => e)
-                .toList();
-            state = AsyncValue.data(
-              _processData(
-                courses,
-                _cachedAttendance!,
-                trackingList,
-                _lastAcademic!,
-                _cachedInstructors ?? [],
-              ),
-            );
-          }
-        }
+      if (nextTracking == null) return;
+      final currentAcademic = ref.read(academicProvider).value;
+      if (currentAcademic != _lastAcademic) return;
+
+      final courses = _cachedCourses;
+      final attendance = _cachedAttendance;
+
+      if (courses == null || attendance == null || !state.hasValue) {
+        // Buffer the update so build() applies it once courses and attendance exist.
+        _pendingTrackingFromListener = nextTracking;
+        return;
       }
+
+      if (nextTracking.officialReport != null) {
+        _cachedAttendance = nextTracking.officialReport;
+      }
+      final trackingList = nextTracking.groupedByCourse.values
+          .expand((e) => e)
+          .toList();
+
+      state = AsyncValue.data(
+        _processData(
+          courses,
+          _cachedAttendance!,
+          trackingList,
+          _lastAcademic!,
+          _cachedInstructors ?? [],
+        ),
+      );
     });
 
     // 2. Fast Path: If we have cached official data AND the term matches
     if (_cachedCourses != null &&
         _cachedAttendance != null &&
         _lastAcademic == academic) {
-      final activeTracking = ref.read(trackingProvider).value;
+      final trackingAsync = ref.read(trackingProvider);
+      final activeTracking =
+          !trackingAsync.isLoading ? trackingAsync.value : null;
       if (activeTracking?.officialReport != null) {
         _cachedAttendance = activeTracking!.officialReport;
       }
@@ -244,29 +254,45 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     }
 
     _needsRevalidate = false;
+    _pendingTrackingFromListener = null;
 
     // Cold-start slow path: no disk cache for dashboard.
-    // Fire trackingProvider in PARALLEL (non-blocking) — the EzygoBatchFetcher
-    // deduplicates the attendance request so only one network hit is made.
-    // The trackingProvider listener above merges records into the dashboard
-    // state once tracking resolves, ensuring both att + tracking appear together.
-    AppLogger.safeUnawait(
-      ref.read(trackingProvider.future).then<void>((_) {}).catchError((
-        Object e,
-        StackTrace st,
-      ) {
-        AppLogger.e(
-          'DashboardNotifier: parallel tracking cold-start failed',
-          e,
-          st,
-        );
-      }),
-      'DashboardNotifier: parallel tracking cold-start',
+    // Truly parallelize: fetch courses (EzyGo) AND wait for tracking to resolve.
+    // EzygoBatchFetcher deduplicates the shared attendance request, so only ONE
+    // network hit is made for attendance regardless of parallel execution.
+    // This eliminates the serial dependency while preserving attendance reuse.
+    final trackingFuture = ref.read(trackingProvider.future);
+    final result = await _fetchAndProcess(
+      <TrackingRecord>[],
+      academic,
+      null,
+      parallelTrackingFuture: trackingFuture,
     );
 
-    // Fetch dashboard data independently (courses + attendance via EzyGo).
-    // The attendance request is deduplicated with trackingProvider's request.
-    return _fetchAndProcess(<TrackingRecord>[], academic, null);
+    // Apply any tracking update that arrived during or prior to _fetchAndProcess.
+    final pendingTracking =
+        _pendingTrackingFromListener ?? ref.read(trackingProvider).value;
+    if (pendingTracking != null &&
+        !_isDisposed &&
+        _cachedCourses != null &&
+        _cachedAttendance != null) {
+      _pendingTrackingFromListener = null;
+      if (pendingTracking.officialReport != null) {
+        _cachedAttendance = pendingTracking.officialReport;
+      }
+      final trackingList = pendingTracking.groupedByCourse.values
+          .expand((e) => e)
+          .toList();
+      return _processData(
+        _cachedCourses!,
+        _cachedAttendance!,
+        trackingList,
+        academic,
+        _cachedInstructors ?? [],
+      );
+    }
+
+    return result;
   }
 
   Future<DashboardData> _fetchAndProcess(
@@ -274,6 +300,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     AcademicState academic,
     AttendanceReportDetailed? trackedAttendance, {
     bool forceFreshAttendance = false,
+    Future<TrackingState>? parallelTrackingFuture,
   }) async {
     try {
       if (_isDisposed) throw StateError('DashboardNotifier disposed');
@@ -291,15 +318,29 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
       Future<AttendanceReportDetailed?> resolveAttendance() async {
         if (!forceFreshAttendance) {
-          final existing =
-              attendanceToUse ??
-              _cachedAttendance ??
-              ref.read(trackingProvider).value?.officialReport;
+          final existing = attendanceToUse ?? _cachedAttendance;
           if (existing != null) return existing;
+        }
+        // If we have a parallel tracking future, await it to reuse its
+        // officialReport — this avoids a duplicate EzyGo attendance fetch
+        // since EzygoBatchFetcher deduplicates the request.
+        if (parallelTrackingFuture != null) {
+          try {
+            final resolved = await parallelTrackingFuture;
+            if (resolved.officialReport != null) return resolved.officialReport;
+          } on Object catch (e) {
+            AppLogger.e(
+              'DashboardNotifier: parallelTrackingFuture failed, falling back to own attendance fetch',
+              e,
+            );
+          }
         }
         return _fetchAttendanceOnce(api: api, storage: storage);
       }
 
+      // Fetch courses (EzyGo) in parallel with attendance resolution.
+      // When parallelTrackingFuture is set, resolveAttendance() awaits tracking,
+      // so the true network calls (courses + attendance via tracking) run in parallel.
       await Future.wait<dynamic>([
         api.fetchCourses(storage).then((res) => coursesResponse = res),
         resolveAttendance().then((res) {
@@ -411,10 +452,32 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         );
       }
 
+      var resolvedTracking = List<TrackingRecord>.from(tracking);
+      if (resolvedTracking.isEmpty && parallelTrackingFuture != null) {
+        try {
+          final resolvedState = await parallelTrackingFuture;
+          final records = resolvedState.groupedByCourse.values
+              .expand((e) => e)
+              .toList();
+          if (records.isNotEmpty) {
+            resolvedTracking = records;
+          }
+        } on Object catch (_) {}
+      }
+      if (resolvedTracking.isEmpty) {
+        final activeTracking = ref.read(trackingProvider).value;
+        if (activeTracking != null &&
+            activeTracking.groupedByCourse.isNotEmpty) {
+          resolvedTracking = activeTracking.groupedByCourse.values
+              .expand((e) => e)
+              .toList();
+        }
+      }
+
       return _processData(
         _cachedCourses!,
         _cachedAttendance!,
-        tracking,
+        resolvedTracking,
         academic,
         sharedInstructors,
       );
@@ -630,8 +693,12 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     try {
       if (_isDisposed) return;
       final trackingState = ref.read(trackingProvider).value;
+      final trackingToUse = tracking.isNotEmpty
+          ? tracking
+          : (trackingState?.groupedByCourse.values.expand((e) => e).toList() ??
+              <TrackingRecord>[]);
       final freshData = await _fetchAndProcess(
-        tracking,
+        trackingToUse,
         academic,
         trackingState?.officialReport,
         forceFreshAttendance: true,
@@ -700,23 +767,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         AppLogger.e('DashboardNotifier: refresh coordinator failed', e, st);
         refreshError = e;
         refreshStackTrace = st;
-      } finally {
-        // Clear disk cache only when refresh succeeds to avoid leaving the app
-        // with no fallback data during connectivity issues.
-        if (refreshError == null) {
-          final storage = ref.read(secureStorageProvider);
-          final academicAsync = ref.read(academicProvider);
-          final academic = academicAsync.value;
-          if (academic != null) {
-            final suffix =
-                '${user.supabaseUserId}_${academic.semester}_${academic.year}';
-            await Future.wait([
-              storage.deleteCachedData('dashboard_courses_$suffix'),
-              storage.deleteCachedData('dashboard_attendance_$suffix'),
-              storage.deleteCachedData('dashboard_instructors_$suffix'),
-            ]);
-          }
-        }
       }
     }
 

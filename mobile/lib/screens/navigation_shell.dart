@@ -13,8 +13,10 @@ import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/app_update_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
+import 'package:ghostclass/providers/leave_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
 import 'package:ghostclass/providers/outage_provider.dart';
+import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/providers/ui_state_provider.dart';
@@ -84,6 +86,56 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
     ]);
   }
 
+  bool _deferredPrewarmTriggered = false;
+
+  void _checkAndPrewarmDeferredPages() {
+    final dash = ref.read(dashboardProvider);
+    final track = ref.read(trackingProvider);
+
+    if (dash.hasValue &&
+        !dash.isLoading &&
+        track.hasValue &&
+        !track.isLoading) {
+      if (_deferredPrewarmTriggered) return;
+      _deferredPrewarmTriggered = true;
+
+      AppLogger.safeUnawait(
+        _prewarmDeferredPages(),
+        'NavigationShell: prewarm deferred pages after dash and tracking',
+      );
+    }
+  }
+
+  Future<void> _prewarmDeferredPages() async {
+    await Future.wait<void>([
+      () async {
+        try {
+          await ref.read(scoreProvider.future);
+        } on Object catch (e, st) {
+          AppLogger.e('NavigationShell: Failed to preload scores in bg', e, st);
+        }
+      }(),
+      () async {
+        try {
+          await ref.read(leaveProvider.future);
+        } on Object catch (e, st) {
+          AppLogger.e('NavigationShell: Failed to preload leaves in bg', e, st);
+        }
+      }(),
+      () async {
+        try {
+          await ref.read(notificationsProvider.future);
+        } on Object catch (e, st) {
+          AppLogger.e(
+            'NavigationShell: Failed to preload notifications in bg',
+            e,
+            st,
+          );
+        }
+      }(),
+    ]);
+  }
+
   void _checkAndShowUpdateDialog() {
     if (!mounted) return;
     final updateState = ref.read(appUpdateProvider);
@@ -134,18 +186,36 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   void initState() {
     super.initState();
 
-    // Run update dialog check after first frame
+    // Run update dialog check after first frame and attempt deferred prewarm
     WidgetsBinding.instance.addPostFrameCallback((_) {
       try {
         _checkAndShowUpdateDialog();
       } on Object catch (e, st) {
         AppLogger.e('NavigationShell: update dialog check failed', e, st);
       }
+      _checkAndPrewarmDeferredPages();
     });
 
-    // Subscribe to academic changes and security failures. We keep the
-    // returned ProviderSubscription objects so we can close them in dispose.
+    // Subscribe to academic changes, dash/tracking readiness, and security failures.
     _subscriptions.addAll([
+      ref.listenManual<AsyncValue<DashboardData>>(dashboardProvider, (
+        previous,
+        next,
+      ) {
+        if (next.hasValue && !next.isLoading) {
+          _checkAndPrewarmDeferredPages();
+        }
+      }),
+
+      ref.listenManual<AsyncValue<TrackingState>>(trackingProvider, (
+        previous,
+        next,
+      ) {
+        if (next.hasValue && !next.isLoading) {
+          _checkAndPrewarmDeferredPages();
+        }
+      }),
+
       ref.listenManual<AsyncValue<AcademicState?>>(academicProvider, (
         previous,
         next,
@@ -158,10 +228,14 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         if (nextAcademic == null || next.isLoading) return;
         if (previousAcademic == nextAcademic) return;
 
+        _deferredPrewarmTriggered = false;
+
         // Keep calendar dependencies warm in the background whenever the
         // academic context changes, even if the calendar screen is not open.
         AppLogger.safeUnawait(
-          _prewarmCalendarData().catchError(
+          _prewarmCalendarData().then((_) {
+            _checkAndPrewarmDeferredPages();
+          }).catchError(
             (Object e, StackTrace st) {
               AppLogger.e('NavigationShell: Prewarm calendar failed', e, st);
             },

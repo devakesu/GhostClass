@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
@@ -67,8 +68,8 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final isStalePeriod =
         data != null &&
         academicAsync.value != null &&
-        (data.selectedSemester != academicAsync.value!.semester ||
-            data.selectedYear != academicAsync.value!.year);
+        (semestersDiffer(data.selectedSemester, academicAsync.value!.semester) ||
+            yearsDiffer(data.selectedYear, academicAsync.value!.year));
 
     final hasData = data != null;
     if ((isSyncing && !hasData) ||

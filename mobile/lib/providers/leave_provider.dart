@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/models/leave.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
@@ -46,16 +47,23 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final storage = ref.read(secureStorageProvider);
     final cacheKey =
         'leaves_raw_${user.supabaseUserId}_${academic.semester}_${academic.year}';
+    final fallbackCacheKey = 'leaves_raw_${user.supabaseUserId}';
 
     // 1. Try disk cache first for instant boot (<15ms)
     try {
-      final cachedRaw = await storage.getCachedData(cacheKey);
-      if (cachedRaw is Map<String, dynamic>) {
-        final cachedState = _parseLeaveData(cachedRaw, academic);
+      var cachedRaw = await storage.getCachedData(cacheKey);
+      cachedRaw ??= await storage.getCachedData(fallbackCacheKey);
+
+      if (cachedRaw is Map) {
+        final cachedState = _parseLeaveData(
+          cachedRaw.cast<String, dynamic>(),
+          academic,
+        );
 
         // Revalidate in background quietly
         AppLogger.safeUnawait(
           _fetchAndProcess(
+                user: user,
                 storage: storage,
                 cacheKey: cacheKey,
                 academic: academic,
@@ -84,6 +92,7 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     }
 
     return _fetchAndProcess(
+      user: user,
       storage: storage,
       cacheKey: cacheKey,
       academic: academic,
@@ -91,6 +100,7 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
   }
 
   Future<LeaveState> _fetchAndProcess({
+    required AuthenticatedUser user,
     required SecureStorageService storage,
     required String cacheKey,
     required AcademicState academic,
@@ -101,11 +111,12 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
 
     if (res.statusCode == 200 && data.isNotEmpty) {
       AppLogger.safeUnawait(
-        storage.saveCachedData(cacheKey, data).catchError((
-          Object e,
-          StackTrace st,
-        ) {
+        Future.wait([
+          storage.saveCachedData(cacheKey, data),
+          storage.saveCachedData('leaves_raw_${user.supabaseUserId}', data),
+        ]).catchError((Object e, StackTrace st) {
           AppLogger.e('LeaveNotifier: Failed to cache leaves data', e, st);
+          return <void>[];
         }),
         'LeaveNotifier: saveCachedData',
       );
@@ -150,14 +161,47 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
     final leaves = rawLeaves
         .whereType<Map<dynamic, dynamic>>()
         .map((l) => Leave.fromJson(l.cast<String, dynamic>()))
-        .where(
-          (l) =>
-              l.userSubgroup?.academicSemester == academic.semester &&
-              l.userSubgroup?.academicYear == academic.year,
-        )
+        .where((l) => _matchesLeaveAcademic(l, academic))
         .toList();
 
     return LeaveState(leaves: leaves, sessions: sessions);
+  }
+
+  bool _matchesLeaveAcademic(Leave l, AcademicState academic) {
+    final subSem = l.userSubgroup?.academicSemester.trim();
+    final subYear = l.userSubgroup?.academicYear.trim();
+
+    final hasSem = subSem != null && subSem.isNotEmpty;
+    final hasYear = subYear != null && subYear.isNotEmpty;
+
+    final windowStart = academic.startDate.subtract(const Duration(days: 30));
+    final windowEnd = academic.endDate.add(const Duration(days: 30));
+
+    if (hasSem || hasYear) {
+      if (hasSem && semestersDiffer(subSem, academic.semester)) {
+        return false;
+      }
+      if (hasYear && yearsDiffer(subYear, academic.year)) {
+        return false;
+      }
+      if (!hasYear) {
+        final created = DateTime.tryParse(l.createdAt);
+        if (created != null) {
+          if (!created.isAfter(windowStart) || !created.isBefore(windowEnd)) {
+            return false;
+          }
+        }
+      }
+      return true;
+    }
+
+    // Fallback: Check leave's createdAt against academic window
+    final created = DateTime.tryParse(l.createdAt);
+    if (created != null) {
+      return created.isAfter(windowStart) && created.isBefore(windowEnd);
+    }
+
+    return true;
   }
 
   Future<void> refresh() async {

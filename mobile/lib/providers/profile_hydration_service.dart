@@ -714,7 +714,9 @@ class ProfileHydrationService extends Notifier<void> {
         'Purging caches and invalidating page providers.',
       );
       ref.read(apiServiceProvider).clearCaches();
-      await storage.clearAllCachedData();
+      if (classChanged) {
+        await storage.clearAllCachedData();
+      }
 
       if (nextAcademic != null) {
         await storage.saveAcademicState(nextAcademic);

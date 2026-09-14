@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/models/score.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
@@ -95,7 +96,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     final cached = await _tryHydrateFromCache(user: user, academic: academic);
     if (cached != null) {
       AppLogger.safeUnawait(
-        _initialFetch(user: user, academic: academic)
+        _initialFetch(user: user, academic: academic, bypassCache: true)
             .then((fresh) {
               if (!_isDisposed) {
                 state = AsyncValue.data(fresh);
@@ -123,10 +124,17 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     required AcademicState? academic,
   }) async {
     final storage = ref.read(secureStorageProvider);
-    final examsCacheKey = 'scores_exams_${user.supabaseUserId}';
+    final semSuffix =
+        academic != null ? '_${academic.semester}_${academic.year}' : '';
+    final examsCacheKey = 'scores_exams_${user.supabaseUserId}$semSuffix';
 
     try {
-      final cachedExamsRaw = await storage.getCachedData(examsCacheKey);
+      var cachedExamsRaw = await storage.getCachedData(examsCacheKey);
+      if (cachedExamsRaw is! List && semSuffix.isNotEmpty) {
+        cachedExamsRaw = await storage.getCachedData(
+          'scores_exams_${user.supabaseUserId}',
+        );
+      }
       if (cachedExamsRaw is! List) return null;
 
       final allExams = cachedExamsRaw
@@ -142,20 +150,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
           .toList();
 
       if (targetExams.isEmpty) {
-        return _applyFilter(
-          ScoreState(
-            rawExams: [],
-            groupedExams: [],
-            questions: {},
-            answers: {},
-            resolvedScores: {},
-            filterType: 'all',
-            totalExams: 0,
-            scoredCount: 0,
-            pendingCount: 0,
-          ),
-          'all',
-        );
+        return null;
       }
 
       final questionsMap = <int, List<ExamQuestion>>{};
@@ -254,13 +249,23 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
 
       final examsJson = examsRes.data as List<dynamic>;
 
-      // Cache raw exams list for future offline/instant hydration
+      // Cache raw exams list for future offline/instant hydration per-academic and general
+      final semSuffix =
+          academic != null ? '_${academic.semester}_${academic.year}' : '';
       AppLogger.safeUnawait(
-        storage
-            .saveCachedData('scores_exams_${user.supabaseUserId}', examsJson)
-            .catchError((Object e, StackTrace st) {
-              AppLogger.e('ScoreNotifier: Failed to cache raw exams', e, st);
-            }),
+        Future.wait([
+          storage.saveCachedData(
+            'scores_exams_${user.supabaseUserId}$semSuffix',
+            examsJson,
+          ),
+          storage.saveCachedData(
+            'scores_exams_${user.supabaseUserId}',
+            examsJson,
+          ),
+        ]).catchError((Object e, StackTrace st) {
+          AppLogger.e('ScoreNotifier: Failed to cache raw exams', e, st);
+          return <void>[];
+        }),
         'ScoreNotifier: saveCachedData exams',
       );
 
@@ -412,14 +417,51 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
 
   bool _matchesAcademic(Exam exam, AcademicState? academic) {
     if (academic == null) return true;
-    if (exam.courses.isEmpty) return true;
-    return exam.courses.any((c) {
-      final sem = c.academicSemester;
-      final year = c.academicYear;
-      if (sem != null && sem != academic.semester) return false;
-      if (year != null && year != academic.year) return false;
-      return true;
-    });
+
+    final windowStart = academic.startDate.subtract(const Duration(days: 30));
+    final windowEnd = academic.endDate.add(const Duration(days: 30));
+
+    // If courses exist on the exam, check their academic metadata
+    if (exam.courses.isNotEmpty) {
+      final coursesWithAcademic = exam.courses.where(
+        (c) =>
+            (c.academicSemester != null &&
+                c.academicSemester!.trim().isNotEmpty) ||
+            (c.academicYear != null && c.academicYear!.trim().isNotEmpty),
+      );
+
+      if (coursesWithAcademic.isNotEmpty) {
+        return coursesWithAcademic.any((c) {
+          final sem = c.academicSemester?.trim();
+          final year = c.academicYear?.trim();
+
+          // If course specifies semester, it MUST match the academic semester
+          if (sem != null && sem.isNotEmpty) {
+            if (semestersDiffer(sem, academic.semester)) return false;
+          }
+
+          // If course specifies year, it MUST match the academic year
+          if (year != null && year.isNotEmpty) {
+            if (yearsDiffer(year, academic.year)) return false;
+          } else if (exam.date != null) {
+            // If year is omitted on course, verify date falls within semester window
+            if (!exam.date!.isAfter(windowStart) ||
+                !exam.date!.isBefore(windowEnd)) {
+              return false;
+            }
+          }
+
+          return true;
+        });
+      }
+    }
+
+    // Fallback: If no course has explicit semester/year metadata, use exam date
+    if (exam.date != null) {
+      return exam.date!.isAfter(windowStart) && exam.date!.isBefore(windowEnd);
+    }
+
+    return false;
   }
 
   Future<void> _loadExamDetails({
@@ -447,31 +489,46 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     }
 
     if (qsData == null || ansData == null) {
-      final results = await Future.wait([
-        api.fetchExamQuestions(exam.id, storage),
-        api.fetchExamAnswers(exam.id, storage),
-      ]);
+      try {
+        final results = await Future.wait([
+          api.fetchExamQuestions(exam.id, storage),
+          api.fetchExamAnswers(exam.id, storage),
+        ]);
 
-      qsData = results[0].data;
-      ansData = results[1].data;
+        if (results[0].statusCode == 200 && results[0].data is List) {
+          qsData = results[0].data;
+          storage.saveCachedData(cacheKeyQs, qsData).ignore();
+        }
+        if (results[1].statusCode == 200 && results[1].data is List) {
+          ansData = results[1].data;
+          storage.saveCachedData(cacheKeyAns, ansData).ignore();
+        }
+      } on Object catch (e, st) {
+        AppLogger.e(
+          'ScoreNotifier: Network fetch for exam ${exam.id} failed',
+          e,
+          st,
+        );
+      }
 
-      final saveTasks = <Future<void>>[];
-      if (results[0].statusCode == 200 && qsData is List) {
-        saveTasks.add(storage.saveCachedData(cacheKeyQs, qsData));
-      }
-      if (results[1].statusCode == 200 && ansData is List) {
-        saveTasks.add(storage.saveCachedData(cacheKeyAns, ansData));
-      }
-      if (saveTasks.isNotEmpty) {
-        await Future.wait(saveTasks);
+      // If network fetch failed or returned invalid data, fall back to cached data
+      if (qsData == null || ansData == null) {
+        final fallback = await Future.wait([
+          storage.getCachedData(cacheKeyQs),
+          storage.getCachedData(cacheKeyAns),
+        ]);
+        qsData ??= fallback[0];
+        ansData ??= fallback[1];
       }
     }
 
     final qs = (qsData is List<dynamic> ? qsData : <dynamic>[])
-        .map((j) => ExamQuestion.fromJson(j as Map<String, dynamic>))
+        .whereType<Map<dynamic, dynamic>>()
+        .map((j) => ExamQuestion.fromJson(j.cast<String, dynamic>()))
         .toList();
     final ans = (ansData is List<dynamic> ? ansData : <dynamic>[])
-        .map((j) => ExamAnswer.fromJson(j as Map<String, dynamic>))
+        .whereType<Map<dynamic, dynamic>>()
+        .map((j) => ExamAnswer.fromJson(j.cast<String, dynamic>()))
         .toList();
 
     // Deduplicate questions and answers to prevent inflation from API duplicates

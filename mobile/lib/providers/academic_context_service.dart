@@ -88,7 +88,6 @@ class AcademicContextService extends Notifier<void> {
       ref.read(academicProvider.notifier).updateState(nextAcademic);
 
       api.clearCaches();
-      await storage.clearAllCachedData();
 
       final token = await authNotifier.getFreshSupabaseToken();
       if (token == null) {
