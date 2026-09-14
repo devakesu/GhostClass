@@ -251,16 +251,16 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // The trackingProvider listener above merges records into the dashboard
     // state once tracking resolves, ensuring both att + tracking appear together.
     AppLogger.safeUnawait(
-      ref
-          .read(trackingProvider.future)
-          .then<void>((_) {})
-          .catchError((Object e, StackTrace st) {
-            AppLogger.e(
-              'DashboardNotifier: parallel tracking cold-start failed',
-              e,
-              st,
-            );
-          }),
+      ref.read(trackingProvider.future).then<void>((_) {}).catchError((
+        Object e,
+        StackTrace st,
+      ) {
+        AppLogger.e(
+          'DashboardNotifier: parallel tracking cold-start failed',
+          e,
+          st,
+        );
+      }),
       'DashboardNotifier: parallel tracking cold-start',
     );
 
@@ -308,44 +308,48 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         }),
         if (classId != null) ...[
           // Fetch Class Courses
-          Future.sync(() => api.fetchClassCourses(classId)).then((coursesRes) {
-            if (coursesRes.isNotEmpty) {
-              sharedCourses = coursesRes.map((raw) {
-                final c = raw as Map<String, dynamic>;
-                return CourseDetails(
-                  id: 0, // Mark as shared/custom
-                  name: c['course_name'] as String? ?? 'Unnamed Course',
-                  code: c['course_code'] as String?,
-                  academicYear: academic.year,
-                  academicSemester: academic.semester,
+          Future.sync(() => api.fetchClassCourses(classId))
+              .then((coursesRes) {
+                if (coursesRes.isNotEmpty) {
+                  sharedCourses = coursesRes.map((raw) {
+                    final c = raw as Map<String, dynamic>;
+                    return CourseDetails(
+                      id: 0, // Mark as shared/custom
+                      name: c['course_name'] as String? ?? 'Unnamed Course',
+                      code: c['course_code'] as String?,
+                      academicYear: academic.year,
+                      academicSemester: academic.semester,
+                    );
+                  }).toList();
+                }
+              })
+              .catchError((Object e, StackTrace st) {
+                AppLogger.e(
+                  'DashboardNotifier: fetchClassCourses failed (graceful fallback)',
+                  e,
+                  st,
                 );
-              }).toList();
-            }
-          }).catchError((Object e, StackTrace st) {
-            AppLogger.e(
-              'DashboardNotifier: fetchClassCourses failed (graceful fallback)',
-              e,
-              st,
-            );
-          }),
+              }),
           // Fetch Instructor Mappings
-          Future.sync(() => api.fetchCourseInstructors(classId)).then((instructorsRes) {
-            if (instructorsRes.isNotEmpty) {
-              sharedInstructors = instructorsRes
-                  .map(
-                    (json) => CourseInstructor.fromJson(
-                      json as Map<String, dynamic>,
-                    ),
-                  )
-                  .toList();
-            }
-          }).catchError((Object e, StackTrace st) {
-            AppLogger.e(
-              'DashboardNotifier: fetchCourseInstructors failed (graceful fallback)',
-              e,
-              st,
-            );
-          }),
+          Future.sync(() => api.fetchCourseInstructors(classId))
+              .then((instructorsRes) {
+                if (instructorsRes.isNotEmpty) {
+                  sharedInstructors = instructorsRes
+                      .map(
+                        (json) => CourseInstructor.fromJson(
+                          json as Map<String, dynamic>,
+                        ),
+                      )
+                      .toList();
+                }
+              })
+              .catchError((Object e, StackTrace st) {
+                AppLogger.e(
+                  'DashboardNotifier: fetchCourseInstructors failed (graceful fallback)',
+                  e,
+                  st,
+                );
+              }),
         ],
       ]);
 

@@ -46,8 +46,9 @@ void main() {
     mockStorage = MockSecureStorageService();
     mockApi = MockApiService();
 
-    when(() => mockStorage.getCachedData(any<String>()))
-        .thenAnswer((_) async => null);
+    when(
+      () => mockStorage.getCachedData(any<String>()),
+    ).thenAnswer((_) async => null);
     when(
       () => mockStorage.saveCachedData(
         any<String>(),
@@ -94,7 +95,9 @@ void main() {
     );
 
     when(() => mockApi.fetchClassCourses(any())).thenAnswer((_) async => []);
-    when(() => mockApi.fetchCourseInstructors(any())).thenAnswer((_) async => []);
+    when(
+      () => mockApi.fetchCourseInstructors(any()),
+    ).thenAnswer((_) async => []);
   });
 
   group('Performance Optimizations', () {
@@ -108,15 +111,18 @@ void main() {
           secChUa: 'TestSecChUa',
         );
 
-        when(() => mockStorage.getStealthInfo())
-            .thenAnswer((_) async => info);
+        when(() => mockStorage.getStealthInfo()).thenAnswer((_) async => info);
 
         final service = StealthHeadersService(mockStorage);
 
-        final headers1 = await service.getHeaders(url: 'https://edu.ezygo.app/test');
+        final headers1 = await service.getHeaders(
+          url: 'https://edu.ezygo.app/test',
+        );
         expect(headers1['User-Agent'], 'TestUA');
 
-        final headers2 = await service.getHeaders(url: 'https://edu.ezygo.app/test2');
+        final headers2 = await service.getHeaders(
+          url: 'https://edu.ezygo.app/test2',
+        );
         expect(headers2['User-Agent'], 'TestUA');
 
         // Verify storage was read only once due to in-memory caching
@@ -243,14 +249,19 @@ void main() {
           ],
         };
 
-        when(() => mockStorage.getCachedData('scores_exams_${mockUser.supabaseUserId}'))
-            .thenAnswer((_) async => [cachedExamJson]);
+        when(
+          () => mockStorage.getCachedData(
+            'scores_exams_${mockUser.supabaseUserId}',
+          ),
+        ).thenAnswer((_) async => [cachedExamJson]);
 
-        when(() => mockStorage.getCachedData('exam_questions_10'))
-            .thenAnswer((_) async => <dynamic>[]);
+        when(
+          () => mockStorage.getCachedData('exam_questions_10'),
+        ).thenAnswer((_) async => <dynamic>[]);
 
-        when(() => mockStorage.getCachedData('exam_answers_10'))
-            .thenAnswer((_) async => <dynamic>[]);
+        when(
+          () => mockStorage.getCachedData('exam_answers_10'),
+        ).thenAnswer((_) async => <dynamic>[]);
 
         final container = ProviderContainer(
           overrides: [
@@ -301,8 +312,11 @@ void main() {
           },
         };
 
-        when(() => mockStorage.getCachedData('leaves_raw_${mockUser.supabaseUserId}_Odd_2025'))
-            .thenAnswer((_) async => cachedLeavesRaw);
+        when(
+          () => mockStorage.getCachedData(
+            'leaves_raw_${mockUser.supabaseUserId}_Odd_2025',
+          ),
+        ).thenAnswer((_) async => cachedLeavesRaw);
 
         final container = ProviderContainer(
           overrides: [
@@ -370,14 +384,26 @@ void main() {
           'instructor_name': 'Dr. Alan Turing',
         };
 
-        when(() => mockStorage.getCachedData('dashboard_courses_${mockUser.supabaseUserId}_Odd_2025'))
-            .thenAnswer((_) async => [cachedCourse]);
-        when(() => mockStorage.getCachedData('dashboard_attendance_${mockUser.supabaseUserId}_Odd_2025'))
-            .thenAnswer((_) async => cachedAttendance);
-        when(() => mockStorage.getCachedData('dashboard_instructors_${mockUser.supabaseUserId}_Odd_2025'))
-            .thenAnswer((_) async => [cachedInstructor]);
-        when(() => mockStorage.getCachedData('tracking_records_${mockUser.supabaseUserId}_Odd_2025'))
-            .thenAnswer((_) async => <dynamic>[]);
+        when(
+          () => mockStorage.getCachedData(
+            'dashboard_courses_${mockUser.supabaseUserId}_Odd_2025',
+          ),
+        ).thenAnswer((_) async => [cachedCourse]);
+        when(
+          () => mockStorage.getCachedData(
+            'dashboard_attendance_${mockUser.supabaseUserId}_Odd_2025',
+          ),
+        ).thenAnswer((_) async => cachedAttendance);
+        when(
+          () => mockStorage.getCachedData(
+            'dashboard_instructors_${mockUser.supabaseUserId}_Odd_2025',
+          ),
+        ).thenAnswer((_) async => [cachedInstructor]);
+        when(
+          () => mockStorage.getCachedData(
+            'tracking_records_${mockUser.supabaseUserId}_Odd_2025',
+          ),
+        ).thenAnswer((_) async => <dynamic>[]);
 
         final container = ProviderContainer(
           overrides: [
@@ -418,55 +444,82 @@ void main() {
         const term1 = AcademicState(semester: 'Odd', year: '2025');
         const term2 = AcademicState(semester: 'Even', year: '2025');
 
-        when(() => mockStorage.getCachedData('dashboard_courses_${mockUser.supabaseUserId}_Odd_2025'))
-            .thenAnswer((_) async => [
-              {
-                'id': 1,
-                'name': 'Course Odd',
-                'code': 'ODD101',
-                'academic_semester': 'Odd',
-                'academic_year': '2025',
-              },
-            ]);
-        when(() => mockStorage.getCachedData('dashboard_attendance_${mockUser.supabaseUserId}_Odd_2025'))
-            .thenAnswer((_) async => {
-              'student_attendance_data': <String, dynamic>{},
-              'courses': {'ODD101': {'id': 1, 'name': 'Course Odd', 'code': 'ODD101'}},
-              'attendance_dates': <dynamic>[],
-              'sessions': <dynamic>[],
-            });
+        when(
+          () => mockStorage.getCachedData(
+            'dashboard_courses_${mockUser.supabaseUserId}_Odd_2025',
+          ),
+        ).thenAnswer(
+          (_) async => [
+            {
+              'id': 1,
+              'name': 'Course Odd',
+              'code': 'ODD101',
+              'academic_semester': 'Odd',
+              'academic_year': '2025',
+            },
+          ],
+        );
+        when(
+          () => mockStorage.getCachedData(
+            'dashboard_attendance_${mockUser.supabaseUserId}_Odd_2025',
+          ),
+        ).thenAnswer(
+          (_) async => {
+            'student_attendance_data': <String, dynamic>{},
+            'courses': {
+              'ODD101': {'id': 1, 'name': 'Course Odd', 'code': 'ODD101'},
+            },
+            'attendance_dates': <dynamic>[],
+            'sessions': <dynamic>[],
+          },
+        );
 
-        when(() => mockStorage.getCachedData('dashboard_courses_${mockUser.supabaseUserId}_Even_2025'))
-            .thenAnswer((_) async => [
-              {
-                'id': 2,
-                'name': 'Course Even',
-                'code': 'EVEN201',
-                'academic_semester': 'Even',
-                'academic_year': '2025',
-              },
-            ]);
-        when(() => mockStorage.getCachedData('dashboard_attendance_${mockUser.supabaseUserId}_Even_2025'))
-            .thenAnswer((_) async => {
-              'student_attendance_data': <String, dynamic>{},
-              'courses': {'EVEN201': {'id': 2, 'name': 'Course Even', 'code': 'EVEN201'}},
-              'attendance_dates': <dynamic>[],
-              'sessions': <dynamic>[],
-            });
+        when(
+          () => mockStorage.getCachedData(
+            'dashboard_courses_${mockUser.supabaseUserId}_Even_2025',
+          ),
+        ).thenAnswer(
+          (_) async => [
+            {
+              'id': 2,
+              'name': 'Course Even',
+              'code': 'EVEN201',
+              'academic_semester': 'Even',
+              'academic_year': '2025',
+            },
+          ],
+        );
+        when(
+          () => mockStorage.getCachedData(
+            'dashboard_attendance_${mockUser.supabaseUserId}_Even_2025',
+          ),
+        ).thenAnswer(
+          (_) async => {
+            'student_attendance_data': <String, dynamic>{},
+            'courses': {
+              'EVEN201': {'id': 2, 'name': 'Course Even', 'code': 'EVEN201'},
+            },
+            'attendance_dates': <dynamic>[],
+            'sessions': <dynamic>[],
+          },
+        );
 
         final academicNotifier = MockAcademicNotifier(term1);
         final container = ProviderContainer(
           overrides: [
             authProvider.overrideWith(() => MockAuthNotifier(mockUser)),
             academicProvider.overrideWith(() => academicNotifier),
-            trackingProvider.overrideWith(() => DelayedTrackingNotifier()..completer.complete(
-              TrackingState(
-                groupedByCourse: {},
-                totalCount: 0,
-                isSyncing: false,
-                syncCompleted: true,
-              ),
-            )),
+            trackingProvider.overrideWith(
+              () => DelayedTrackingNotifier()
+                ..completer.complete(
+                  TrackingState(
+                    groupedByCourse: {},
+                    totalCount: 0,
+                    isSyncing: false,
+                    syncCompleted: true,
+                  ),
+                ),
+            ),
             apiServiceProvider.overrideWith((ref) => mockApi),
             secureStorageProvider.overrideWith((ref) => mockStorage),
           ],

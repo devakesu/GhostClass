@@ -167,9 +167,16 @@ async function handleCsrfRetry(error: unknown) {
     ? (data.message || data.error)
     : "";
 
+  const msgStr = String(msg).toLowerCase();
+  const isCsrfError =
+    msgStr.includes("csrf") ||
+    msgStr.includes("invalid csrf token") ||
+    msgStr.includes("csrf token session") ||
+    msgStr.includes("session mismatch");
+
   if (
     errObj.response?.status === 403 &&
-    String(msg).toLowerCase().includes("invalid csrf token") &&
+    isCsrfError &&
     !config._csrfRetried
   ) {
     config._csrfRetried = true;

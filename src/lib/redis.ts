@@ -75,7 +75,14 @@ function createRedisClient(): Redis {
     );
   }
 
-  return new Redis({ url, token });
+  return new Redis({
+    url,
+    token,
+    retry: {
+      retries: 1,
+      backoff: () => 50,
+    },
+  });
 }
 
 /**

@@ -152,11 +152,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       if (integrityError != null) {
         final currentError = integrityError!;
         final appEx = currentError is AppException ? currentError : null;
-        final isCriticalSecurity = appEx != null &&
+        final isCriticalSecurity =
+            appEx != null &&
             appEx.details?['type'] == 'security' &&
             appEx.details?['criticalRisk'] == true;
 
-        final isNetworkError = currentError is DioException ||
+        final isNetworkError =
+            currentError is DioException ||
             (appEx != null &&
                 (appEx.type == AppExceptionType.network ||
                     appEx.type == AppExceptionType.server));
@@ -469,18 +471,19 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           localAcademic.year.trim().isNotEmpty;
 
       if (!hasLocalAcademic) {
-        final sem = finalUser.profile?.currentSemester ??
-            finalUser.settings.semester;
-        final yr = finalUser.profile?.currentYear ??
-            finalUser.settings.academicYear;
+        final sem =
+            finalUser.profile?.currentSemester ?? finalUser.settings.semester;
+        final yr =
+            finalUser.profile?.currentYear ?? finalUser.settings.academicYear;
         if (sem != null && yr != null) {
           final seeded = AcademicState(semester: sem, year: yr);
           ref.read(academicProvider.notifier).updateState(seeded);
           final storage = ref.read(secureStorageProvider);
           AppLogger.safeUnawait(
-            storage
-                .saveAcademicState(seeded)
-                .catchError((Object e, StackTrace st) {
+            storage.saveAcademicState(seeded).catchError((
+              Object e,
+              StackTrace st,
+            ) {
               AppLogger.e(
                 'SplashScreen: saveAcademicState fallback failed',
                 e,
@@ -503,13 +506,13 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               .read(profileHydrationServiceProvider.notifier)
               .runProfileRefresh(finalUser, sync: true, force: true)
               .catchError((Object syncErr, StackTrace syncSt) {
-            AppLogger.e(
-              'SplashScreen: Deferred background profile sync failed',
-              syncErr,
-              syncSt,
-            );
-            return finalUser;
-          }),
+                AppLogger.e(
+                  'SplashScreen: Deferred background profile sync failed',
+                  syncErr,
+                  syncSt,
+                );
+                return finalUser;
+              }),
           'SplashScreen: deferred background profile sync',
         );
       }

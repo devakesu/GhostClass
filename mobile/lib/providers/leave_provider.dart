@@ -101,7 +101,10 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
 
     if (res.statusCode == 200 && data.isNotEmpty) {
       AppLogger.safeUnawait(
-        storage.saveCachedData(cacheKey, data).catchError((Object e, StackTrace st) {
+        storage.saveCachedData(cacheKey, data).catchError((
+          Object e,
+          StackTrace st,
+        ) {
           AppLogger.e('LeaveNotifier: Failed to cache leaves data', e, st);
         }),
         'LeaveNotifier: saveCachedData',

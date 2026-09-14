@@ -376,7 +376,10 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                                 alpha: 0.15,
                               );
 
-                              final hatchColors = _buildHatchColors(brightLine, faintGap);
+                              final hatchColors = _buildHatchColors(
+                                brightLine,
+                                faintGap,
+                              );
 
                               // Whether this bar has a custom target distinct from the global one
                               final hasCustomTarget =

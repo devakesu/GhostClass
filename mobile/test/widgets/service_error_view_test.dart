@@ -112,7 +112,9 @@ void main() {
 
       // Failure toast must be visible
       expect(
-        find.text('Connection failed. Please check your network and try again.'),
+        find.text(
+          'Connection failed. Please check your network and try again.',
+        ),
         findsOneWidget,
       );
 

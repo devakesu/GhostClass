@@ -70,6 +70,39 @@ const SESSION_COOKIE_NAMES = [
   "authjs.session-token",
 ];
 
+/**
+ * Extracts a stable session identifier (such as user.id or sub) from a raw cookie value.
+ * Supabase auth cookies contain JSON/JWT data where access_token rotates on refresh,
+ * but user.id / sub remains stable across the lifetime of the session.
+ */
+export function extractStableSessionId(
+  raw: string | null | undefined,
+): string | null {
+  if (!raw) return null;
+  try {
+    let str = raw;
+    if (str.startsWith("base64-")) {
+      str = Buffer.from(str.slice(7), "base64").toString("utf8");
+    }
+    if (str.startsWith("{")) {
+      const parsed = JSON.parse(str);
+      if (parsed.user?.id) return String(parsed.user.id);
+      if (parsed.access_token) {
+        const parts = parsed.access_token.split(".");
+        if (parts.length === 3) {
+          const payload = JSON.parse(
+            Buffer.from(parts[1], "base64").toString("utf8"),
+          );
+          if (payload.sub) return String(payload.sub);
+        }
+      }
+    }
+  } catch {
+    // Non-fatal, fall back to raw string
+  }
+  return raw;
+}
+
 export async function getSessionIdFromCookie(): Promise<string | null> {
   const cookieStore = await cookies();
 
@@ -82,10 +115,19 @@ export async function getSessionIdFromCookie(): Promise<string | null> {
 
   // M-4: Also support Supabase-SSR auth cookies (starts with "sb-" and ends with "-auth-token")
   const allCookies = cookieStore.getAll();
-  for (const cookie of allCookies) {
-    if (cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token")) {
-      return cookie.value;
+  const sbCookies = allCookies.filter(
+    (cookie) =>
+      cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token"),
+  );
+
+  if (sbCookies.length > 0) {
+    for (const cookie of sbCookies) {
+      const stableId = extractStableSessionId(cookie.value);
+      if (stableId && stableId !== cookie.value) {
+        return stableId;
+      }
     }
+    return extractStableSessionId(sbCookies[0].value);
   }
 
   return null;

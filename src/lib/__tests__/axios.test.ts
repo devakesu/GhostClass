@@ -184,6 +184,36 @@ describe("axios lib", () => {
       expect(requestSpy).toHaveBeenCalled();
     });
 
+    it("handles 403 CSRF session mismatch error by refreshing token and retrying", async () => {
+      const error = {
+        config: { url: "/api/test", _csrfRetried: false, headers: new Map() },
+        response: {
+          status: 403,
+          data: {
+            error: "CSRF token session mismatch",
+            message: "CSRF token session mismatch",
+          },
+        },
+      } as any;
+
+      mockFetch.mockResolvedValueOnce({
+        ok: true,
+        json: async () => ({ token: "e".repeat(64) }),
+      });
+
+      const requestSpy = vi.spyOn(axiosInstance, "request").mockResolvedValue(
+        { data: "success" } as any,
+      );
+
+      const interceptor = (axiosInstance.interceptors.response as any)
+        .handlers[0]?.rejected;
+      if (interceptor) await interceptor(error);
+
+      expect(mockFetch).toHaveBeenCalledWith("/api/csrf", expect.any(Object));
+      expect(getCsrfToken()).toBe("e".repeat(64));
+      expect(requestSpy).toHaveBeenCalled();
+    });
+
     it("handles 401 error by attempting session sync", async () => {
       const error = {
         config: { url: "/api/test", _authRetried: false },

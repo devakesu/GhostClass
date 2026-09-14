@@ -2,12 +2,17 @@ import crypto from "node:crypto";
 import { headers as nextHeaders } from "next/headers";
 import { getAppCheck } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logger";
-import { getSessionIdFromCookie, validateCsrfToken } from "@/lib/security/csrf";
+import {
+  extractStableSessionId,
+  getSessionIdFromCookie,
+  validateCsrfToken,
+} from "@/lib/security/csrf";
 import { NextRequest, NextResponse } from "next/server";
 import { getClientIp } from "@/lib/utils.server";
 import { redis } from "@/lib/redis";
 import * as Sentry from "@sentry/nextjs";
 import { Ratelimit } from "@upstash/ratelimit";
+import { createResilientLimiter } from "@/lib/ratelimit";
 
 // C-2: Module-level lazy singletons — avoids creating a new Ratelimit instance
 // (and its internal HTTP connection pool) on every inbound request.
@@ -18,11 +23,11 @@ function getWebProxyLimiter(): Ratelimit {
   if (!_webProxyLimiter) {
     const limit = parseInt(process.env.PROXY_RATE_LIMIT_REQUESTS || "300", 10);
     const window = parseInt(process.env.PROXY_RATE_LIMIT_WINDOW || "60", 10);
-    _webProxyLimiter = new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(limit, `${window} s`),
-      prefix: "@ghostclass/web-proxy",
-    });
+    _webProxyLimiter = createResilientLimiter(
+      "@ghostclass/web-proxy",
+      limit,
+      window,
+    );
   }
   return _webProxyLimiter;
 }
@@ -31,11 +36,11 @@ function getWebApiLimiter(): Ratelimit {
   if (!_webApiLimiter) {
     const limit = parseInt(process.env.WEB_RATE_LIMIT_REQUESTS || "60", 10);
     const window = parseInt(process.env.WEB_RATE_LIMIT_WINDOW || "60", 10);
-    _webApiLimiter = new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(limit, `${window} s`),
-      prefix: "@ghostclass/web-api",
-    });
+    _webApiLimiter = createResilientLimiter(
+      "@ghostclass/web-api",
+      limit,
+      window,
+    );
   }
   return _webApiLimiter;
 }
@@ -92,6 +97,16 @@ export interface AuthResult {
   isMobileRequest?: boolean;
 }
 
+function isSessionMatched(boundSession: string, currentSession: string): boolean {
+  const normalizedBound = typeof extractStableSessionId === "function"
+    ? extractStableSessionId(boundSession)
+    : boundSession;
+  const normalizedCurrent = typeof extractStableSessionId === "function"
+    ? extractStableSessionId(currentSession)
+    : currentSession;
+  return normalizedBound === normalizedCurrent;
+}
+
 async function verifyCsrfTokenWithSessionBinding(
   headerList: Headers,
   sessionId?: string | null,
@@ -106,14 +121,42 @@ async function verifyCsrfTokenWithSessionBinding(
 
   if (sessionId) {
     try {
-      const boundSession = await redis.get(`csrf:token:${csrfToken}:session`);
-      if (!boundSession || boundSession !== sessionId) {
+      let timeoutId: NodeJS.Timeout | undefined;
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error("Redis session binding lookup timed out")),
+          1500,
+        );
+      });
+
+      const redisPromise = (async () => {
+        try {
+          return await redis.get<string>(`csrf:token:${csrfToken}:session`);
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      })();
+
+      const boundSession = await Promise.race([redisPromise, timeoutPromise]);
+      if (!boundSession) {
+        // Token was created pre-authentication or key expired in Redis.
+        // The cryptographic synchronizer token has already been validated against the httpOnly cookie.
+        // Lazily bind the valid token to the current session in Redis.
+        await redis
+          .set(`csrf:token:${csrfToken}:session`, sessionId, { ex: 86400 })
+          .catch(() => {});
+      } else if (!isSessionMatched(boundSession, sessionId)) {
         logger.warn("CSRF token session binding mismatch");
         return { isValid: false, error: "CSRF token session mismatch" };
       }
     } catch (error) {
-      logger.warn("CSRF session binding check unavailable", error);
-      return { isValid: false, error: "CSRF session binding unavailable" };
+      logger.warn(
+        "CSRF session binding check unavailable; falling back to valid cookie token",
+        error,
+      );
+      // Cryptographic synchronizer token has already been validated against the httpOnly
+      // cookie above. Allow request through to prevent Redis outages from halting web clients.
+      return { isValid: true };
     }
   }
   return { isValid: true };

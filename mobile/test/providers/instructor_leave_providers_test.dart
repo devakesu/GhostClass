@@ -48,8 +48,9 @@ void main() {
     mockStorage = MockSecureStorageService();
     mockApi = MockApiService();
 
-    when(() => mockStorage.getCachedData(any<String>()))
-        .thenAnswer((_) async => null);
+    when(
+      () => mockStorage.getCachedData(any<String>()),
+    ).thenAnswer((_) async => null);
     when(
       () => mockStorage.saveCachedData(
         any<String>(),

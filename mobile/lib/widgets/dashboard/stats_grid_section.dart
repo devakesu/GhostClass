@@ -41,7 +41,10 @@ class StatsGridSection extends StatelessWidget {
                           color: const Color(0xFFF97316),
                         ),
                       if (stats.extraPresent > 0)
-                        _Correction(value: stats.extraPresent, color: Colors.blue),
+                        _Correction(
+                          value: stats.extraPresent,
+                          color: Colors.blue,
+                        ),
                     ],
                   ),
                 ),
@@ -63,7 +66,10 @@ class StatsGridSection extends StatelessWidget {
                           isNegative: true,
                         ),
                       if (stats.extraAbsent > 0)
-                        _Correction(value: stats.extraAbsent, color: Colors.blue),
+                        _Correction(
+                          value: stats.extraAbsent,
+                          color: Colors.blue,
+                        ),
                     ],
                   ),
                 ),

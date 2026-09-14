@@ -103,7 +103,11 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
             })
             .catchError((Object e, StackTrace st) {
               if (!_isDisposed) {
-                AppLogger.e('ScoreNotifier: Background revalidate failed', e, st);
+                AppLogger.e(
+                  'ScoreNotifier: Background revalidate failed',
+                  e,
+                  st,
+                );
               }
             }),
         'ScoreNotifier: background revalidate',
@@ -130,8 +134,9 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
           .map((j) => Exam.fromJson(j.cast<String, dynamic>()))
           .toList();
 
-      final participatedExams =
-          allExams.where((e) => e.courses.isNotEmpty).toList();
+      final participatedExams = allExams
+          .where((e) => e.courses.isNotEmpty)
+          .toList();
       final targetExams = participatedExams
           .where((e) => _matchesAcademic(e, academic))
           .toList();

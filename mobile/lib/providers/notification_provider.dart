@@ -5,7 +5,6 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
-
 class AppNotification {
   AppNotification({
     required this.id,
@@ -156,7 +155,10 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
         hasNextPage: hasNextPage,
       );
     } on Object catch (e) {
-      AppLogger.e('NotificationsNotifier: Failed to deserialize cached state', e);
+      AppLogger.e(
+        'NotificationsNotifier: Failed to deserialize cached state',
+        e,
+      );
       return null;
     }
   }
@@ -164,24 +166,28 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
   Map<String, dynamic> _serializeState(NotificationsState s) {
     return {
       'action': s.actionNotifications
-          .map((n) => {
-                'id': n.id,
-                'title': n.title,
-                'description': n.description,
-                'created_at': n.createdAt.toIso8601String(),
-                'topic': n.topic,
-                'is_read': n.isRead,
-              })
+          .map(
+            (n) => {
+              'id': n.id,
+              'title': n.title,
+              'description': n.description,
+              'created_at': n.createdAt.toIso8601String(),
+              'topic': n.topic,
+              'is_read': n.isRead,
+            },
+          )
           .toList(),
       'regular': s.regularNotifications
-          .map((n) => {
-                'id': n.id,
-                'title': n.title,
-                'description': n.description,
-                'created_at': n.createdAt.toIso8601String(),
-                'topic': n.topic,
-                'is_read': n.isRead,
-              })
+          .map(
+            (n) => {
+              'id': n.id,
+              'title': n.title,
+              'description': n.description,
+              'created_at': n.createdAt.toIso8601String(),
+              'topic': n.topic,
+              'is_read': n.isRead,
+            },
+          )
           .toList(),
       'unreadCount': s.unreadCount,
       'hasNextPage': s.hasNextPage,
@@ -256,15 +262,16 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     // Persist to disk cache for instant badge on next app open.
     if (storage != null && cacheKey != null) {
       AppLogger.safeUnawait(
-        storage
-            .saveCachedData(cacheKey, _serializeState(result))
-            .catchError((Object e, StackTrace st) {
-              AppLogger.e(
-                'NotificationsNotifier: Failed to save cache',
-                e,
-                st,
-              );
-            }),
+        storage.saveCachedData(cacheKey, _serializeState(result)).catchError((
+          Object e,
+          StackTrace st,
+        ) {
+          AppLogger.e(
+            'NotificationsNotifier: Failed to save cache',
+            e,
+            st,
+          );
+        }),
         'NotificationsNotifier: saveCachedData',
       );
     }

@@ -34,6 +34,7 @@ vi.mock("@sentry/nextjs", () => ({
 vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: vi.fn(),
   getSessionIdFromCookie: vi.fn(),
+  extractStableSessionId: vi.fn((val) => val),
 }));
 
 vi.mock("@/lib/redis", () => ({
@@ -193,6 +194,24 @@ describe("app-check logic", () => {
       process.env.CRON_SECRET = "cron-secret";
       const h = new Headers({ "authorization": "Bearer cron-secret" });
       vi.mocked(headers).mockResolvedValue(h);
+
+      const wrapped = withSecurity(
+        vi.fn().mockResolvedValue(new Response("ok")),
+      );
+      const req = new Request("https://test.com", { headers: h });
+      const res = await wrapped(req as any, { params: {} });
+
+      expect(res.status).toBe(200);
+    });
+
+    it("falls back to valid cookie token when Redis session binding check errors or times out", async () => {
+      process.env.VITEST = "false";
+      const h = new Headers({ "x-csrf-token": "token123" });
+      vi.mocked(headers).mockResolvedValue(h);
+      vi.mocked(getSessionIdFromCookie).mockResolvedValue("sb-cookie-auth-token-xyz");
+      vi.mocked(validateCsrfToken).mockResolvedValue(true);
+      const { redis } = await import("@/lib/redis");
+      vi.mocked(redis.get).mockRejectedValue(new Error("Redis connection timeout"));
 
       const wrapped = withSecurity(
         vi.fn().mockResolvedValue(new Response("ok")),

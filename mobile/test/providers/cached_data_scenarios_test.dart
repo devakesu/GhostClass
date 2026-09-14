@@ -52,13 +52,14 @@ class TestAcademicNotifier extends AcademicNotifier {
 
 class TestTrackingNotifier extends TrackingNotifier {
   TestTrackingNotifier([TrackingState? initial])
-      : _state = initial ??
-            TrackingState(
-              groupedByCourse: {},
-              totalCount: 0,
-              isSyncing: false,
-              syncCompleted: true,
-            );
+    : _state =
+          initial ??
+          TrackingState(
+            groupedByCourse: {},
+            totalCount: 0,
+            isSyncing: false,
+            syncCompleted: true,
+          );
 
   final TrackingState _state;
 
@@ -106,8 +107,9 @@ void main() {
     when(() => mockSession.accessToken).thenReturn('test-token');
     when(() => mockSession.isExpired).thenReturn(false);
 
-    when(() => mockStorage.getCachedData(any<String>()))
-        .thenAnswer((_) async => null);
+    when(
+      () => mockStorage.getCachedData(any<String>()),
+    ).thenAnswer((_) async => null);
     when(
       () => mockStorage.saveCachedData(
         any<String>(),
@@ -129,8 +131,9 @@ void main() {
 
     when(() => mockApi.clearCaches()).thenReturn(null);
     when(() => mockApi.fetchClassCourses(any())).thenAnswer((_) async => []);
-    when(() => mockApi.fetchCourseInstructors(any()))
-        .thenAnswer((_) async => []);
+    when(
+      () => mockApi.fetchCourseInstructors(any()),
+    ).thenAnswer((_) async => []);
     when(() => mockApi.fetchCourses(any())).thenAnswer(
       (_) async => Response(
         requestOptions: RequestOptions(),
@@ -203,14 +206,18 @@ void main() {
           'sessions': <dynamic>[],
         };
 
-        when(() => mockStorage.getCachedData('dashboard_courses_$suffix'))
-            .thenAnswer((_) async => cachedCourses);
-        when(() => mockStorage.getCachedData('dashboard_attendance_$suffix'))
-            .thenAnswer((_) async => cachedAttendance);
-        when(() => mockStorage.getCachedData('dashboard_instructors_$suffix'))
-            .thenAnswer((_) async => <dynamic>[]);
-        when(() => mockStorage.getCachedData('tracking_records_$suffix'))
-            .thenAnswer((_) async => <dynamic>[]);
+        when(
+          () => mockStorage.getCachedData('dashboard_courses_$suffix'),
+        ).thenAnswer((_) async => cachedCourses);
+        when(
+          () => mockStorage.getCachedData('dashboard_attendance_$suffix'),
+        ).thenAnswer((_) async => cachedAttendance);
+        when(
+          () => mockStorage.getCachedData('dashboard_instructors_$suffix'),
+        ).thenAnswer((_) async => <dynamic>[]);
+        when(
+          () => mockStorage.getCachedData('tracking_records_$suffix'),
+        ).thenAnswer((_) async => <dynamic>[]);
 
         // 2. Fresh server response with updated attendance (3 present out of 4)
         final freshAttendance = {
@@ -309,10 +316,10 @@ void main() {
         when(() => mockStorage.getAcademicState()).thenAnswer(
           (_) async => const AcademicState(semester: 'Odd', year: '2024-25'),
         );
-        when(() => mockStorage.saveEzygoToken(any()))
-            .thenAnswer((_) async {});
-        when(() => mockStorage.saveSupabaseUserId(any()))
-            .thenAnswer((_) async {});
+        when(() => mockStorage.saveEzygoToken(any())).thenAnswer((_) async {});
+        when(
+          () => mockStorage.saveSupabaseUserId(any()),
+        ).thenAnswer((_) async {});
         when(() => mockStorage.saveSettings(any())).thenAnswer((_) async {});
         when(() => mockStorage.saveUserProfile(any())).thenAnswer((_) async {});
 
@@ -343,8 +350,9 @@ void main() {
 
         observer.disposedProviders.clear();
 
-        final hydrationService =
-            container.read(profileHydrationServiceProvider.notifier);
+        final hydrationService = container.read(
+          profileHydrationServiceProvider.notifier,
+        );
 
         // Server returns updated academic period: Even 2024-25
         final serverProfilePayload = {
@@ -418,8 +426,9 @@ void main() {
 
         observer.disposedProviders.clear();
 
-        final hydrationService =
-            container.read(profileHydrationServiceProvider.notifier);
+        final hydrationService = container.read(
+          profileHydrationServiceProvider.notifier,
+        );
 
         const syncResultWithChanges = CronSyncResult(
           success: true,
@@ -465,8 +474,9 @@ void main() {
 
         observer.disposedProviders.clear();
 
-        final hydrationService =
-            container.read(profileHydrationServiceProvider.notifier);
+        final hydrationService = container.read(
+          profileHydrationServiceProvider.notifier,
+        );
 
         const syncResultNoChanges = CronSyncResult(
           success: true,
@@ -523,14 +533,18 @@ void main() {
           'sessions': <dynamic>[],
         };
 
-        when(() => mockStorage.getCachedData('dashboard_courses_$suffix'))
-            .thenAnswer((_) async => cachedCourses);
-        when(() => mockStorage.getCachedData('dashboard_attendance_$suffix'))
-            .thenAnswer((_) async => cachedAttendance);
-        when(() => mockStorage.getCachedData('dashboard_instructors_$suffix'))
-            .thenAnswer((_) async => <dynamic>[]);
-        when(() => mockStorage.getCachedData('tracking_records_$suffix'))
-            .thenAnswer((_) async => <dynamic>[]);
+        when(
+          () => mockStorage.getCachedData('dashboard_courses_$suffix'),
+        ).thenAnswer((_) async => cachedCourses);
+        when(
+          () => mockStorage.getCachedData('dashboard_attendance_$suffix'),
+        ).thenAnswer((_) async => cachedAttendance);
+        when(
+          () => mockStorage.getCachedData('dashboard_instructors_$suffix'),
+        ).thenAnswer((_) async => <dynamic>[]);
+        when(
+          () => mockStorage.getCachedData('tracking_records_$suffix'),
+        ).thenAnswer((_) async => <dynamic>[]);
 
         // Simulate network drop during background revalidation
         when(() => mockApi.fetchCourses(any())).thenThrow(

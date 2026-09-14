@@ -63,14 +63,22 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         try {
           await ref.read(trackingProvider.future);
         } on Object catch (e, st) {
-          AppLogger.e('NavigationShell: Failed to prewarm tracking data', e, st);
+          AppLogger.e(
+            'NavigationShell: Failed to prewarm tracking data',
+            e,
+            st,
+          );
         }
       }(),
       () async {
         try {
           await ref.read(dashboardProvider.future);
         } on Object catch (e, st) {
-          AppLogger.e('NavigationShell: Failed to prewarm dashboard data', e, st);
+          AppLogger.e(
+            'NavigationShell: Failed to prewarm dashboard data',
+            e,
+            st,
+          );
         }
       }(),
     ]);

@@ -225,7 +225,8 @@ class ProfileHydrationService extends Notifier<void> {
           (Object e, StackTrace st) {
             AppLogger.e(
               'ProfileHydrationService: Failed to delete tracking_records cache',
-              e, st,
+              e,
+              st,
             );
           },
         ),
@@ -233,7 +234,8 @@ class ProfileHydrationService extends Notifier<void> {
           (Object e, StackTrace st) {
             AppLogger.e(
               'ProfileHydrationService: Failed to delete tracking_report cache',
-              e, st,
+              e,
+              st,
             );
           },
         ),
@@ -241,7 +243,8 @@ class ProfileHydrationService extends Notifier<void> {
           (Object e, StackTrace st) {
             AppLogger.e(
               'ProfileHydrationService: Failed to delete dashboard_attendance cache',
-              e, st,
+              e,
+              st,
             );
           },
         ),
@@ -253,7 +256,8 @@ class ProfileHydrationService extends Notifier<void> {
     } on Object catch (e, st) {
       AppLogger.e(
         'ProfileHydrationService: Unexpected error during disk cache eviction',
-        e, st,
+        e,
+        st,
       );
     }
   }
@@ -505,13 +509,15 @@ class ProfileHydrationService extends Notifier<void> {
         'ProfileHydrationService: Forced refresh requested while non-forced is '
         'in-flight. Will chain a forced refresh after current completes.',
       );
-      final future = inFlight.then((_) => _fetchAndApplyServerProfile(
-            user,
-            supabaseToken: supabaseToken,
-            updateState: updateState,
-            sync: true,
-            force: true,
-          ));
+      final future = inFlight.then(
+        (_) => _fetchAndApplyServerProfile(
+          user,
+          supabaseToken: supabaseToken,
+          updateState: updateState,
+          sync: true,
+          force: true,
+        ),
+      );
       _profileRefreshInFlight = future;
       _profileRefreshInFlightIsForced = true;
       return future.whenComplete(() {

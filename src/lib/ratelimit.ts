@@ -188,50 +188,85 @@ logger.dev(
   `[CSP Report Rate Limit] ${CSP_REPORT_LIMIT} requests per ${CSP_REPORT_WINDOW}s`,
 );
 
+/**
+ * Creates a rate limiter instance with local in-memory caching (ephemeralCache),
+ * disabled telemetry analytics (prevents unhandled background fetch failures),
+ * and graceful degradation (fails open with standard limits if Redis is unreachable).
+ */
+export function createResilientLimiter(
+  prefix: string,
+  limit: number,
+  windowSeconds: number,
+): Ratelimit {
+  const instance = new Ratelimit({
+    redis: redis,
+    limiter: Ratelimit.slidingWindow(limit, `${windowSeconds} s`),
+    analytics: false,
+    ephemeralCache: new Map(),
+    prefix,
+  });
+
+  const originalLimit = instance.limit.bind(instance);
+
+  instance.limit = async function (id: string, req?: Parameters<typeof originalLimit>[1]) {
+    try {
+      return await originalLimit(id, req);
+    } catch (error: unknown) {
+      logger.warn(
+        `[Rate Limit] Degraded: Redis error for ${prefix}, failing open:`,
+        error instanceof Error ? error.message : String(error),
+      );
+      return {
+        success: true,
+        limit,
+        remaining: limit,
+        reset: Date.now() + windowSeconds * 1000,
+        pending: Promise.resolve(),
+      };
+    }
+  };
+
+  return instance;
+}
+
 // Create rate limiter instances once at module load time.
 // Separate prefixes ensure that contact-form traffic cannot starve the cron-sync
 // rate-limit budget (and vice-versa).
-const syncLimiter = new Ratelimit({
-  redis: redis,
-  limiter: Ratelimit.slidingWindow(SYNC_LIMIT, `${SYNC_WINDOW} s`),
-  analytics: true,
-  prefix: "@ghostclass/sync-ratelimit",
-});
+const syncLimiter = createResilientLimiter(
+  "@ghostclass/sync-ratelimit",
+  SYNC_LIMIT,
+  SYNC_WINDOW,
+);
 
-const contactLimiter = new Ratelimit({
-  redis: redis,
-  limiter: Ratelimit.slidingWindow(CONTACT_LIMIT, `${CONTACT_WINDOW} s`),
-  analytics: true,
-  prefix: "@ghostclass/contact-ratelimit",
-});
+const contactLimiter = createResilientLimiter(
+  "@ghostclass/contact-ratelimit",
+  CONTACT_LIMIT,
+  CONTACT_WINDOW,
+);
 
-const profileLimiter = new Ratelimit({
-  redis: redis,
-  limiter: Ratelimit.slidingWindow(PROFILE_LIMIT, `${PROFILE_WINDOW} s`),
-  analytics: true,
-  prefix: "@ghostclass/profile-ratelimit",
-});
+const profileLimiter = createResilientLimiter(
+  "@ghostclass/profile-ratelimit",
+  PROFILE_LIMIT,
+  PROFILE_WINDOW,
+);
 
-const authLimiter = new Ratelimit({
-  redis: redis,
-  limiter: Ratelimit.slidingWindow(AUTH_LIMIT, `${AUTH_WINDOW} s`),
-  analytics: true,
-  prefix: "@ghostclass/auth-ratelimit",
-});
+const authLimiter = createResilientLimiter(
+  "@ghostclass/auth-ratelimit",
+  AUTH_LIMIT,
+  AUTH_WINDOW,
+);
 
-const proxyLimiter = new Ratelimit({
-  redis: redis,
-  limiter: Ratelimit.slidingWindow(PROXY_LIMIT, `${PROXY_WINDOW} s`),
-  analytics: true,
-  prefix: "@ghostclass/proxy-ratelimit",
-});
+const proxyLimiter = createResilientLimiter(
+  "@ghostclass/proxy-ratelimit",
+  PROXY_LIMIT,
+  PROXY_WINDOW,
+);
 
-const cspReportLimiter = new Ratelimit({
-  redis: redis,
-  limiter: Ratelimit.slidingWindow(CSP_REPORT_LIMIT, `${CSP_REPORT_WINDOW} s`),
-  analytics: true,
-  prefix: "@ghostclass/csp-report-ratelimit",
-});
+const cspReportLimiter = createResilientLimiter(
+  "@ghostclass/csp-report-ratelimit",
+  CSP_REPORT_LIMIT,
+  CSP_REPORT_WINDOW,
+);
 
 /** Rate limiter for cron sync endpoint */
 export const syncRateLimiter = syncLimiter;
