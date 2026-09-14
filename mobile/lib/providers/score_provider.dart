@@ -67,8 +67,13 @@ class CourseGroup {
 }
 
 class ScoreNotifier extends AsyncNotifier<ScoreState> {
+  bool _isDisposed = false;
+
   @override
   Future<ScoreState> build() async {
+    _isDisposed = false;
+    ref.onDispose(() => _isDisposed = true);
+
     final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
 
@@ -86,7 +91,145 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
 
     final academic = academicAsync.value;
 
+    // Fast path: Attempt to hydrate from disk cache for instant boot (<15ms)
+    final cached = await _tryHydrateFromCache(user: user, academic: academic);
+    if (cached != null) {
+      AppLogger.safeUnawait(
+        _initialFetch(user: user, academic: academic)
+            .then((fresh) {
+              if (!_isDisposed) {
+                state = AsyncValue.data(fresh);
+              }
+            })
+            .catchError((Object e, StackTrace st) {
+              if (!_isDisposed) {
+                AppLogger.e('ScoreNotifier: Background revalidate failed', e, st);
+              }
+            }),
+        'ScoreNotifier: background revalidate',
+      );
+      return cached;
+    }
+
     return _initialFetch(user: user, academic: academic);
+  }
+
+  Future<ScoreState?> _tryHydrateFromCache({
+    required AuthenticatedUser user,
+    required AcademicState? academic,
+  }) async {
+    final storage = ref.read(secureStorageProvider);
+    final examsCacheKey = 'scores_exams_${user.supabaseUserId}';
+
+    try {
+      final cachedExamsRaw = await storage.getCachedData(examsCacheKey);
+      if (cachedExamsRaw is! List) return null;
+
+      final allExams = cachedExamsRaw
+          .whereType<Map<dynamic, dynamic>>()
+          .map((j) => Exam.fromJson(j.cast<String, dynamic>()))
+          .toList();
+
+      final participatedExams =
+          allExams.where((e) => e.courses.isNotEmpty).toList();
+      final targetExams = participatedExams
+          .where((e) => _matchesAcademic(e, academic))
+          .toList();
+
+      if (targetExams.isEmpty) {
+        return _applyFilter(
+          ScoreState(
+            rawExams: [],
+            groupedExams: [],
+            questions: {},
+            answers: {},
+            resolvedScores: {},
+            filterType: 'all',
+            totalExams: 0,
+            scoredCount: 0,
+            pendingCount: 0,
+          ),
+          'all',
+        );
+      }
+
+      final questionsMap = <int, List<ExamQuestion>>{};
+      final answersMap = <int, List<ExamAnswer>>{};
+      final resolvedScores = <int, ResolvedScore>{};
+
+      final detailReads = await Future.wait(
+        targetExams.map((exam) async {
+          final q = await storage.getCachedData('exam_questions_${exam.id}');
+          final a = await storage.getCachedData('exam_answers_${exam.id}');
+          return (exam: exam, questions: q, answers: a);
+        }),
+      );
+
+      for (final read in detailReads) {
+        if (read.questions is! List || read.answers is! List) {
+          return null;
+        }
+
+        final qs = (read.questions as List)
+            .whereType<Map<dynamic, dynamic>>()
+            .map((j) => ExamQuestion.fromJson(j.cast<String, dynamic>()))
+            .toList();
+        final ans = (read.answers as List)
+            .whereType<Map<dynamic, dynamic>>()
+            .map((j) => ExamAnswer.fromJson(j.cast<String, dynamic>()))
+            .toList();
+
+        final uniqueQuestions = {for (final q in qs) q.id: q}.values.toList();
+        final uniqueAnswers = {for (final a in ans) a.id: a}.values.toList();
+
+        questionsMap[read.exam.id] = uniqueQuestions;
+        answersMap[read.exam.id] = uniqueAnswers;
+
+        _computeExamScore(
+          exam: read.exam,
+          uniqueQuestions: uniqueQuestions,
+          uniqueAnswers: uniqueAnswers,
+          resolvedScores: resolvedScores,
+        );
+      }
+
+      final visibleExams = targetExams.where((e) {
+        if (e.activityType == 'assignment') {
+          final hasAnswers = (answersMap[e.id] ?? []).isNotEmpty;
+          final hasScore = resolvedScores[e.id] != null;
+          return hasAnswers || hasScore || e.apiScore != null;
+        }
+        return true;
+      }).toList();
+
+      final scored = visibleExams
+          .where((e) => resolvedScores.containsKey(e.id))
+          .length;
+      final pending = visibleExams.length - scored;
+
+      final state = ScoreState(
+        rawExams: visibleExams,
+        groupedExams: [],
+        questions: questionsMap,
+        answers: answersMap,
+        resolvedScores: resolvedScores,
+        filterType: 'all',
+        totalExams: visibleExams.length,
+        scoredCount: scored,
+        pendingCount: pending,
+      );
+
+      return _applyFilter(
+        state,
+        'all',
+        totalExams: visibleExams.length,
+        scoredCount: scored,
+        pendingCount: pending,
+      );
+    } on Object catch (e) {
+      AppLogger.e('ScoreNotifier: Error hydrating from disk cache', e);
+      return null;
+    }
   }
 
   Future<ScoreState> _initialFetch({
@@ -105,14 +248,23 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       }
 
       final examsJson = examsRes.data as List<dynamic>;
+
+      // Cache raw exams list for future offline/instant hydration
+      AppLogger.safeUnawait(
+        storage
+            .saveCachedData('scores_exams_${user.supabaseUserId}', examsJson)
+            .catchError((Object e, StackTrace st) {
+              AppLogger.e('ScoreNotifier: Failed to cache raw exams', e, st);
+            }),
+        'ScoreNotifier: saveCachedData exams',
+      );
+
       final allExams = examsJson
           .map((j) => Exam.fromJson(j as Map<String, dynamic>))
           .toList();
 
       // Only show exams where I am a participant
       final participatedExams = allExams.where((e) {
-        // Some EzyGo responses omit participants but still belong to the user
-        // We filter basically by "does it have course info" or "is it likely mine"
         return e.courses.isNotEmpty;
       }).toList();
 
@@ -120,9 +272,13 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       final answersMap = <int, List<ExamAnswer>>{};
       final resolvedScores = <int, ResolvedScore>{};
 
-      // Batch Resolve Details with small concurrency to avoid flooding APIs.
+      // Batch Resolve Details ONLY for the active academic period.
+      // Avoids loading questions and answers for dozens of previous-year exams.
+      final targetExams = participatedExams
+          .where((e) => _matchesAcademic(e, academic))
+          .toList();
+
       const poolSize = 5;
-      final targetExams = participatedExams.toList();
       for (var i = 0; i < targetExams.length; i += poolSize) {
         final slice = targetExams.skip(i).take(poolSize);
         await Future.wait(
@@ -150,10 +306,8 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
         );
       }
 
-      // ─── Filter Visible Exams (Academic Context) ──────────────────────────
-      final visibleExams = participatedExams.where((e) {
-        if (!_matchesAcademic(e, academic)) return false;
-
+      // ─── Filter Visible Exams (Academic Context & Assignments) ───────────
+      final visibleExams = targetExams.where((e) {
         if (e.activityType == 'assignment') {
           final hasAnswers = (answersMap[e.id] ?? []).isNotEmpty;
           final hasScore = resolvedScores[e.id] != null;
@@ -296,11 +450,15 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       qsData = results[0].data;
       ansData = results[1].data;
 
+      final saveTasks = <Future<void>>[];
       if (results[0].statusCode == 200 && qsData is List) {
-        await storage.saveCachedData(cacheKeyQs, qsData);
+        saveTasks.add(storage.saveCachedData(cacheKeyQs, qsData));
       }
       if (results[1].statusCode == 200 && ansData is List) {
-        await storage.saveCachedData(cacheKeyAns, ansData);
+        saveTasks.add(storage.saveCachedData(cacheKeyAns, ansData));
+      }
+      if (saveTasks.isNotEmpty) {
+        await Future.wait(saveTasks);
       }
     }
 
@@ -318,6 +476,20 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     questionsMap[exam.id] = uniqueQuestions;
     answersMap[exam.id] = uniqueAnswers;
 
+    _computeExamScore(
+      exam: exam,
+      uniqueQuestions: uniqueQuestions,
+      uniqueAnswers: uniqueAnswers,
+      resolvedScores: resolvedScores,
+    );
+  }
+
+  void _computeExamScore({
+    required Exam exam,
+    required List<ExamQuestion> uniqueQuestions,
+    required List<ExamAnswer> uniqueAnswers,
+    required Map<int, ResolvedScore> resolvedScores,
+  }) {
     double? finalScore;
     final hasAnyGrade =
         uniqueAnswers.isNotEmpty && uniqueAnswers.any((a) => a.score != null);

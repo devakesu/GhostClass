@@ -3,6 +3,8 @@ import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
+import 'package:ghostclass/services/stealth_headers_service.dart';
+
 /// Centralises cache invalidation for the app so we have a single
 /// intentional place to clear caches on logout, academic changes, and errors.
 class CacheManager {
@@ -13,6 +15,7 @@ class CacheManager {
     try {
       // Clear in-memory/HTTP caches first
       _ref.read(apiServiceProvider).clearCaches();
+      _ref.read(stealthHeadersServiceProvider).invalidateCache();
 
       // Then wipe secure storage (tokens/profile/settings)
       await _ref.read(secureStorageProvider).clearAll();

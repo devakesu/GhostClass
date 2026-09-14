@@ -58,17 +58,22 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   }
 
   Future<void> _prewarmCalendarData() async {
-    try {
-      await ref.read(trackingProvider.future);
-    } on Object catch (e, st) {
-      AppLogger.e('NavigationShell: Failed to prewarm tracking data', e, st);
-    }
-
-    try {
-      await ref.read(dashboardProvider.future);
-    } on Object catch (e, st) {
-      AppLogger.e('NavigationShell: Failed to prewarm dashboard data', e, st);
-    }
+    await Future.wait<void>([
+      () async {
+        try {
+          await ref.read(trackingProvider.future);
+        } on Object catch (e, st) {
+          AppLogger.e('NavigationShell: Failed to prewarm tracking data', e, st);
+        }
+      }(),
+      () async {
+        try {
+          await ref.read(dashboardProvider.future);
+        } on Object catch (e, st) {
+          AppLogger.e('NavigationShell: Failed to prewarm dashboard data', e, st);
+        }
+      }(),
+    ]);
   }
 
   void _checkAndShowUpdateDialog() {
@@ -342,8 +347,17 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
       trackingProvider.select((state) => state.error),
     );
 
-    // Reactive provider confirms an outage (Global Barrier)
-    final showOutageBarrier = ref.watch(outageProvider);
+    // Only show the full-screen outage barrier when the user has NO cached data
+    // to fall back to. Background SWR revalidation failures while cached data is
+    // visible should be silent — the listener will retry on the next interaction.
+    final dashboardHasData = ref.watch(
+      dashboardProvider.select((s) => s.hasValue),
+    );
+    final trackingHasData = ref.watch(
+      trackingProvider.select((s) => s.hasValue),
+    );
+    final showOutageBarrier =
+        ref.watch(outageProvider) && (!dashboardHasData || !trackingHasData);
 
     // --- SECURITY BARRIER ---
     final securityFailure = ref.watch(securityFailureProvider);
@@ -742,6 +756,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                         AppLogger.e(
                           'NavigationShell: Outage recovery wait timed out or failed ($e). Re-enabling UI.',
                         );
+                        rethrow;
                       }
                     },
                   ),

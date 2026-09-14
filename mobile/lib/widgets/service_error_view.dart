@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/theme/app_theme.dart';
+import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
@@ -32,6 +33,8 @@ class ServiceErrorView extends ConsumerStatefulWidget {
 
 class _ServiceErrorViewState extends ConsumerState<ServiceErrorView> {
   bool _isRetrying = false;
+  bool _lastRetryFailed = false;
+  DateTime? _lastRetryTime;
 
   @override
   Widget build(BuildContext context) {
@@ -97,8 +100,29 @@ class _ServiceErrorViewState extends ConsumerState<ServiceErrorView> {
                                 if (widget.onRetry != null) {
                                   await widget.onRetry!();
                                 } else {
-                                  context.go('/');
+                                  if (mounted) context.go('/');
+                                  return;
                                 }
+                                if (!context.mounted) return;
+                                setState(() {
+                                  _lastRetryFailed = false;
+                                  _lastRetryTime = DateTime.now();
+                                });
+                                ServiceToast.show(
+                                  context,
+                                  'Connected successfully!',
+                                );
+                              } on Object catch (_) {
+                                if (!context.mounted) return;
+                                setState(() {
+                                  _lastRetryFailed = true;
+                                  _lastRetryTime = DateTime.now();
+                                });
+                                ServiceToast.show(
+                                  context,
+                                  'Connection failed. Please check your network and try again.',
+                                  isError: true,
+                                );
                               } finally {
                                 if (mounted) {
                                   setState(() {
@@ -211,6 +235,43 @@ class _ServiceErrorViewState extends ConsumerState<ServiceErrorView> {
                     ),
                   ],
                 ),
+                if (_lastRetryFailed && _lastRetryTime != null) ...[
+                  const SizedBox(height: 16),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 14,
+                      vertical: 8,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.redAccent.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.redAccent.withValues(alpha: 0.25),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(
+                          LucideIcons.alertCircle,
+                          size: 14,
+                          color: Colors.redAccent,
+                        ),
+                        const SizedBox(width: 8),
+                        Flexible(
+                          child: Text(
+                            'Retry failed just now. Still unable to reach server.',
+                            style: GoogleFonts.manrope(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: Colors.redAccent,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ).animate().fadeIn().shake(duration: 400.ms),
+                ],
                 const SizedBox(height: 16),
                 TextButton.icon(
                   onPressed: () async {

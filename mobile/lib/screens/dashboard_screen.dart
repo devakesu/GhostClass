@@ -70,13 +70,26 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         (data.selectedSemester != academicAsync.value!.semester ||
             data.selectedYear != academicAsync.value!.year);
 
-    if (isSyncing ||
-        academicAsync.isLoading ||
-        isStalePeriod ||
-        (dashboardState.isLoading && data == null)) {
+    final hasData = data != null;
+    if ((isSyncing && !hasData) ||
+        (academicAsync.isLoading && !hasData) ||
+        (dashboardState.isLoading && !hasData)) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
+      );
+    }
+
+    if (isStalePeriod) {
+      // Semester/year changed — show a descriptive loading state instead of
+      // a blank screen, so the user knows we're waiting on EzyGo to update.
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const LoadingOverlay(
+          isFullScreen: false,
+          showLogo: false,
+          message: 'Waiting on EzyGo...',
+        ),
       );
     }
 
@@ -96,6 +109,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   .timeout(AppConfig.defaultTimeout);
             } on Object catch (e, st) {
               AppLogger.e('DashboardScreen: Retry failed', e, st);
+              rethrow;
             }
           },
         ),

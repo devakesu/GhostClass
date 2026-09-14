@@ -5,6 +5,7 @@ import 'package:ghostclass/models/leave.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
+import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 class LeaveState {
@@ -20,8 +21,13 @@ final leaveProvider = AsyncNotifierProvider<LeaveNotifier, LeaveState>(
 );
 
 class LeaveNotifier extends AsyncNotifier<LeaveState> {
+  bool _isDisposed = false;
+
   @override
   FutureOr<LeaveState> build() async {
+    _isDisposed = false;
+    ref.onDispose(() => _isDisposed = true);
+
     final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
 
@@ -32,15 +38,83 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
       ]);
     }
 
+    final user = authState.value;
     final academic = academicAsync.value;
 
-    if (authState.value == null || academic == null) return LeaveState.empty();
+    if (user == null || academic == null) return LeaveState.empty();
 
-    final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
+    final cacheKey =
+        'leaves_raw_${user.supabaseUserId}_${academic.semester}_${academic.year}';
 
+    // 1. Try disk cache first for instant boot (<15ms)
+    try {
+      final cachedRaw = await storage.getCachedData(cacheKey);
+      if (cachedRaw is Map<String, dynamic>) {
+        final cachedState = _parseLeaveData(cachedRaw, academic);
+
+        // Revalidate in background quietly
+        AppLogger.safeUnawait(
+          _fetchAndProcess(
+                storage: storage,
+                cacheKey: cacheKey,
+                academic: academic,
+              )
+              .then((fresh) {
+                if (!_isDisposed) {
+                  state = AsyncValue.data(fresh);
+                }
+              })
+              .catchError((Object e, StackTrace st) {
+                if (!_isDisposed) {
+                  AppLogger.e(
+                    'LeaveNotifier: Background revalidation failed',
+                    e,
+                    st,
+                  );
+                }
+              }),
+          'LeaveNotifier: background revalidate',
+        );
+
+        return cachedState;
+      }
+    } on Object catch (e) {
+      AppLogger.e('LeaveNotifier: Error loading disk cache', e);
+    }
+
+    return _fetchAndProcess(
+      storage: storage,
+      cacheKey: cacheKey,
+      academic: academic,
+    );
+  }
+
+  Future<LeaveState> _fetchAndProcess({
+    required SecureStorageService storage,
+    required String cacheKey,
+    required AcademicState academic,
+  }) async {
+    final api = ref.read(apiServiceProvider);
     final res = await api.fetchLeaveData(storage);
     final data = res.data as Map<String, dynamic>? ?? {};
+
+    if (res.statusCode == 200 && data.isNotEmpty) {
+      AppLogger.safeUnawait(
+        storage.saveCachedData(cacheKey, data).catchError((Object e, StackTrace st) {
+          AppLogger.e('LeaveNotifier: Failed to cache leaves data', e, st);
+        }),
+        'LeaveNotifier: saveCachedData',
+      );
+    }
+
+    return _parseLeaveData(data, academic);
+  }
+
+  LeaveState _parseLeaveData(
+    Map<String, dynamic> data,
+    AcademicState academic,
+  ) {
     final studentLeaves = data['studentLeaves'] as Map<String, dynamic>? ?? {};
     final rawLeaves = studentLeaves['student_leaves'] as List<dynamic>? ?? [];
 

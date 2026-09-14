@@ -53,13 +53,16 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   AttendanceReportDetailed? _pendingTrackedAttendance;
 
   bool _needsRevalidate = true;
+  bool _isDisposed = false;
 
   @override
   FutureOr<DashboardData> build() async {
+    _isDisposed = false;
+    ref.onDispose(() => _isDisposed = true);
+
     // 1. Reactive Dependency: Rebuild when auth user ID or academic status changes
     final userAsync = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
-    final trackingFuture = ref.watch(trackingProvider.future);
 
     // If either core dependency is actively reloading (e.g. changing semester),
     // suspend the dashboard build to prevent showing a split-second stale UI.
@@ -105,8 +108,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     }
     _lastClassId = classId;
 
-    // Invalidate cache if academic rollover occurred
-    if (_lastAcademic != null && _lastAcademic!.hasRollover(academic)) {
+    // Invalidate in-memory caches when academic term changes
+    if (_lastAcademic != null && _lastAcademic != academic) {
       _cachedCourses = null;
       _cachedAttendance = null;
       _cachedInstructors = null;
@@ -118,23 +121,32 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     final storage = ref.read(secureStorageProvider);
     final cacheKeySuffix =
         '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+    List<TrackingRecord>? cachedTrackingRecords;
     if (_cachedCourses == null || _cachedAttendance == null) {
       try {
         final results = await Future.wait([
           storage.getCachedData('dashboard_courses_$cacheKeySuffix'),
           storage.getCachedData('dashboard_attendance_$cacheKeySuffix'),
           storage.getCachedData('dashboard_instructors_$cacheKeySuffix'),
+          storage.getCachedData('tracking_records_$cacheKeySuffix'),
+          storage.getCachedData('tracking_report_$cacheKeySuffix'),
         ]);
         final cachedCoursesRaw = results[0];
-        final cachedAttendanceRaw = results[1];
+        var cachedAttendanceRaw = results[1];
         final cachedInstructorsRaw = results[2];
+        final cachedRecordsRaw = results[3];
+        final cachedTrackingReportRaw = results[4];
+
+        if (cachedAttendanceRaw == null && cachedTrackingReportRaw is Map) {
+          cachedAttendanceRaw = cachedTrackingReportRaw;
+        }
 
         if (cachedCoursesRaw != null && cachedAttendanceRaw != null) {
           _cachedCourses = (cachedCoursesRaw as List)
               .map((c) => CourseDetails.fromJson(c as Map<String, dynamic>))
               .toList();
           _cachedAttendance = AttendanceReportDetailed.fromJson(
-            cachedAttendanceRaw as Map<String, dynamic>,
+            Map<String, dynamic>.from(cachedAttendanceRaw as Map),
           );
           if (cachedInstructorsRaw != null) {
             _cachedInstructors = (cachedInstructorsRaw as List)
@@ -146,27 +158,64 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
             _cachedInstructors = [];
           }
         }
+        if (cachedRecordsRaw is List) {
+          cachedTrackingRecords = cachedRecordsRaw
+              .map(
+                (json) => TrackingRecord.fromJson(
+                  Map<String, dynamic>.from(json as Map),
+                ),
+              )
+              .toList();
+        }
       } on Object catch (e) {
         AppLogger.e('DashboardNotifier: Error loading disk cache', e);
       }
     }
 
-    // 2. Wait for tracking data
-    final tracking = await trackingFuture;
+    // Seamlessly update active dashboard state when tracking finishes background revalidation
+    ref.listen<AsyncValue<TrackingState>>(trackingProvider, (previous, next) {
+      final nextTracking = next.value;
+      if (nextTracking != null && state.hasValue) {
+        final currentAcademic = ref.read(academicProvider).value;
+        if (currentAcademic == _lastAcademic) {
+          // Accept tracking updates whether or not we have in-memory cached
+          // courses/attendance — on cold start these are populated after the
+          // first _fetchAndProcess completes and we must still merge records.
+          final courses = _cachedCourses;
+          final attendance = _cachedAttendance;
+          if (courses != null && attendance != null) {
+            if (nextTracking.officialReport != null) {
+              _cachedAttendance = nextTracking.officialReport;
+            }
+            final trackingList = nextTracking.groupedByCourse.values
+                .expand((e) => e)
+                .toList();
+            state = AsyncValue.data(
+              _processData(
+                courses,
+                _cachedAttendance!,
+                trackingList,
+                _lastAcademic!,
+                _cachedInstructors ?? [],
+              ),
+            );
+          }
+        }
+      }
+    });
 
-    // Proactively update official report cache if tracking has a fresher one (e.g. from a sync)
-    if (tracking.officialReport != null) {
-      _cachedAttendance = tracking.officialReport;
-    }
-
-    final trackingList = tracking.groupedByCourse.values
-        .expand((e) => e)
-        .toList();
-
-    // 3. Fast Path: If we have cached official data AND the term hasn't changed
+    // 2. Fast Path: If we have cached official data AND the term matches
     if (_cachedCourses != null &&
         _cachedAttendance != null &&
         _lastAcademic == academic) {
+      final activeTracking = ref.read(trackingProvider).value;
+      if (activeTracking?.officialReport != null) {
+        _cachedAttendance = activeTracking!.officialReport;
+      }
+      final trackingList = activeTracking != null
+          ? activeTracking.groupedByCourse.values.expand((e) => e).toList()
+          : (cachedTrackingRecords ?? <TrackingRecord>[]);
+
       if (_needsRevalidate) {
         _needsRevalidate = false;
         AppLogger.safeUnawait(
@@ -195,15 +244,39 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     }
 
     _needsRevalidate = false;
-    return _fetchAndProcess(trackingList, academic, tracking.officialReport);
+
+    // Cold-start slow path: no disk cache for dashboard.
+    // Fire trackingProvider in PARALLEL (non-blocking) — the EzygoBatchFetcher
+    // deduplicates the attendance request so only one network hit is made.
+    // The trackingProvider listener above merges records into the dashboard
+    // state once tracking resolves, ensuring both att + tracking appear together.
+    AppLogger.safeUnawait(
+      ref
+          .read(trackingProvider.future)
+          .then<void>((_) {})
+          .catchError((Object e, StackTrace st) {
+            AppLogger.e(
+              'DashboardNotifier: parallel tracking cold-start failed',
+              e,
+              st,
+            );
+          }),
+      'DashboardNotifier: parallel tracking cold-start',
+    );
+
+    // Fetch dashboard data independently (courses + attendance via EzyGo).
+    // The attendance request is deduplicated with trackingProvider's request.
+    return _fetchAndProcess(<TrackingRecord>[], academic, null);
   }
 
   Future<DashboardData> _fetchAndProcess(
     List<TrackingRecord> tracking,
     AcademicState academic,
-    AttendanceReportDetailed? trackedAttendance,
-  ) async {
+    AttendanceReportDetailed? trackedAttendance, {
+    bool forceFreshAttendance = false,
+  }) async {
     try {
+      if (_isDisposed) throw StateError('DashboardNotifier disposed');
       final api = ref.read(apiServiceProvider);
       final storage = ref.read(secureStorageProvider);
 
@@ -217,11 +290,13 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       var sharedInstructors = <CourseInstructor>[];
 
       Future<AttendanceReportDetailed?> resolveAttendance() async {
-        final existing =
-            attendanceToUse ??
-            _cachedAttendance ??
-            ref.read(trackingProvider).value?.officialReport;
-        if (existing != null) return existing;
+        if (!forceFreshAttendance) {
+          final existing =
+              attendanceToUse ??
+              _cachedAttendance ??
+              ref.read(trackingProvider).value?.officialReport;
+          if (existing != null) return existing;
+        }
         return _fetchAttendanceOnce(api: api, storage: storage);
       }
 
@@ -233,7 +308,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         }),
         if (classId != null) ...[
           // Fetch Class Courses
-          api.fetchClassCourses(classId).then((coursesRes) {
+          Future.sync(() => api.fetchClassCourses(classId)).then((coursesRes) {
             if (coursesRes.isNotEmpty) {
               sharedCourses = coursesRes.map((raw) {
                 final c = raw as Map<String, dynamic>;
@@ -246,9 +321,15 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
                 );
               }).toList();
             }
+          }).catchError((Object e, StackTrace st) {
+            AppLogger.e(
+              'DashboardNotifier: fetchClassCourses failed (graceful fallback)',
+              e,
+              st,
+            );
           }),
           // Fetch Instructor Mappings
-          api.fetchCourseInstructors(classId).then((instructorsRes) {
+          Future.sync(() => api.fetchCourseInstructors(classId)).then((instructorsRes) {
             if (instructorsRes.isNotEmpty) {
               sharedInstructors = instructorsRes
                   .map(
@@ -258,6 +339,12 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
                   )
                   .toList();
             }
+          }).catchError((Object e, StackTrace st) {
+            AppLogger.e(
+              'DashboardNotifier: fetchCourseInstructors failed (graceful fallback)',
+              e,
+              st,
+            );
           }),
         ],
       ]);
@@ -328,7 +415,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         sharedInstructors,
       );
     } on Object catch (e) {
-      AppLogger.e('DashboardNotifier: Server fetch failed', e);
+      if (!_isDisposed) {
+        AppLogger.e('DashboardNotifier: Server fetch failed', e);
+      }
       rethrow;
     }
   }
@@ -535,12 +624,15 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     AcademicState academic,
   ) async {
     try {
+      if (_isDisposed) return;
       final trackingState = ref.read(trackingProvider).value;
       final freshData = await _fetchAndProcess(
         tracking,
         academic,
         trackingState?.officialReport,
+        forceFreshAttendance: true,
       );
+      if (_isDisposed) return;
       final currentAcademic = ref.read(academicProvider).value;
       if (academic.semester == currentAcademic?.semester &&
           academic.year == currentAcademic?.year) {
@@ -552,6 +644,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         );
       }
     } on Object catch (e) {
+      if (_isDisposed) return;
       AppLogger.e(
         'DashboardNotifier: Silent background revalidation failed',
         e,

@@ -461,11 +461,13 @@ bool isValidCourseName(String text) {
   ).hasMatch(trimmed);
 }
 
+final _whitespaceRegex = RegExp(r'\s');
+
 String standardizeCourseCode(String input) {
   return input
       .trim()
       .toUpperCase()
-      .replaceAll(RegExp(r'\s'), '')
+      .replaceAll(_whitespaceRegex, '')
       .replaceAll('\u00A0', '')
       .replaceAll('-', '');
 }

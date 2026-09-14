@@ -49,6 +49,7 @@ class SecureStorageService {
   final FlutterSecureStorage _storage;
   final Directory? _cacheDirOverride;
   enc.Key? _cachedAesKey;
+  Directory? _resolvedCacheDir;
 
   @visibleForTesting
   FlutterSecureStorage get storage => _storage;
@@ -77,11 +78,14 @@ class SecureStorageService {
   }
 
   Future<Directory> _getCacheDirectory() async {
+    if (_resolvedCacheDir != null) return _resolvedCacheDir!;
+
     final override = _cacheDirOverride;
     if (override != null) {
       if (!override.existsSync()) {
         override.createSync(recursive: true);
       }
+      _resolvedCacheDir = override;
       return override;
     }
     Directory? baseDir;
@@ -94,6 +98,7 @@ class SecureStorageService {
     if (!cacheDir.existsSync()) {
       cacheDir.createSync(recursive: true);
     }
+    _resolvedCacheDir = cacheDir;
     return cacheDir;
   }
 
@@ -439,6 +444,7 @@ class SecureStorageService {
       }
     } on Object catch (_) {}
     _cachedAesKey = null;
+    _resolvedCacheDir = null;
     await _safeDeleteAll();
   }
 

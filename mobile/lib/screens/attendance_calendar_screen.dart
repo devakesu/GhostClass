@@ -130,6 +130,7 @@ class _AttendanceCalendarScreenState
               ]).timeout(AppConfig.defaultTimeout);
             } on Object catch (e, st) {
               AppLogger.e('AttendanceCalendarScreen: Retry failed', e, st);
+              rethrow;
             }
           },
         ),

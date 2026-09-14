@@ -425,7 +425,15 @@ class CronSyncResult {
   final int updates;
   final int errors;
 
-  bool get hasChanges => deletions > 0 || updates > 0;
+  /// True when the cron sync made any meaningful changes to Supabase data.
+  ///
+  /// - [deletions]: records removed (e.g. duplicate/invalid entries).
+  /// - [updates]: records updated (e.g. status, session or type field changed).
+  /// - [conflicts]: backend detected a discrepancy and corrected it (e.g.
+  ///   `extra` → `correction` type change, deduplication resolution).
+  ///   Conflicts do not always surface as "updates" in the count, so we must
+  ///   invalidate providers whenever conflicts are non-zero.
+  bool get hasChanges => deletions > 0 || updates > 0 || conflicts > 0;
 
   @override
   String toString() =>

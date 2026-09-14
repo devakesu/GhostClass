@@ -37,12 +37,26 @@ class ErrorDashboardNotifier extends DashboardNotifier {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUpAll(() {
+    registerFallbackValue(Duration.zero);
+  });
+
   late MockSecureStorageService mockStorage;
   late MockApiService mockApi;
 
   setUp(() {
     mockStorage = MockSecureStorageService();
     mockApi = MockApiService();
+
+    when(() => mockStorage.getCachedData(any<String>()))
+        .thenAnswer((_) async => null);
+    when(
+      () => mockStorage.saveCachedData(
+        any<String>(),
+        any<dynamic>(),
+        ttl: any<Duration>(named: 'ttl'),
+      ),
+    ).thenAnswer((_) async {});
   });
 
   group('instructorProvider Coverage', () {

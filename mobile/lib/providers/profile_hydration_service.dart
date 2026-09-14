@@ -27,6 +27,7 @@ final profileHydrationServiceProvider =
 class ProfileHydrationService extends Notifier<void> {
   Future<void>? _refreshProfileInFlight;
   Future<AuthenticatedUser>? _profileRefreshInFlight;
+  bool _profileRefreshInFlightIsForced = false;
   int _profileRefreshGeneration = 0;
   DateTime? _lastRefresh;
 
@@ -39,6 +40,7 @@ class ProfileHydrationService extends Notifier<void> {
     _profileRefreshGeneration++;
     _refreshProfileInFlight = null;
     _profileRefreshInFlight = null;
+    _profileRefreshInFlightIsForced = false;
     _lastRefresh = null;
   }
 
@@ -142,14 +144,18 @@ class ProfileHydrationService extends Notifier<void> {
     if (session == null) return null;
 
     final storage = ref.read(secureStorageProvider);
-    final ezygoToken = await storage.getNormalizedEzygoToken();
+    final results = await Future.wait<dynamic>([
+      storage.getNormalizedEzygoToken(),
+      storage.getAcademicState(),
+    ]);
+    final ezygoToken = results[0] as String?;
+    final localAcademic = results[1] as AcademicState?;
 
     final user = await buildStoredUserForIdentity(
       supabaseUserId: session.user.id,
       ezygoToken: ezygoToken ?? '',
     );
 
-    final localAcademic = await storage.getAcademicState();
     final hasAcademic =
         localAcademic != null &&
         localAcademic.semester.trim().isNotEmpty &&
@@ -184,12 +190,70 @@ class ProfileHydrationService extends Notifier<void> {
     if (result.hasChanges) {
       AppLogger.i(
         'ProfileHydrationService: Cron sync reported changes ($result). '
-        'Invalidating all screen providers.',
+        'Clearing caches and invalidating all screen providers.',
       );
+      ref.read(apiServiceProvider).clearCaches();
+
+      // Proactively evict disk caches for Supabase-backed tracking and dashboard
+      // data so that if the app is killed before the background SWR finishes
+      // writing fresh data, the next cold open doesn't serve stale cron-era data.
+      AppLogger.safeUnawait(
+        _evictTrackingAndDashboardDiskCache(),
+        'ProfileHydrationService: evict disk cache on cron sync changes',
+      );
+
       invalidateAllScreenProviders();
     } else {
       AppLogger.d(
         'ProfileHydrationService: Cron sync reported no changes ($result).',
+      );
+    }
+  }
+
+  Future<void> _evictTrackingAndDashboardDiskCache() async {
+    try {
+      final storage = ref.read(secureStorageProvider);
+      final user = ref.read(authProvider).value;
+      final academic = ref.read(academicProvider).value;
+      if (user == null || academic == null) return;
+
+      final suffix =
+          '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+
+      await Future.wait([
+        storage.deleteCachedData('tracking_records_$suffix').catchError(
+          (Object e, StackTrace st) {
+            AppLogger.e(
+              'ProfileHydrationService: Failed to delete tracking_records cache',
+              e, st,
+            );
+          },
+        ),
+        storage.deleteCachedData('tracking_report_$suffix').catchError(
+          (Object e, StackTrace st) {
+            AppLogger.e(
+              'ProfileHydrationService: Failed to delete tracking_report cache',
+              e, st,
+            );
+          },
+        ),
+        storage.deleteCachedData('dashboard_attendance_$suffix').catchError(
+          (Object e, StackTrace st) {
+            AppLogger.e(
+              'ProfileHydrationService: Failed to delete dashboard_attendance cache',
+              e, st,
+            );
+          },
+        ),
+      ]);
+
+      AppLogger.d(
+        'ProfileHydrationService: Disk cache evicted for $suffix after cron sync.',
+      );
+    } on Object catch (e, st) {
+      AppLogger.e(
+        'ProfileHydrationService: Unexpected error during disk cache eviction',
+        e, st,
       );
     }
   }
@@ -427,7 +491,36 @@ class ProfileHydrationService extends Notifier<void> {
     bool force = false,
   }) {
     final inFlight = _profileRefreshInFlight;
-    if (inFlight != null) return inFlight;
+    // Only coalesce if the in-flight request has equal-or-greater priority.
+    // A force=true caller should NOT be coalesced into a non-forced in-flight
+    // because the non-forced request may skip the full EzyGo sync.
+    if (inFlight != null && (!force || _profileRefreshInFlightIsForced)) {
+      return inFlight;
+    }
+
+    // If a non-forced request is in-flight and we need a forced one, wait for
+    // the current one to complete then fire the forced refresh.
+    if (inFlight != null && force && !_profileRefreshInFlightIsForced) {
+      AppLogger.i(
+        'ProfileHydrationService: Forced refresh requested while non-forced is '
+        'in-flight. Will chain a forced refresh after current completes.',
+      );
+      final future = inFlight.then((_) => _fetchAndApplyServerProfile(
+            user,
+            supabaseToken: supabaseToken,
+            updateState: updateState,
+            sync: true,
+            force: true,
+          ));
+      _profileRefreshInFlight = future;
+      _profileRefreshInFlightIsForced = true;
+      return future.whenComplete(() {
+        if (identical(_profileRefreshInFlight, future)) {
+          _profileRefreshInFlight = null;
+          _profileRefreshInFlightIsForced = false;
+        }
+      });
+    }
 
     final future = _fetchAndApplyServerProfile(
       user,
@@ -437,10 +530,12 @@ class ProfileHydrationService extends Notifier<void> {
       force: force,
     );
     _profileRefreshInFlight = future;
+    _profileRefreshInFlightIsForced = force;
 
     return future.whenComplete(() {
       if (identical(_profileRefreshInFlight, future)) {
         _profileRefreshInFlight = null;
+        _profileRefreshInFlightIsForced = false;
       }
     });
   }

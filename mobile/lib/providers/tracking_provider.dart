@@ -51,8 +51,13 @@ final trackingProvider = AsyncNotifierProvider<TrackingNotifier, TrackingState>(
 );
 
 class TrackingNotifier extends AsyncNotifier<TrackingState> {
+  bool _isDisposed = false;
+
   @override
   FutureOr<TrackingState> build() async {
+    _isDisposed = false;
+    ref.onDispose(() => _isDisposed = true);
+
     // 1. Reactive Dependency: Clear data immediately on logout OR Semester Change
     final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
@@ -82,12 +87,12 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
 
     // 1. Try disk cache first for instant boot (<15ms)
     try {
-      final cachedReportRaw = await storage.getCachedData(
-        'tracking_report_$cacheKeySuffix',
-      );
-      final cachedRecordsRaw = await storage.getCachedData(
-        'tracking_records_$cacheKeySuffix',
-      );
+      final cacheResults = await Future.wait([
+        storage.getCachedData('tracking_report_$cacheKeySuffix'),
+        storage.getCachedData('tracking_records_$cacheKeySuffix'),
+      ]);
+      final cachedReportRaw = cacheResults[0];
+      final cachedRecordsRaw = cacheResults[1];
 
       if (cachedReportRaw is Map && cachedRecordsRaw is List) {
         final officialReport = AttendanceReportDetailed.fromJson(
@@ -120,14 +125,18 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         AppLogger.safeUnawait(
           _fetchAndProcess(academic: academic)
               .then((fresh) {
-                state = AsyncValue.data(fresh);
+                if (!_isDisposed) {
+                  state = AsyncValue.data(fresh);
+                }
               })
               .catchError((Object e, StackTrace st) {
-                AppLogger.e(
-                  'TrackingNotifier: Background revalidation failed',
-                  e,
-                  st,
-                );
+                if (!_isDisposed) {
+                  AppLogger.e(
+                    'TrackingNotifier: Background revalidation failed',
+                    e,
+                    st,
+                  );
+                }
               }),
           'TrackingNotifier: background revalidate',
         );
