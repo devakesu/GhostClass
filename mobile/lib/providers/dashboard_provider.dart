@@ -124,16 +124,28 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // Load Disk Cache (Secure Storage) if in-memory cache is empty
     final storage = ref.read(secureStorageProvider);
     final cacheKeySuffix =
-        '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+        '${user.supabaseUserId}_${academic.cacheKeySuffix}';
     List<TrackingRecord>? cachedTrackingRecords;
     if (_cachedCourses == null || _cachedAttendance == null) {
       try {
+        Future<dynamic> readWithFallback(String prefix) async {
+          final canonicalData =
+              await storage.getCachedData('${prefix}_$cacheKeySuffix');
+          if (canonicalData != null) return canonicalData;
+          final legacyKey =
+              '${prefix}_${user.supabaseUserId}_${academic.semester}_${academic.year}';
+          if (legacyKey != '${prefix}_$cacheKeySuffix') {
+            return storage.getCachedData(legacyKey);
+          }
+          return null;
+        }
+
         final results = await Future.wait([
-          storage.getCachedData('dashboard_courses_$cacheKeySuffix'),
-          storage.getCachedData('dashboard_attendance_$cacheKeySuffix'),
-          storage.getCachedData('dashboard_instructors_$cacheKeySuffix'),
-          storage.getCachedData('tracking_records_$cacheKeySuffix'),
-          storage.getCachedData('tracking_report_$cacheKeySuffix'),
+          readWithFallback('dashboard_courses'),
+          readWithFallback('dashboard_attendance'),
+          readWithFallback('dashboard_instructors'),
+          readWithFallback('tracking_records'),
+          readWithFallback('tracking_report'),
         ]);
         final cachedCoursesRaw = results[0];
         var cachedAttendanceRaw = results[1];
@@ -210,6 +222,19 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
           _cachedInstructors ?? [],
         ),
       );
+
+      final user = ref.read(authProvider).value;
+      if (user != null) {
+        final trackingKeySuffix =
+            '${user.supabaseUserId}_${currentAcademic?.cacheKeySuffix ?? _lastAcademic!.cacheKeySuffix}';
+        AppLogger.safeUnawait(
+          storage.saveCachedData(
+            'tracking_records_$trackingKeySuffix',
+            trackingList.map((r) => r.toJson()).toList(),
+          ),
+          'DashboardNotifier: persist tracking records from listener',
+        );
+      }
     });
 
     // 2. Fast Path: If we have cached official data AND the term matches
@@ -217,8 +242,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         _cachedAttendance != null &&
         _lastAcademic == academic) {
       final trackingAsync = ref.read(trackingProvider);
-      final activeTracking =
-          !trackingAsync.isLoading ? trackingAsync.value : null;
+      final activeTracking = !trackingAsync.isLoading
+          ? trackingAsync.value
+          : null;
       if (activeTracking?.officialReport != null) {
         _cachedAttendance = activeTracking!.officialReport;
       }
@@ -428,7 +454,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final user = ref.read(authProvider).value;
       if (user != null) {
         final cacheKeySuffix =
-            '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+            '${user.supabaseUserId}_${academic.cacheKeySuffix}';
         AppLogger.safeUnawait(
           storage.saveCachedData(
             'dashboard_courses_$cacheKeySuffix',
@@ -696,7 +722,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final trackingToUse = tracking.isNotEmpty
           ? tracking
           : (trackingState?.groupedByCourse.values.expand((e) => e).toList() ??
-              <TrackingRecord>[]);
+                <TrackingRecord>[]);
       final freshData = await _fetchAndProcess(
         trackingToUse,
         academic,
@@ -705,8 +731,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       );
       if (_isDisposed) return;
       final currentAcademic = ref.read(academicProvider).value;
-      if (academic.semester == currentAcademic?.semester &&
-          academic.year == currentAcademic?.year) {
+      if (academic == currentAcademic) {
         state = AsyncValue.data(freshData);
       } else {
         AppLogger.i(

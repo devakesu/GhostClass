@@ -65,7 +65,7 @@ void main() {
         'success': false,
         'processed': 7,
         'deletions': 0,
-        'conflicts': 12,
+        'conflicts': 0,
         'updates': 0,
         'errors': 3,
       };
@@ -75,13 +75,13 @@ void main() {
       expect(result.success, false);
       expect(result.processed, 7);
       expect(result.deletions, 0);
-      expect(result.conflicts, 12);
+      expect(result.conflicts, 0);
       expect(result.updates, 0);
       expect(result.errors, 3);
       expect(result.hasChanges, false);
     });
 
-    test('hasChanges returns true only when deletions > 0 or updates > 0', () {
+    test('hasChanges returns true when deletions > 0, updates > 0, or conflicts > 0', () {
       const onlyUpdates = CronSyncResult(
         success: true,
         processed: 5,
@@ -102,7 +102,7 @@ void main() {
       );
       expect(onlyDeletions.hasChanges, true);
 
-      const noChangesWithConflicts = CronSyncResult(
+      const onlyConflicts = CronSyncResult(
         success: false,
         processed: 5,
         deletions: 0,
@@ -110,7 +110,7 @@ void main() {
         updates: 0,
         errors: 1,
       );
-      expect(noChangesWithConflicts.hasChanges, false);
+      expect(onlyConflicts.hasChanges, true);
 
       const zeroChanges = CronSyncResult(
         success: true,
@@ -243,7 +243,7 @@ void main() {
           success: false,
           processed: 7,
           deletions: 0,
-          conflicts: 12,
+          conflicts: 0,
           updates: 0,
           errors: 3,
         );

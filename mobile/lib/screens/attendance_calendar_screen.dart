@@ -90,9 +90,11 @@ class _AttendanceCalendarScreenState
       }
     }
 
-    if (dashboardState.isLoading ||
-        trackingState.isLoading ||
-        academicAsync.isLoading) {
+    final hasData = dash != null && track != null && academic != null;
+    if (!hasData &&
+        (dashboardState.isLoading ||
+            trackingState.isLoading ||
+            academicAsync.isLoading)) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(

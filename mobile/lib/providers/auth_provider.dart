@@ -729,9 +729,13 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
   Future<void> deleteAccount() =>
       ref.read(profileHydrationServiceProvider.notifier).deleteAccount();
 
-  Future<void> updateAcademicContext(String? sem, String? year) => ref
+  Future<void> updateAcademicContext(
+    String? sem,
+    String? year, {
+    bool optimistic = false,
+  }) => ref
       .read(academicContextServiceProvider.notifier)
-      .updateAcademicContext(sem, year);
+      .updateAcademicContext(sem, year, optimistic: optimistic);
 
   Future<void> updateDefaultInstitution(int institutionId) => ref
       .read(academicContextServiceProvider.notifier)

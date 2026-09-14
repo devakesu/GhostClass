@@ -16,8 +16,21 @@ import 'package:ghostclass/services/secure_storage.dart';
 @immutable
 class AcademicState {
   const AcademicState({required this.semester, required this.year});
+
+  factory AcademicState.canonical(String semester, String year) {
+    return AcademicState(
+      semester: canonicalSemester(semester),
+      year: canonicalAcademicYear(year),
+    );
+  }
+
   final String semester;
   final String year;
+
+  String get canonicalSemesterValue => canonicalSemester(semester);
+  String get canonicalYearValue => canonicalAcademicYear(year);
+
+  String get cacheKeySuffix => '${canonicalSemesterValue}_$canonicalYearValue';
 
   AcademicState copyWith({String? semester, String? year}) {
     return AcademicState(
@@ -31,11 +44,12 @@ class AcademicState {
       identical(this, other) ||
       other is AcademicState &&
           runtimeType == other.runtimeType &&
-          semester == other.semester &&
-          year == other.year;
+          !semestersDiffer(semester, other.semester) &&
+          !yearsDiffer(year, other.year);
 
   @override
-  int get hashCode => semester.hashCode ^ year.hashCode;
+  int get hashCode =>
+      canonicalSemesterValue.hashCode ^ canonicalYearValue.hashCode;
 
   DateTime get startDate {
     final parsed = _parseAcademicYear(year);
@@ -214,18 +228,7 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
     final current = state.value;
     final nextYear =
         current?.year ?? calculateCurrentAcademicInfo()['current_year']!;
-
-    // 1. Show loading immediately in the state
-    state = const AsyncValue.loading();
-
-    try {
-      // 2. Perform the heavy lifting on the server
-      await ref
-          .read(authProvider.notifier)
-          .updateAcademicContext(semester, nextYear);
-    } finally {
-      ref.invalidateSelf();
-    }
+    await setAcademicPeriod(semester, nextYear);
   }
 
   Future<void> setYear(String year) async {
@@ -233,29 +236,46 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
     final nextSemester =
         current?.semester ??
         calculateCurrentAcademicInfo()['current_semester']!;
-
-    // 1. Show loading immediately
-    state = const AsyncValue.loading();
-
-    try {
-      // 2. Update server
-      await ref
-          .read(authProvider.notifier)
-          .updateAcademicContext(nextSemester, year);
-    } finally {
-      ref.invalidateSelf();
-    }
+    await setAcademicPeriod(nextSemester, year);
   }
 
   Future<void> setAcademicPeriod(String semester, String year) async {
-    state = const AsyncValue.loading();
+    final nextAcademic = AcademicState.canonical(semester, year);
+    final storage = ref.read(secureStorageProvider);
 
+    // 1. Immediately update state so UI renders cached data in <15ms
+    state = AsyncValue.data(nextAcademic);
+
+    // 2. Persist chosen academic state immediately
+    AppLogger.safeUnawait(
+      storage.saveAcademicState(nextAcademic).catchError((
+        Object e,
+        StackTrace st,
+      ) {
+        AppLogger.e(
+          'AcademicNotifier: saveAcademicState on period switch failed',
+          e,
+          st,
+        );
+      }),
+      'AcademicNotifier: saveAcademicState on period switch',
+    );
+
+    // 3. Update EzyGo settings in background without blocking UI
     try {
       await ref
           .read(authProvider.notifier)
-          .updateAcademicContext(semester, year);
-    } finally {
-      ref.invalidateSelf();
+          .updateAcademicContext(
+            nextAcademic.semester,
+            nextAcademic.year,
+            optimistic: true,
+          );
+    } on Object catch (e, st) {
+      AppLogger.e(
+        'AcademicNotifier: Background updateAcademicContext failed',
+        e,
+        st,
+      );
     }
   }
 

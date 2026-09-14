@@ -175,7 +175,7 @@ void main() {
       () async {
         final mockUser = createMockUser().copyWith(isSyncing: false);
         const academic = AcademicState(semester: 'Odd', year: '2025');
-        final suffix = '${mockUser.supabaseUserId}_Odd_2025';
+        final suffix = '${mockUser.supabaseUserId}_${academic.cacheKeySuffix}';
 
         // 1. Initial cached data (10 present out of 12)
         final cachedCourses = [
@@ -374,8 +374,8 @@ void main() {
         // 1. API in-memory caches must be cleared
         verify(() => mockApi.clearCaches()).called(1);
 
-        // 2. Storage disk cache must be cleared
-        verify(() => mockStorage.clearAllCachedData()).called(1);
+        // 2. Storage disk cache must be preserved across terms (not cleared)
+        verifyNever(() => mockStorage.clearAllCachedData());
 
         // 3. New academic state must be persisted
         verify(

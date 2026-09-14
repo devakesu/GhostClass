@@ -68,7 +68,10 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final isStalePeriod =
         data != null &&
         academicAsync.value != null &&
-        (semestersDiffer(data.selectedSemester, academicAsync.value!.semester) ||
+        (semestersDiffer(
+              data.selectedSemester,
+              academicAsync.value!.semester,
+            ) ||
             yearsDiffer(data.selectedYear, academicAsync.value!.year));
 
     final hasData = data != null;

@@ -190,19 +190,16 @@ class ProfileHydrationService extends Notifier<void> {
     if (result.hasChanges) {
       AppLogger.i(
         'ProfileHydrationService: Cron sync reported changes ($result). '
-        'Clearing caches and invalidating all screen providers.',
+        'Updating required fields across dashboard, calendar, tracking, and notifications.',
       );
       ref.read(apiServiceProvider).clearCaches();
 
-      // Proactively evict disk caches for Supabase-backed tracking and dashboard
-      // data so that if the app is killed before the background SWR finishes
-      // writing fresh data, the next cold open doesn't serve stale cron-era data.
-      AppLogger.safeUnawait(
-        _evictTrackingAndDashboardDiskCache(),
-        'ProfileHydrationService: evict disk cache on cron sync changes',
-      );
+      // 1. Reload notifications page
+      ref.invalidate(notificationsProvider);
 
-      invalidateAllScreenProviders();
+      // 2. Invalidate screen providers so fresh live data smoothly updates required fields
+      // and atomically overwrites disk cache without partial eviction race conditions.
+      invalidateAllScreenProviders(includeNotifications: false);
     } else {
       AppLogger.d(
         'ProfileHydrationService: Cron sync reported no changes ($result).',
@@ -210,57 +207,6 @@ class ProfileHydrationService extends Notifier<void> {
     }
   }
 
-  Future<void> _evictTrackingAndDashboardDiskCache() async {
-    try {
-      final storage = ref.read(secureStorageProvider);
-      final user = ref.read(authProvider).value;
-      final academic = ref.read(academicProvider).value;
-      if (user == null || academic == null) return;
-
-      final suffix =
-          '${user.supabaseUserId}_${academic.semester}_${academic.year}';
-
-      await Future.wait([
-        storage.deleteCachedData('tracking_records_$suffix').catchError(
-          (Object e, StackTrace st) {
-            AppLogger.e(
-              'ProfileHydrationService: Failed to delete tracking_records cache',
-              e,
-              st,
-            );
-          },
-        ),
-        storage.deleteCachedData('tracking_report_$suffix').catchError(
-          (Object e, StackTrace st) {
-            AppLogger.e(
-              'ProfileHydrationService: Failed to delete tracking_report cache',
-              e,
-              st,
-            );
-          },
-        ),
-        storage.deleteCachedData('dashboard_attendance_$suffix').catchError(
-          (Object e, StackTrace st) {
-            AppLogger.e(
-              'ProfileHydrationService: Failed to delete dashboard_attendance cache',
-              e,
-              st,
-            );
-          },
-        ),
-      ]);
-
-      AppLogger.d(
-        'ProfileHydrationService: Disk cache evicted for $suffix after cron sync.',
-      );
-    } on Object catch (e, st) {
-      AppLogger.e(
-        'ProfileHydrationService: Unexpected error during disk cache eviction',
-        e,
-        st,
-      );
-    }
-  }
 
   Future<void> runBackgroundStartupHydration(
     AuthenticatedUser cachedUser, {

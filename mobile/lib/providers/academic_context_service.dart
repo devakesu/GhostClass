@@ -23,7 +23,11 @@ class AcademicContextService extends Notifier<void> {
     // No-op state
   }
 
-  Future<void> updateAcademicContext(String? sem, String? year) async {
+  Future<void> updateAcademicContext(
+    String? sem,
+    String? year, {
+    bool optimistic = false,
+  }) async {
     final authNotifier = ref.read(authProvider.notifier);
     final user = ref.read(authProvider).value;
     if (user == null) return;
@@ -31,8 +35,10 @@ class AcademicContextService extends Notifier<void> {
     final api = ref.read(apiServiceProvider);
     final storage = ref.read(secureStorageProvider);
 
-    // 1. Immediately display syncing loader in UI
-    authNotifier.updateState(user.copyWith(isSyncing: true));
+    if (!optimistic) {
+      // 1. Immediately display syncing loader in UI for non-optimistic flows
+      authNotifier.updateState(user.copyWith(isSyncing: true));
+    }
 
     try {
       final currentAcademic = await storage.getAcademicState();
@@ -44,32 +50,33 @@ class AcademicContextService extends Notifier<void> {
           year ??
           currentAcademic?.year ??
           calculateCurrentAcademicInfo()['current_year']!;
-      final nextAcademic = AcademicState(semester: nextSem, year: nextYear);
+      final nextAcademic = AcademicState.canonical(nextSem, nextYear);
 
-      if (year != null) {
-        final yearResponse = await api.updateAcademicYear(nextYear, storage);
-        if (yearResponse.statusCode != 200 && yearResponse.statusCode != 201) {
-          final resData = yearResponse.data as Map<String, dynamic>?;
-          throw Exception(formatApiError(resData, 'Auth.AcademicUpdate'));
-        }
-      }
-
-      if (sem != null) {
-        final semesterResponse = await api.updateSemester(nextSem, storage);
-        if (semesterResponse.statusCode != 200 &&
-            semesterResponse.statusCode != 201) {
-          final resData = semesterResponse.data as Map<String, dynamic>?;
-          throw Exception(formatApiError(resData, 'Auth.AcademicUpdate'));
-        }
-      }
+      // Parallelize EzyGo server setting updates
+      await Future.wait<dynamic>([
+        if (year != null)
+          api.updateAcademicYear(nextAcademic.year, storage).then((res) {
+            if (res.statusCode != 200 && res.statusCode != 201) {
+              final resData = res.data as Map<String, dynamic>?;
+              throw Exception(formatApiError(resData, 'Auth.AcademicUpdate'));
+            }
+          }),
+        if (sem != null)
+          api.updateSemester(nextAcademic.semester, storage).then((res) {
+            if (res.statusCode != 200 && res.statusCode != 201) {
+              final resData = res.data as Map<String, dynamic>?;
+              throw Exception(formatApiError(resData, 'Auth.AcademicUpdate'));
+            }
+          }),
+      ]);
 
       final updatedSettings = user.settings.copyWith(
-        semester: nextSem,
-        academicYear: nextYear,
+        semester: nextAcademic.semester,
+        academicYear: nextAcademic.year,
       );
       final updatedProfile = user.profile?.copyWith(
-        currentSemester: nextSem,
-        currentYear: nextYear,
+        currentSemester: nextAcademic.semester,
+        currentYear: nextAcademic.year,
       );
 
       await Future.wait([
@@ -82,73 +89,75 @@ class AcademicContextService extends Notifier<void> {
         user.copyWith(
           settings: updatedSettings,
           profile: updatedProfile,
-          isSyncing: true,
+          isSyncing: false,
         ),
       );
       ref.read(academicProvider.notifier).updateState(nextAcademic);
 
       api.clearCaches();
 
-      final token = await authNotifier.getFreshSupabaseToken();
-      if (token == null) {
-        await authNotifier.logout();
-        return;
-      }
-
-      try {
-        final response = await api.refreshProfile(
-          token,
-          sync: true,
-          force: true,
-        );
-        if (response.statusCode == 401) {
-          final data = response.data as Map<String, dynamic>?;
-          throw AppException(
-            message: formatApiError(data, 'Security Verification'),
-            type: AppExceptionType.unauthorized,
-            statusCode: 401,
-            details: data,
-          );
+      if (!optimistic) {
+        final token = await authNotifier.getFreshSupabaseToken();
+        if (token == null) {
+          await authNotifier.logout();
+          return;
         }
 
-        if (response.statusCode != 200 || response.data == null) {
-          if (response.statusCode != null && response.statusCode! >= 500) {
+        try {
+          final response = await api.refreshProfile(
+            token,
+            sync: true,
+            force: true,
+          );
+          if (response.statusCode == 401) {
+            final data = response.data as Map<String, dynamic>?;
+            throw AppException(
+              message: formatApiError(data, 'Security Verification'),
+              type: AppExceptionType.unauthorized,
+              statusCode: 401,
+              details: data,
+            );
+          }
+
+          if (response.statusCode != 200 || response.data == null) {
+            if (response.statusCode != null && response.statusCode! >= 500) {
+              throw const AppException(
+                message: 'Ezygo issues (5xx)',
+                type: AppExceptionType.server,
+              );
+            }
             throw const AppException(
-              message: 'Ezygo issues (5xx)',
+              message: 'Profile sync failed',
               type: AppExceptionType.server,
             );
           }
-          throw const AppException(
-            message: 'Profile sync failed',
-            type: AppExceptionType.server,
+
+          final currentUser = ref.read(authProvider).value ?? user;
+          await ref
+              .read(profileHydrationServiceProvider.notifier)
+              .applyProfileResponseData(
+                currentUser: currentUser.copyWith(isSyncing: false),
+                data: response.data as Map<String, dynamic>,
+              );
+        } on Object catch (profileErr) {
+          AppLogger.e(
+            'AcademicContextService: Profile refresh during academic update failed',
+            profileErr,
           );
+          if (profileErr is AppException && profileErr.isAuthError) {
+            rethrow;
+          }
         }
 
-        final currentUser = ref.read(authProvider).value ?? user;
-        await ref
+        // Re-assert persistence of chosen academic context
+        await storage.saveAcademicState(nextAcademic);
+        ref.read(academicProvider.notifier).updateState(nextAcademic);
+
+        ref
             .read(profileHydrationServiceProvider.notifier)
-            .applyProfileResponseData(
-              currentUser: currentUser.copyWith(isSyncing: true),
-              data: response.data as Map<String, dynamic>,
-            );
-      } on Object catch (profileErr) {
-        AppLogger.e(
-          'AcademicContextService: Profile refresh during academic update failed',
-          profileErr,
-        );
-        if (profileErr is AppException && profileErr.isAuthError) {
-          rethrow;
-        }
+            .invalidateAllScreenProviders();
+        ref.invalidate(academicProvider);
       }
-
-      // Re-assert persistence of chosen academic context
-      await storage.saveAcademicState(nextAcademic);
-      ref.read(academicProvider.notifier).updateState(nextAcademic);
-
-      ref
-          .read(profileHydrationServiceProvider.notifier)
-          .invalidateAllScreenProviders();
-      ref.invalidate(academicProvider);
 
       AppLogger.i(
         'AuthNotifier: Academic context updated successfully ($sem, $year)',

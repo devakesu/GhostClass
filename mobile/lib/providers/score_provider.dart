@@ -124,13 +124,22 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     required AcademicState? academic,
   }) async {
     final storage = ref.read(secureStorageProvider);
-    final semSuffix =
-        academic != null ? '_${academic.semester}_${academic.year}' : '';
+    final semSuffix = academic != null
+        ? '_${academic.cacheKeySuffix}'
+        : '';
     final examsCacheKey = 'scores_exams_${user.supabaseUserId}$semSuffix';
 
     try {
       var cachedExamsRaw = await storage.getCachedData(examsCacheKey);
-      if (cachedExamsRaw is! List && semSuffix.isNotEmpty) {
+      if (cachedExamsRaw is! List && academic != null) {
+        // Fallback to legacy raw semester/year key
+        final legacyKey =
+            'scores_exams_${user.supabaseUserId}_${academic.semester}_${academic.year}';
+        if (legacyKey != examsCacheKey) {
+          cachedExamsRaw = await storage.getCachedData(legacyKey);
+        }
+      }
+      if (cachedExamsRaw is! List) {
         cachedExamsRaw = await storage.getCachedData(
           'scores_exams_${user.supabaseUserId}',
         );
@@ -250,8 +259,9 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       final examsJson = examsRes.data as List<dynamic>;
 
       // Cache raw exams list for future offline/instant hydration per-academic and general
-      final semSuffix =
-          academic != null ? '_${academic.semester}_${academic.year}' : '';
+      final semSuffix = academic != null
+          ? '_${academic.cacheKeySuffix}'
+          : '';
       AppLogger.safeUnawait(
         Future.wait([
           storage.saveCachedData(

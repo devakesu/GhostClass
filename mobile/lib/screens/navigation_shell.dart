@@ -233,13 +233,19 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
         // Keep calendar dependencies warm in the background whenever the
         // academic context changes, even if the calendar screen is not open.
         AppLogger.safeUnawait(
-          _prewarmCalendarData().then((_) {
-            _checkAndPrewarmDeferredPages();
-          }).catchError(
-            (Object e, StackTrace st) {
-              AppLogger.e('NavigationShell: Prewarm calendar failed', e, st);
-            },
-          ),
+          _prewarmCalendarData()
+              .then((_) {
+                _checkAndPrewarmDeferredPages();
+              })
+              .catchError(
+                (Object e, StackTrace st) {
+                  AppLogger.e(
+                    'NavigationShell: Prewarm calendar failed',
+                    e,
+                    st,
+                  );
+                },
+              ),
           'NavigationShell: prewarm calendar',
         );
       }),

@@ -83,15 +83,28 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     final storage = ref.read(secureStorageProvider);
     final user = authState.value!;
     final cacheKeySuffix =
-        '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+        '${user.supabaseUserId}_${academic.cacheKeySuffix}';
 
     // 1. Try disk cache first for instant boot (<15ms)
     try {
+      Future<dynamic> readWithFallback(String prefix) async {
+        final canonicalData =
+            await storage.getCachedData('${prefix}_$cacheKeySuffix');
+        if (canonicalData != null) return canonicalData;
+        final legacyKey =
+            '${prefix}_${user.supabaseUserId}_${academic.semester}_${academic.year}';
+        if (legacyKey != '${prefix}_$cacheKeySuffix') {
+          return storage.getCachedData(legacyKey);
+        }
+        return null;
+      }
+
       final cacheResults = await Future.wait([
-        storage.getCachedData('tracking_report_$cacheKeySuffix'),
-        storage.getCachedData('tracking_records_$cacheKeySuffix'),
+        readWithFallback('tracking_report'),
+        readWithFallback('tracking_records'),
+        readWithFallback('dashboard_attendance'),
       ]);
-      final cachedReportRaw = cacheResults[0];
+      final cachedReportRaw = cacheResults[0] ?? cacheResults[2];
       final cachedRecordsRaw = cacheResults[1];
 
       if (cachedReportRaw is Map && cachedRecordsRaw is List) {
@@ -230,7 +243,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     }
 
     final cacheKeySuffix =
-        '${auth.supabaseUserId}_${academic.semester}_${academic.year}';
+        '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
     AppLogger.safeUnawait(
       storage.saveCachedData(
         'tracking_report_$cacheKeySuffix',
@@ -380,6 +393,17 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
             totalCount: current.totalCount + 1,
           ),
         );
+
+        final allRecords = newGrouped.values.expand((e) => e).toList();
+        final cacheKeySuffix = '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
+        AppLogger.safeUnawait(
+          ref.read(secureStorageProvider).saveCachedData(
+            'tracking_records_$cacheKeySuffix',
+            allRecords.map((r) => r.toJson()).toList(),
+          ),
+          'TrackingNotifier: persist cache on insert',
+        );
+
         // Analytics: attendance added
         try {
           await AnalyticsService.instance.logAttendanceMarked(
@@ -435,6 +459,22 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
               totalCount: current.totalCount - 1,
             ),
           );
+
+          final auth = ref.read(authProvider).value;
+          final academic = ref.read(academicProvider).value;
+          if (auth != null && academic != null) {
+            final allRecords = newGrouped.values.expand((e) => e).toList();
+            final cacheKeySuffix =
+                '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
+            AppLogger.safeUnawait(
+              ref.read(secureStorageProvider).saveCachedData(
+                'tracking_records_$cacheKeySuffix',
+                allRecords.map((r) => r.toJson()).toList(),
+              ),
+              'TrackingNotifier: persist cache on delete',
+            );
+          }
+
           // Analytics: attendance deleted
           try {
             await AnalyticsService.instance.logAttendanceDeleted(
@@ -491,6 +531,17 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       }
 
       await query;
+      if (courseId == null) {
+        final cacheKeySuffix =
+            '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
+        AppLogger.safeUnawait(
+          ref.read(secureStorageProvider).saveCachedData(
+            'tracking_records_$cacheKeySuffix',
+            <dynamic>[],
+          ),
+          'TrackingNotifier: clear cache on clearRecords',
+        );
+      }
       await refresh();
     } on Object catch (e) {
       AppLogger.e('TrackingNotifier: Failed to clear records', e);

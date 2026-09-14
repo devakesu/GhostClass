@@ -264,6 +264,23 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
+    // 0. Fire startup queries early in background at splash beginning so cache is warm
+    final currentSession = ref.read(supabaseClientProvider).auth.currentSession;
+    if (currentSession != null) {
+      AppLogger.safeUnawait(
+        Future.wait<dynamic>([
+          ref.read(authProvider.future),
+          ref.read(academicProvider.future),
+          ref.read(dashboardProvider.future),
+          ref.read(trackingProvider.future),
+        ]).catchError((Object e, StackTrace st) {
+          AppLogger.d('SplashScreen: early query prewarm non-fatal error: $e');
+          return <dynamic>[];
+        }),
+        'SplashScreen: early startup queries trigger',
+      );
+    }
+
     // Keep the splash visible for 750ms to allow entrance animation to play cleanly
     final splashHold = Future<void>.delayed(
       const Duration(milliseconds: 750),

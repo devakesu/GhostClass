@@ -46,12 +46,17 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
 
     final storage = ref.read(secureStorageProvider);
     final cacheKey =
+        'leaves_raw_${user.supabaseUserId}_${academic.cacheKeySuffix}';
+    final legacyCacheKey =
         'leaves_raw_${user.supabaseUserId}_${academic.semester}_${academic.year}';
     final fallbackCacheKey = 'leaves_raw_${user.supabaseUserId}';
 
     // 1. Try disk cache first for instant boot (<15ms)
     try {
       var cachedRaw = await storage.getCachedData(cacheKey);
+      if (cachedRaw == null && legacyCacheKey != cacheKey) {
+        cachedRaw = await storage.getCachedData(legacyCacheKey);
+      }
       cachedRaw ??= await storage.getCachedData(fallbackCacheKey);
 
       if (cachedRaw is Map) {
