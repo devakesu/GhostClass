@@ -19,7 +19,7 @@ export function GET(req: Request) {
     new Date().toISOString();
   const auditStatus = process.env.AUDIT_STATUS ?? "UNKNOWN";
   const signatureStatus = process.env.SIGNATURE_STATUS ?? "UNSIGNED";
-  const imageDigest = process.env.IMAGE_DIGEST ?? commitSha;
+  const imageDigest = process.env.IMAGE_DIGEST ?? (process.env.APP_COMMIT_SHA ? undefined : "dev");
 
   const response: Record<string, unknown> = {
     commit: commitSha,

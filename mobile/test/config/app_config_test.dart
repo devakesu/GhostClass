@@ -43,6 +43,7 @@ void main() {
     test('Metadata properties map standard strings safely', () {
       expect(AppConfig.appVersion, isNotEmpty);
       expect(AppConfig.appCommitSha, isNotEmpty);
+      expect(AppConfig.imageDigest, isA<String>());
       expect(AppConfig.buildTimestamp, isNotEmpty);
       expect(AppConfig.githubRunId, isNotEmpty);
       expect(AppConfig.githubRunNumber, isNotEmpty);

@@ -53,7 +53,7 @@ function getBuildMeta(): BuildMeta {
     new Date().toISOString();
   const auditStatus = process.env.AUDIT_STATUS ?? "UNKNOWN";
   const signatureStatus = process.env.SIGNATURE_STATUS ?? "UNSIGNED";
-  const imageDigest = process.env.IMAGE_DIGEST ?? commitSha;
+  const imageDigest = process.env.IMAGE_DIGEST || undefined;
 
   return {
     commit_sha: commitSha,
@@ -122,6 +122,36 @@ const BuildLink = ({
           : commitShort}
         )
       </span>
+    </div>
+  );
+};
+
+const CommitRow = ({
+  meta,
+  validRepo,
+}: {
+  meta: BuildMeta;
+  validRepo: boolean;
+}) => {
+  const isShaValid = isValidCommitSha(meta.commit_sha);
+  return (
+    <div>
+      <span className="text-cyan-400">{">"} COMMIT_SHA:</span>{" "}
+      {isShaValid && validRepo ? (
+        <a
+          href={`https://github.com/${meta.github_repo}/commit/${meta.commit_sha}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="text-neutral-300 hover:text-cyan-400 hover:underline break-all"
+        >
+          {meta.commit_sha}
+        </a>
+      ) : (
+        <span className="text-neutral-300 break-all">{meta.commit_sha}</span>
+      )}
+      {meta.commit_sha && meta.commit_sha !== "dev" && (
+        <InlineCopyButton text={meta.commit_sha} />
+      )}
     </div>
   );
 };
@@ -262,6 +292,7 @@ export default function BuildInfoPage() {
                 validRepo={validRepo}
                 meta={meta}
               />
+              <CommitRow meta={meta} validRepo={validRepo} />
               <DeploymentDate timestamp={meta.timestamp} />
 
               <div>

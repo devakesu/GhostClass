@@ -354,14 +354,14 @@ describe("Provenance API Route", () => {
       expect(data.image_digest).toBe("sha256:abcdef123456");
     });
 
-    it("should fallback to commit SHA when IMAGE_DIGEST is not set", async () => {
+    it("should not fallback to commit SHA when IMAGE_DIGEST is not set", async () => {
       delete process.env.IMAGE_DIGEST;
       process.env.APP_COMMIT_SHA = "commit123";
 
       const response = GET(makeRequest());
       const data = await response.json();
 
-      expect(data.image_digest).toBe("commit123");
+      expect(data.image_digest).toBeUndefined();
     });
 
     it("should fallback to 'dev' when neither IMAGE_DIGEST nor APP_COMMIT_SHA is set", async () => {

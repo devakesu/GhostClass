@@ -176,7 +176,7 @@ class AboutScreen extends ConsumerWidget {
                       ),
                       MetricCard(
                         icon: LucideIcons.fileDigit,
-                        label: 'Commit',
+                        label: 'Commit SHA',
                         value: _shortSha(AppConfig.appCommitSha),
                         accent: accent,
                         onTap:
@@ -262,6 +262,12 @@ class AboutScreen extends ConsumerWidget {
                           value:
                               'GitHub attestation attached to the APK artifact.',
                         ),
+                        if (AppConfig.imageDigest.isNotEmpty)
+                          ProofRow(
+                            icon: LucideIcons.box,
+                            label: 'Image digest',
+                            value: AppConfig.imageDigest,
+                          ),
                         ProofRow(
                           icon: LucideIcons.monitorSmartphone,
                           label: 'Runtime mode',

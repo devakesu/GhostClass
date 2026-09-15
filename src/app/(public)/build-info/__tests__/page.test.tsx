@@ -44,6 +44,7 @@ describe("BuildInfoPage", () => {
     expect(screen.getAllByText("v1.8.0")[0]).toBeInTheDocument();
     expect(screen.getByText("#42")).toBeInTheDocument();
     expect(screen.getByText("abc123d")).toBeInTheDocument();
+    expect(screen.getByText("abc123def456")).toBeInTheDocument();
     expect(screen.getByText("2026-02-18")).toBeInTheDocument();
     expect(screen.getByText("15:30:45 UTC")).toBeInTheDocument();
     expect(screen.getAllByText("PASSED").length).toBeGreaterThan(0);
