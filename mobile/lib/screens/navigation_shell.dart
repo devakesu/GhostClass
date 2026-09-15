@@ -673,70 +673,73 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
       ),
       body: widget.child,
       bottomNavigationBar: BottomAppBar(
-        height: 75,
+        height: 75 + bottomPadding,
         color: bg,
         padding: EdgeInsets.zero,
         notchMargin: 0,
-        child: Container(
-          padding: const EdgeInsets.only(
-            bottom: 6,
-            top: 6,
-            left: 12,
-            right: 12,
-          ),
-          decoration: BoxDecoration(
-            color: surface.withValues(alpha: 0.6),
-            border: Border(
-              top: BorderSide(
-                color: Theme.of(
-                  context,
-                ).colorScheme.outlineVariant.withValues(alpha: 0.1),
+        child: SafeArea(
+          top: false,
+          child: Container(
+            padding: const EdgeInsets.only(
+              bottom: 6,
+              top: 6,
+              left: 12,
+              right: 12,
+            ),
+            decoration: BoxDecoration(
+              color: surface.withValues(alpha: 0.6),
+              border: Border(
+                top: BorderSide(
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.outlineVariant.withValues(alpha: 0.1),
+                ),
               ),
             ),
-          ),
-          child: Row(
-            children: [
-              Expanded(
-                child: _NavButton(
-                  icon: LucideIcons.layoutDashboard,
-                  label: 'Dashboard',
-                  isSelected: selectedIndex == 0,
-                  onTap: () => _onTabTapped(0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: _NavButton(
+                    icon: LucideIcons.layoutDashboard,
+                    label: 'Dashboard',
+                    isSelected: selectedIndex == 0,
+                    onTap: () => _onTabTapped(0),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _NavButton(
-                  icon: LucideIcons.calendar,
-                  label: 'Calendar',
-                  isSelected: selectedIndex == 1,
-                  onTap: () => _onTabTapped(1),
+                Expanded(
+                  child: _NavButton(
+                    icon: LucideIcons.calendar,
+                    label: 'Calendar',
+                    isSelected: selectedIndex == 1,
+                    onTap: () => _onTabTapped(1),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _NavButton(
-                  icon: LucideIcons.graduationCap,
-                  label: 'Scores',
-                  isSelected: selectedIndex == 2,
-                  onTap: () => _onTabTapped(2),
+                Expanded(
+                  child: _NavButton(
+                    icon: LucideIcons.graduationCap,
+                    label: 'Scores',
+                    isSelected: selectedIndex == 2,
+                    onTap: () => _onTabTapped(2),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _NavButton(
-                  icon: LucideIcons.clipboardList,
-                  label: 'Leaves',
-                  isSelected: selectedIndex == 3,
-                  onTap: () => _onTabTapped(3),
+                Expanded(
+                  child: _NavButton(
+                    icon: LucideIcons.clipboardList,
+                    label: 'Leaves',
+                    isSelected: selectedIndex == 3,
+                    onTap: () => _onTabTapped(3),
+                  ),
                 ),
-              ),
-              Expanded(
-                child: _NavButton(
-                  icon: LucideIcons.ghost,
-                  label: 'GhostClass',
-                  isSelected: selectedIndex == 4,
-                  onTap: () => _onTabTapped(4),
+                Expanded(
+                  child: _NavButton(
+                    icon: LucideIcons.ghost,
+                    label: 'GhostClass',
+                    isSelected: selectedIndex == 4,
+                    onTap: () => _onTabTapped(4),
+                  ),
                 ),
-              ),
-            ],
+              ],
+            ),
           ),
         ),
       ),
