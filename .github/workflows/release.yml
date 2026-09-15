@@ -1327,8 +1327,6 @@ jobs:
 
           [![Get it on Google Play](https://img.shields.io/badge/Get%20it%20on-Google%20Play-34A853?style=for-the-badge&logo=googleplay&logoColor=white)](${PLAY_STORE_URL})
 
-          **Google Play**: ${PLAY_STORE_URL}
-
           > We recommend downloading from Google Play. GhostClass enforces Firebase App Check (Play Integrity), and Play-distributed builds provide the most reliable attestation path.
 
           ### Docker Images

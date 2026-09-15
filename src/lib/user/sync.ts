@@ -74,9 +74,7 @@ async function safeEzygoJson<T>(res: Response): Promise<T | null> {
   }
 }
 
-async function processCoursesData(
-  coursesRes: Response,
-): Promise<{
+async function processCoursesData(coursesRes: Response): Promise<{
   coursesMap: Record<string, CourseItem>;
   coursesList: CourseItem[];
 }> {

@@ -13,18 +13,18 @@
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
-  <img src="https://img.shields.io/badge/Next.js-16.2.12-black?style=for-the-badge&logo=next.js" alt="Next.js" />
+  <img src="https://img.shields.io/badge/Next.js-16.3.3-black?style=for-the-badge&logo=next.js" alt="Next.js" />
   <img src="https://img.shields.io/badge/React-19.2.8-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
   <img src="https://img.shields.io/badge/Tailwind-CSS%204.3.3-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind" />
   <img src="https://img.shields.io/badge/TypeScript-6.0.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
 </p>
 <p align="center">
-  <img src="https://img.shields.io/badge/Flutter-3.44.0-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
+  <img src="https://img.shields.io/badge/Flutter-3.47.4-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
   <img src="https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black" alt="Android" />
   <img src="https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS" />
 </p>
 <p align="center">
-  <img src="https://img.shields.io/badge/Vitest-4.1.10-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" alt="Vitest" />
+  <img src="https://img.shields.io/badge/Vitest-5.0.0-6E9F18?style=for-the-badge&logo=vitest&logoColor=white" alt="Vitest" />
   <img src="https://img.shields.io/badge/Playwright-1.62.1-2EAD33?style=for-the-badge&logo=playwright&logoColor=white" alt="Playwright" />
 </p>
 <!-- markdownlint-enable MD033 -->
@@ -91,10 +91,10 @@ insights!
 
 ### Core Framework
 
-- **Next.js 16.2.12** - React 19 with App Router
+- **Next.js 16.3.3** - React 19 with App Router
 - **TypeScript 6.0.3** - Strict mode for type safety
-- **Flutter 3.44.0** - Cross-platform native mobile application
-- **Node.js** - v24.18.1+
+- **Flutter 3.47.4** - Cross-platform native mobile application
+- **Node.js** - v24.20.0+
 
 ### Styling & UI
 
