@@ -50,6 +50,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   // Cached per signed-in user to avoid leaking across accounts.
   String? _lastUserId;
   String? _lastClassId;
+  String? _lastClassName;
 
   List<CourseDetails>? _cachedCourses;
   AttendanceReportDetailed? _cachedAttendance;
@@ -58,7 +59,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   AttendanceReportDetailed? _pendingTrackedAttendance;
 
   bool _needsRevalidate = true;
-  bool _isDisposed = false;
+  int _revalidationGeneration = 0;
+  Future<void>? _inFlightRevalidation;
   // Buffers a tracking update that arrived while the dashboard was in a
   // loading state (e.g. during pull-to-refresh). Applied immediately after
   // the build/refresh completes to avoid the "tracking appears then goes" bug.
@@ -69,9 +71,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
   @override
   FutureOr<DashboardData> build() async {
-    _isDisposed = false;
-    ref.onDispose(() => _isDisposed = true);
-
     // 1. Reactive Dependency: Rebuild when auth user ID or academic status changes
     final userAsync = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
@@ -96,7 +95,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedInstructors = null;
       _lastAcademic = null;
       _lastClassId = null;
+      _lastClassName = null;
       _needsRevalidate = true;
+      _inFlightRevalidation = null;
       throw Exception('Not authenticated');
     }
 
@@ -107,20 +108,33 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedInstructors = null;
       _lastAcademic = null;
       _lastClassId = null;
+      _lastClassName = null;
       _needsRevalidate = true;
+      _inFlightRevalidation = null;
+      _revalidationGeneration++;
     }
     _lastUserId = user.supabaseUserId;
 
-    // Invalidate caches when class changes.
+    // Invalidate caches when class ID or class label changes.
     final classId = user.profile?.classField?.id;
-    if (_lastClassId != null && _lastClassId != classId) {
+    final className = user.profile?.classField?.name;
+    final classChanged =
+        (_lastClassId != null && _lastClassId != classId) ||
+        (_lastClassName != null && _lastClassName != className) ||
+        (_lastClassId == null && classId != null && classId.isNotEmpty) ||
+        (_lastClassName == null && className != null && className.isNotEmpty);
+
+    if (classChanged) {
       _cachedCourses = null;
       _cachedAttendance = null;
       _cachedInstructors = null;
       _lastAcademic = null;
       _needsRevalidate = true;
+      _inFlightRevalidation = null;
+      _revalidationGeneration++;
     }
     _lastClassId = classId;
+    _lastClassName = className;
 
     // Invalidate in-memory caches when academic term changes
     if (_lastAcademic != null && _lastAcademic != academic) {
@@ -128,6 +142,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedAttendance = null;
       _cachedInstructors = null;
       _needsRevalidate = true;
+      _inFlightRevalidation = null;
+      _revalidationGeneration++;
       // Discard any buffered tracking update from the previous academic period
       // so it is never mistakenly applied to the incoming (new) semester's data.
       _pendingTrackingFromListener = null;
@@ -230,13 +246,17 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
           .expand((e) => e)
           .toList();
 
+      final activeInstructors = (_cachedInstructors?.isNotEmpty ?? false)
+          ? _cachedInstructors!
+          : (state.value?.instructors ?? <CourseInstructor>[]);
+
       state = AsyncValue.data(
         _processData(
           courses,
           _cachedAttendance!,
           trackingList,
           _lastAcademic!,
-          _cachedInstructors ?? [],
+          activeInstructors,
         ),
       );
 
@@ -286,20 +306,19 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         trackingLoaded = false;
       }
 
-      if (_needsRevalidate) {
+      if (_needsRevalidate || _inFlightRevalidation == null) {
         _needsRevalidate = false;
+        final currentGen = ++_revalidationGeneration;
+        _inFlightRevalidation =
+            _silentRevalidate(
+              trackingList,
+              academic,
+              currentGen,
+            ).whenComplete(() {
+              _inFlightRevalidation = null;
+            });
         AppLogger.safeUnawait(
-          Future.microtask(
-            () => _silentRevalidate(trackingList, academic),
-          ).catchError(
-            (Object e, StackTrace st) {
-              AppLogger.e(
-                'DashboardNotifier: Silent revalidate failed',
-                e,
-                st,
-              );
-            },
-          ),
+          _inFlightRevalidation!,
           'DashboardNotifier: silent revalidate',
         );
       }
@@ -334,7 +353,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     // Apply any tracking update that arrived during _fetchAndProcess, but ONLY
     // if it belongs to the same academic period as this build. Cross-academic
     // updates must be discarded to prevent zeros on semester/year switches.
-    if (!_isDisposed && _cachedCourses != null && _cachedAttendance != null) {
+    if (ref.mounted && _cachedCourses != null && _cachedAttendance != null) {
       final pendingTracking = _pendingTrackingFromListener;
       final pendingAcademic = _pendingTrackingAcademic;
       final liveTracking = ref.read(trackingProvider).value;
@@ -380,7 +399,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     Future<TrackingState>? parallelTrackingFuture,
   }) async {
     try {
-      if (_isDisposed) throw StateError('DashboardNotifier disposed');
       final api = ref.read(apiServiceProvider);
       final storage = ref.read(secureStorageProvider);
 
@@ -415,6 +433,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         return _fetchAttendanceOnce(api: api, storage: storage);
       }
 
+      var instructorsFetched = false;
       // Fetch courses (EzyGo) in parallel with attendance resolution.
       // When parallelTrackingFuture is set, resolveAttendance() awaits tracking,
       // so the true network calls (courses + attendance via tracking) run in parallel.
@@ -424,51 +443,50 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
           if (res == null) throw Exception('No attendance data');
           attendance = res;
         }),
-        if (classId != null) ...[
-          // Fetch Class Courses
-          Future.sync(() => api.fetchClassCourses(classId))
-              .then((coursesRes) {
-                if (coursesRes.isNotEmpty) {
-                  sharedCourses = coursesRes.map((raw) {
-                    final c = raw as Map<String, dynamic>;
-                    return CourseDetails(
-                      id: 0, // Mark as shared/custom
-                      name: c['course_name'] as String? ?? 'Unnamed Course',
-                      code: c['course_code'] as String?,
-                      academicYear: academic.year,
-                      academicSemester: academic.semester,
-                    );
-                  }).toList();
-                }
-              })
-              .catchError((Object e, StackTrace st) {
-                AppLogger.e(
-                  'DashboardNotifier: fetchClassCourses failed (graceful fallback)',
-                  e,
-                  st,
-                );
-              }),
-          // Fetch Instructor Mappings
-          Future.sync(() => api.fetchCourseInstructors(classId))
-              .then((instructorsRes) {
-                if (instructorsRes.isNotEmpty) {
-                  sharedInstructors = instructorsRes
-                      .map(
-                        (json) => CourseInstructor.fromJson(
-                          json as Map<String, dynamic>,
-                        ),
-                      )
-                      .toList();
-                }
-              })
-              .catchError((Object e, StackTrace st) {
-                AppLogger.e(
-                  'DashboardNotifier: fetchCourseInstructors failed (graceful fallback)',
-                  e,
-                  st,
-                );
-              }),
-        ],
+        // Fetch Class Courses (RLS resolves user's class if classId is null/empty)
+        api
+            .fetchClassCourses(classId)
+            .then((coursesRes) {
+              if (coursesRes.isNotEmpty) {
+                sharedCourses = coursesRes.map((raw) {
+                  final c = raw as Map<String, dynamic>;
+                  return CourseDetails(
+                    id: 0, // Mark as shared/custom
+                    name: c['course_name'] as String? ?? 'Unnamed Course',
+                    code: c['course_code'] as String?,
+                    academicYear: academic.year,
+                    academicSemester: academic.semester,
+                  );
+                }).toList();
+              }
+            })
+            .catchError((Object e, StackTrace st) {
+              AppLogger.e(
+                'DashboardNotifier: fetchClassCourses failed (graceful fallback)',
+                e,
+                st,
+              );
+            }),
+        // Fetch Instructor Mappings (RLS resolves user's class if classId is null/empty)
+        api
+            .fetchCourseInstructors(classId)
+            .then((instructorsRes) {
+              instructorsFetched = true;
+              sharedInstructors = instructorsRes
+                  .map(
+                    (json) => CourseInstructor.fromJson(
+                      json as Map<String, dynamic>,
+                    ),
+                  )
+                  .toList();
+            })
+            .catchError((Object e, StackTrace st) {
+              AppLogger.e(
+                'DashboardNotifier: fetchCourseInstructors failed (graceful fallback)',
+                e,
+                st,
+              );
+            }),
       ]);
 
       if (coursesResponse.statusCode == 401) {
@@ -500,7 +518,12 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
       _cachedCourses = merged.values.toList();
       _cachedAttendance = _mergeAttendanceCourses(attendance, sharedCourses);
-      _cachedInstructors = sharedInstructors;
+      if (instructorsFetched) {
+        _cachedInstructors = sharedInstructors;
+      } else {
+        _cachedInstructors ??= [];
+        sharedInstructors = _cachedInstructors!;
+      }
 
       final user = ref.read(authProvider).value;
       if (user != null) {
@@ -559,7 +582,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         sharedInstructors,
       );
     } on Object catch (e) {
-      if (!_isDisposed) {
+      if (ref.mounted) {
         AppLogger.e('DashboardNotifier: Server fetch failed', e);
       }
       rethrow;
@@ -767,10 +790,10 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
   Future<void> _silentRevalidate(
     List<TrackingRecord> tracking,
-    AcademicState academic,
-  ) async {
+    AcademicState academic, [
+    int? generation,
+  ]) async {
     try {
-      if (_isDisposed) return;
       final trackingState = ref.read(trackingProvider).value;
       final trackingToUse = tracking.isNotEmpty
           ? tracking
@@ -782,9 +805,12 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         trackingState?.officialReport,
         forceFreshAttendance: true,
       );
-      if (_isDisposed) return;
+      if (generation != null && generation != _revalidationGeneration) return;
+      if (!ref.mounted) return;
       final currentAcademic = ref.read(academicProvider).value;
-      if (academic == currentAcademic) {
+      if (currentAcademic != null &&
+          !utils.semestersDiffer(academic.semester, currentAcademic.semester) &&
+          !utils.yearsDiffer(academic.year, currentAcademic.year)) {
         state = AsyncValue.data(freshData);
       } else {
         AppLogger.i(
@@ -793,7 +819,6 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         );
       }
     } on Object catch (e) {
-      if (_isDisposed) return;
       AppLogger.e(
         'DashboardNotifier: Silent background revalidation failed',
         e,

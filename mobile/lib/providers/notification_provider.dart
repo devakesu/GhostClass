@@ -84,13 +84,10 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
   int _currentPage = 0;
   static const _pageSize = 20;
   final _toggleReadInFlight = <int>{};
-  bool _isDisposed = false;
+  int _revalidationGeneration = 0;
 
   @override
   Future<NotificationsState> build() async {
-    _isDisposed = false;
-    ref.onDispose(() => _isDisposed = true);
-
     final userId = ref.watch(
       authProvider.select((v) => v.value?.supabaseUserId),
     );
@@ -107,15 +104,16 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
         final cachedState = _deserializeState(cached);
         if (cachedState != null) {
           // SWR: revalidate in background, update badge/list silently.
+          final currentGen = ++_revalidationGeneration;
           AppLogger.safeUnawait(
             _fetchInitialData(userId, storage: storage, cacheKey: cacheKey)
                 .then((fresh) {
-                  if (!_isDisposed) {
+                  if (ref.mounted && currentGen == _revalidationGeneration) {
                     state = AsyncValue.data(fresh);
                   }
                 })
                 .catchError((Object e, StackTrace st) {
-                  if (!_isDisposed) {
+                  if (ref.mounted) {
                     AppLogger.e(
                       'NotificationsNotifier: Background SWR revalidation failed',
                       e,

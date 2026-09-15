@@ -641,15 +641,20 @@ class ProfileHydrationService extends Notifier<void> {
     final newSem = profile.currentSemester;
     final newYear = profile.currentYear;
     final newClassLabel = profile.classField?.name;
+    final newClassId = profile.classField?.id;
 
     final localAcademic = await storage.getAcademicState();
     final oldSem =
         currentUser.profile?.currentSemester ?? localAcademic?.semester;
     final oldYear = currentUser.profile?.currentYear ?? localAcademic?.year;
     final oldClassLabel = currentUser.profile?.classField?.name;
+    final oldClassId = currentUser.profile?.classField?.id;
 
     final classChanged =
-        oldClassLabel != null && oldClassLabel != newClassLabel;
+        (oldClassLabel != newClassLabel &&
+            (oldClassLabel != null || newClassLabel != null)) ||
+        (oldClassId != newClassId &&
+            (oldClassId != null || newClassId != null));
     final academicChanged =
         semestersDiffer(oldSem, newSem) || yearsDiffer(oldYear, newYear);
 

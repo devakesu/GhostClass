@@ -242,7 +242,7 @@ class CourseCard extends StatelessWidget {
                                 (i) =>
                                     utils.standardizeCourseCode(i.courseCode) ==
                                     utils.standardizeCourseCode(
-                                      course.code ?? '',
+                                      course.code ?? course.safeId,
                                     ),
                               )
                               .lastOrNull;
@@ -309,7 +309,8 @@ class CourseCard extends StatelessWidget {
                                         context: context,
                                         builder: (context) =>
                                             EditInstructorDialog(
-                                              courseCode: course.code ?? '',
+                                              courseCode:
+                                                  course.code ?? course.safeId,
                                               courseName: course.name,
                                               initialName:
                                                   instructor?.instructorName,

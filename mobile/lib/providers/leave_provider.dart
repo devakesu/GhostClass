@@ -22,13 +22,10 @@ final leaveProvider = AsyncNotifierProvider<LeaveNotifier, LeaveState>(
 );
 
 class LeaveNotifier extends AsyncNotifier<LeaveState> {
-  bool _isDisposed = false;
+  int _revalidationGeneration = 0;
 
   @override
   FutureOr<LeaveState> build() async {
-    _isDisposed = false;
-    ref.onDispose(() => _isDisposed = true);
-
     final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
 
@@ -39,8 +36,8 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
       ]);
     }
 
-    final user = authState.value;
-    final academic = academicAsync.value;
+    final user = ref.read(authProvider).value ?? authState.value;
+    final academic = ref.read(academicProvider).value ?? academicAsync.value;
 
     if (user == null || academic == null) return LeaveState.empty();
 
@@ -66,6 +63,7 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
         );
 
         // Revalidate in background quietly
+        final currentGen = ++_revalidationGeneration;
         AppLogger.safeUnawait(
           _fetchAndProcess(
                 user: user,
@@ -74,12 +72,12 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
                 academic: academic,
               )
               .then((fresh) {
-                if (!_isDisposed) {
+                if (ref.mounted && currentGen == _revalidationGeneration) {
                   state = AsyncValue.data(fresh);
                 }
               })
               .catchError((Object e, StackTrace st) {
-                if (!_isDisposed) {
+                if (ref.mounted) {
                   AppLogger.e(
                     'LeaveNotifier: Background revalidation failed',
                     e,

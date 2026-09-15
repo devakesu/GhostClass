@@ -68,13 +68,10 @@ class CourseGroup {
 }
 
 class ScoreNotifier extends AsyncNotifier<ScoreState> {
-  bool _isDisposed = false;
+  int _revalidationGeneration = 0;
 
   @override
   Future<ScoreState> build() async {
-    _isDisposed = false;
-    ref.onDispose(() => _isDisposed = true);
-
     final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
 
@@ -85,25 +82,26 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       ]);
     }
 
-    final user = authState.value;
+    final user = ref.read(authProvider).value ?? authState.value;
     if (user == null) {
       throw Exception('Unauthorized');
     }
 
-    final academic = academicAsync.value;
+    final academic = ref.read(academicProvider).value ?? academicAsync.value;
 
     // Fast path: Attempt to hydrate from disk cache for instant boot (<15ms)
     final cached = await _tryHydrateFromCache(user: user, academic: academic);
     if (cached != null) {
+      final currentGen = ++_revalidationGeneration;
       AppLogger.safeUnawait(
         _initialFetch(user: user, academic: academic, bypassCache: true)
             .then((fresh) {
-              if (!_isDisposed) {
+              if (ref.mounted && currentGen == _revalidationGeneration) {
                 state = AsyncValue.data(fresh);
               }
             })
             .catchError((Object e, StackTrace st) {
-              if (!_isDisposed) {
+              if (ref.mounted) {
                 AppLogger.e(
                   'ScoreNotifier: Background revalidate failed',
                   e,

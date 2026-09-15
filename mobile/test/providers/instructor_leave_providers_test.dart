@@ -99,9 +99,13 @@ void main() {
         ],
       );
 
-      // Matches course ID
+      // Matches course ID exactly
       final match = container.read(instructorProvider('CS101'));
       expect(match, instructor);
+
+      // Matches course ID with lowercase and whitespace
+      final matchFuzzy = container.read(instructorProvider('  cs 101  '));
+      expect(matchFuzzy, instructor);
 
       // Does not match
       final mismatch = container.read(instructorProvider('CS102'));

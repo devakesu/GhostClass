@@ -51,13 +51,10 @@ final trackingProvider = AsyncNotifierProvider<TrackingNotifier, TrackingState>(
 );
 
 class TrackingNotifier extends AsyncNotifier<TrackingState> {
-  bool _isDisposed = false;
+  int _revalidationGeneration = 0;
 
   @override
   FutureOr<TrackingState> build() async {
-    _isDisposed = false;
-    ref.onDispose(() => _isDisposed = true);
-
     // 1. Reactive Dependency: Clear data immediately on logout OR Semester Change
     final authState = ref.watch(authProvider);
     final academicAsync = ref.watch(academicProvider);
@@ -138,15 +135,16 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         }
 
         // Revalidate in background quietly
+        final currentGen = ++_revalidationGeneration;
         AppLogger.safeUnawait(
           _fetchAndProcess(academic: academic)
               .then((fresh) {
-                if (!_isDisposed) {
+                if (ref.mounted && currentGen == _revalidationGeneration) {
                   state = AsyncValue.data(fresh);
                 }
               })
               .catchError((Object e, StackTrace st) {
-                if (!_isDisposed) {
+                if (ref.mounted) {
                   AppLogger.e(
                     'TrackingNotifier: Background revalidation failed',
                     e,

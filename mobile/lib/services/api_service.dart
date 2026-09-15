@@ -312,14 +312,44 @@ class ApiService {
     );
   }
 
-  Future<List<dynamic>> fetchClassCourses(String classId) async {
+  Future<List<dynamic>> fetchClassCourses([String? classId]) async {
     final supabase = _ref.read<SupabaseClient>(supabaseClientProvider);
-    return supabase.from('class_courses').select().eq('class_id', classId);
+    try {
+      if (classId != null && classId.trim().isNotEmpty) {
+        final res = await supabase
+            .from('class_courses')
+            .select()
+            .eq('class_id', classId.trim());
+        if (res.isNotEmpty) return res;
+      }
+      return await supabase.from('class_courses').select();
+    } on Object catch (_) {
+      try {
+        return await supabase.from('class_courses').select();
+      } on Object catch (_) {
+        return <dynamic>[];
+      }
+    }
   }
 
-  Future<List<dynamic>> fetchCourseInstructors(String classId) async {
+  Future<List<dynamic>> fetchCourseInstructors([String? classId]) async {
     final supabase = _ref.read<SupabaseClient>(supabaseClientProvider);
-    return supabase.from('course_instructors').select().eq('class_id', classId);
+    try {
+      if (classId != null && classId.trim().isNotEmpty) {
+        final res = await supabase
+            .from('course_instructors')
+            .select()
+            .eq('class_id', classId.trim());
+        if (res.isNotEmpty) return res;
+      }
+      return await supabase.from('course_instructors').select();
+    } on Object catch (_) {
+      try {
+        return await supabase.from('course_instructors').select();
+      } on Object catch (_) {
+        return <dynamic>[];
+      }
+    }
   }
 
   // --- Error Handling ---
