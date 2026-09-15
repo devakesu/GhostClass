@@ -46,8 +46,10 @@ export async function GET() {
           {
             status: 429,
             headers: {
-              "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000))
-                .toString(),
+              "Retry-After": Math.max(
+                0,
+                Math.ceil((reset - Date.now()) / 1000),
+              ).toString(),
               "X-RateLimit-Limit": limit.toString(),
               "X-RateLimit-Remaining": remaining.toString(),
               "X-RateLimit-Reset": reset.toString(),
@@ -74,9 +76,8 @@ export async function GET() {
     );
   } catch (error) {
     // Log minimal error info to avoid leaking sensitive details
-    const errorMessage = error instanceof Error
-      ? error.message
-      : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     logger.error("CSRF token initialization error:", { message: errorMessage });
     Sentry.captureException(error, {
       tags: { type: "csrf_init_error", location: "api/csrf" },
@@ -128,8 +129,10 @@ export async function POST() {
         {
           status: 429,
           headers: {
-            "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000))
-              .toString(),
+            "Retry-After": Math.max(
+              0,
+              Math.ceil((reset - Date.now()) / 1000),
+            ).toString(),
           },
         },
       );
@@ -151,9 +154,8 @@ export async function POST() {
     );
   } catch (error) {
     // Log minimal error info to avoid leaking sensitive details
-    const errorMessage = error instanceof Error
-      ? error.message
-      : "Unknown error";
+    const errorMessage =
+      error instanceof Error ? error.message : "Unknown error";
     logger.error("CSRF token refresh error:", { message: errorMessage });
     Sentry.captureException(error, {
       tags: { type: "csrf_refresh_error", location: "api/csrf" },

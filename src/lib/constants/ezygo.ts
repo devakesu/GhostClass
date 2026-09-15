@@ -16,7 +16,7 @@ export const ATTENDANCE_STATUS = {
 } as const;
 
 export type AttendanceStatusCode =
-  typeof ATTENDANCE_STATUS[keyof typeof ATTENDANCE_STATUS];
+  (typeof ATTENDANCE_STATUS)[keyof typeof ATTENDANCE_STATUS];
 
 /**
  * Checks if an attendance code represents a "positive" presence (Attended or Duty Leave).

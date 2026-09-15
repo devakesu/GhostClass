@@ -283,9 +283,9 @@ describe("usePWAInstall", () => {
 
     // Dispatch a prompt whose .prompt() rejects (browser rate-limit / already consumed)
     const throwingPrompt = Object.assign(new Event("beforeinstallprompt"), {
-      prompt: vi.fn().mockRejectedValue(
-        new Error("AbortError: prompt already used"),
-      ),
+      prompt: vi
+        .fn()
+        .mockRejectedValue(new Error("AbortError: prompt already used")),
       userChoice: Promise.resolve({ outcome: "accepted", platform: "" }),
       platforms: [] as string[],
     });

@@ -90,9 +90,11 @@ class _AttendanceCalendarScreenState
       }
     }
 
-    if (dashboardState.isLoading ||
-        trackingState.isLoading ||
-        academicAsync.isLoading) {
+    final hasData = dash != null && track != null && academic != null;
+    if (!hasData &&
+        (dashboardState.isLoading ||
+            trackingState.isLoading ||
+            academicAsync.isLoading)) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(
@@ -130,6 +132,7 @@ class _AttendanceCalendarScreenState
               ]).timeout(AppConfig.defaultTimeout);
             } on Object catch (e, st) {
               AppLogger.e('AttendanceCalendarScreen: Retry failed', e, st);
+              rethrow;
             }
           },
         ),

@@ -93,9 +93,11 @@ vi.mock("axios", () => ({
 // --- Framer-motion mock ---
 vi.mock("framer-motion", () => ({
   motion: {
-    div: (
-      { children, ...rest }: React.PropsWithChildren<Record<string, unknown>>,
-    ) => React.createElement("div", rest, children),
+    div: ({
+      children,
+      ...rest
+    }: React.PropsWithChildren<Record<string, unknown>>) =>
+      React.createElement("div", rest, children),
   },
   AnimatePresence: ({ children }: React.PropsWithChildren) =>
     React.createElement(React.Fragment, null, children),
@@ -446,7 +448,7 @@ describe("LoginForm – EzyGo credential error message override", () => {
       expect(
         screen.getAllByText("These credentials do not match EzyGo records.")
           .length,
-      ).toBeGreaterThan(0)
+      ).toBeGreaterThan(0),
     );
   });
 
@@ -475,8 +477,9 @@ describe("LoginForm – EzyGo credential error message override", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getAllByText("Some other error from EzyGo.").length)
-        .toBeGreaterThan(0)
+      expect(
+        screen.getAllByText("Some other error from EzyGo.").length,
+      ).toBeGreaterThan(0),
     );
   });
 });
@@ -559,7 +562,7 @@ describe("LoginForm – CSRF re-fetch on null token", () => {
       expect(
         screen.getAllByText((t) => t.includes("Secure session setup failed"))
           .length,
-      ).toBeGreaterThan(0)
+      ).toBeGreaterThan(0),
     );
   });
 });

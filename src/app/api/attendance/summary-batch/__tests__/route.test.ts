@@ -75,9 +75,9 @@ describe("POST /api/attendance/summary-batch", () => {
 
   it("returns 429 when rate limited", async () => {
     const { POST } = await import("../route");
-    vi.mocked(proxyRateLimiter.limit).mockResolvedValueOnce(
-      { success: false } as any,
-    );
+    vi.mocked(proxyRateLimiter.limit).mockResolvedValueOnce({
+      success: false,
+    } as any);
     const req = new NextRequest(
       "http://localhost/api/attendance/summary-batch",
       { method: "POST" },

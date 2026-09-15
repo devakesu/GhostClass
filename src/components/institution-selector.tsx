@@ -48,8 +48,8 @@ export function InstitutionSelector() {
   const [pendingSelection, setPendingSelection] = useState<string | null>(null);
 
   // Use pending selection if user has edited, otherwise use the server value
-  const selectedInstitution = pendingSelection ??
-    defaultInstitutionUser?.toString() ?? "";
+  const selectedInstitution =
+    pendingSelection ?? defaultInstitutionUser?.toString() ?? "";
 
   const handleSaveInstitution = () => {
     if (!selectedInstitution) return;
@@ -187,9 +187,11 @@ export function InstitutionSelector() {
             <motion.div>
               <Button
                 onClick={handleSaveInstitution}
-                disabled={updateDefaultInstitutionUser.isPending ||
+                disabled={
+                  updateDefaultInstitutionUser.isPending ||
                   pendingSelection === null ||
-                  pendingSelection === defaultInstitutionUser?.toString()}
+                  pendingSelection === defaultInstitutionUser?.toString()
+                }
                 className="w-full font-semibold min-h-11.5 rounded-[12px] mt-4 font-md"
                 aria-label="Save selected institution as default"
               >
@@ -199,18 +201,16 @@ export function InstitutionSelector() {
                     aria-hidden="true"
                   />
                 )}
-                {updateDefaultInstitutionUser.isPending
-                  ? (
-                    <>
-                      <span className="sr-only">
-                        Saving your institution preference
-                      </span>
-                      <span aria-hidden="true">Saving...</span>
-                    </>
-                  )
-                  : (
-                    "Save as Default"
-                  )}
+                {updateDefaultInstitutionUser.isPending ? (
+                  <>
+                    <span className="sr-only">
+                      Saving your institution preference
+                    </span>
+                    <span aria-hidden="true">Saving...</span>
+                  </>
+                ) : (
+                  "Save as Default"
+                )}
               </Button>
             </motion.div>
           </motion.div>

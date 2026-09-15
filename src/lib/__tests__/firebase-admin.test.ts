@@ -57,8 +57,8 @@ describe("firebase-admin", () => {
     vi.mocked(getApps).mockReturnValue([]);
     vi.mocked(getApp).mockReturnValue(mockApp as unknown as App);
     vi.mocked(initializeApp).mockReturnValue(mockApp as unknown as App);
-    vi.mocked(cert).mockImplementation((creds: unknown) =>
-      creds as ReturnType<typeof cert>
+    vi.mocked(cert).mockImplementation(
+      (creds: unknown) => creds as ReturnType<typeof cert>,
     );
     vi.mocked(getAdminAppCheck).mockReturnValue(
       mockAppCheckService as unknown as AppCheck,

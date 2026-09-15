@@ -120,14 +120,17 @@ describe("POST /api/instructors/upsert", () => {
     });
     expect(mockFrom).toHaveBeenCalledWith("class_courses");
     expect(mockFrom).toHaveBeenCalledWith("course_instructors");
-    expect(mockUpsert).toHaveBeenCalledWith({
-      class_id: "class-456",
-      course_code: "CS101",
-      instructor_name: "Dr. Jane Smith",
-      updated_by: "user-123",
-    }, {
-      onConflict: "class_id, course_code",
-    });
+    expect(mockUpsert).toHaveBeenCalledWith(
+      {
+        class_id: "class-456",
+        course_code: "CS101",
+        instructor_name: "Dr. Jane Smith",
+        updated_by: "user-123",
+      },
+      {
+        onConflict: "class_id, course_code",
+      },
+    );
   });
 
   it("returns 500 when database upsert fails", async () => {

@@ -53,7 +53,13 @@ class UserProfile {
           ? (json['class'] is Map<dynamic, dynamic>
                 ? UserClass.fromJson(json['class'] as Map<String, dynamic>)
                 : UserClass(id: '', name: json['class'].toString()))
-          : null,
+          : (json['class_id'] != null || json['classId'] != null
+                ? UserClass(
+                    id: (json['class_id'] ?? json['classId']).toString(),
+                    name: (json['class_name'] ?? json['className'] ?? 'Class')
+                        .toString(),
+                  )
+                : null),
     );
   }
   final String? firstName;
@@ -157,6 +163,8 @@ class UserProfile {
     'created_at': createdAt,
     'ezygo_created_at': ezygoCreatedAt,
     'class': classField?.toJson(),
+    if (classField?.id != null && classField!.id.isNotEmpty)
+      'class_id': classField!.id,
   };
 }
 

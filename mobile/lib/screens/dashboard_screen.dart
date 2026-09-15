@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
+import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
@@ -67,16 +68,36 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
     final isStalePeriod =
         data != null &&
         academicAsync.value != null &&
-        (data.selectedSemester != academicAsync.value!.semester ||
-            data.selectedYear != academicAsync.value!.year);
+        (semestersDiffer(
+              data.selectedSemester,
+              academicAsync.value!.semester,
+            ) ||
+            yearsDiffer(data.selectedYear, academicAsync.value!.year));
 
-    if (isSyncing ||
-        academicAsync.isLoading ||
-        isStalePeriod ||
-        (dashboardState.isLoading && data == null)) {
+    // `hasData` is true only when we have both attendance data AND tracking
+    // data loaded. `DashboardData.trackingLoaded` is false when the fast-path
+    // returned before the tracking disk-cache resolved — in that case the
+    // overlay stays up until the tracking listener flips it to true.
+    final hasData = data != null && data.trackingLoaded;
+    if ((isSyncing && !hasData) ||
+        (academicAsync.isLoading && !hasData) ||
+        (dashboardState.isLoading && !hasData)) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
+      );
+    }
+
+    if (isStalePeriod) {
+      // Semester/year changed — show a descriptive loading state instead of
+      // a blank screen, so the user knows we're waiting on EzyGo to update.
+      return Scaffold(
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        body: const LoadingOverlay(
+          isFullScreen: false,
+          showLogo: false,
+          message: 'Waiting on EzyGo...',
+        ),
       );
     }
 
@@ -96,6 +117,7 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
                   .timeout(AppConfig.defaultTimeout);
             } on Object catch (e, st) {
               AppLogger.e('DashboardScreen: Retry failed', e, st);
+              rethrow;
             }
           },
         ),

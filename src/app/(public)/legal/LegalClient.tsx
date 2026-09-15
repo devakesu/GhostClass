@@ -73,9 +73,9 @@ function PolicySection({ title, content }: { title: string; content: string }) {
               <ol className="list-decimal pl-5 space-y-1 mb-3" {...props} />
             ),
             li: ({ node, ...props }) => {
-              const parentTagName =
-                (node as { parent?: { tagName?: string } } | undefined)?.parent
-                  ?.tagName;
+              const parentTagName = (
+                node as { parent?: { tagName?: string } } | undefined
+              )?.parent?.tagName;
               if (isListParentTag(parentTagName)) {
                 return createElement("li", { className: "pl-1", ...props });
               }
@@ -91,8 +91,8 @@ function PolicySection({ title, content }: { title: string; content: string }) {
               <strong className="text-foreground/80" {...props} />
             ),
             a: ({ href, ...props }) => {
-              const isExternal = typeof href === "string" &&
-                /^https?:\/\//i.test(href);
+              const isExternal =
+                typeof href === "string" && /^https?:\/\//i.test(href);
               return (
                 <a
                   href={href}

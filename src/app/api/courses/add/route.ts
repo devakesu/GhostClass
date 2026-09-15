@@ -12,7 +12,10 @@ async function authenticateRequest(req: Request) {
     const token = authHeader.split(" ")[1];
     if (!token) return null;
     const supabaseAdmin = getAdminClient();
-    const { data: { user }, error } = await supabaseAdmin.auth.getUser(token);
+    const {
+      data: { user },
+      error,
+    } = await supabaseAdmin.auth.getUser(token);
     if (error || !user) {
       logger.error(
         "API Course Add: Bearer auth.getUser error:",
@@ -24,7 +27,10 @@ async function authenticateRequest(req: Request) {
   }
 
   const supabaseClient = await createClient();
-  const { data: { user }, error } = await supabaseClient.auth.getUser();
+  const {
+    data: { user },
+    error,
+  } = await supabaseClient.auth.getUser();
   if (error || !user) {
     logger.error(
       "API Course Add: Client auth.getUser error:",
@@ -45,31 +51,42 @@ async function handler(
   { decryptedBody }: { decryptedBody?: unknown },
 ) {
   try {
-    const body = decryptedBody || await req.json();
-    const rawBody = typeof body === "object" && body !== null
-      ? body as Record<string, unknown>
-      : {};
+    const body = decryptedBody || (await req.json());
+    const rawBody =
+      typeof body === "object" && body !== null
+        ? (body as Record<string, unknown>)
+        : {};
     const courseCodeValue = rawBody.courseCode;
     const courseNameValue = rawBody.courseName;
 
     if (
-      typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
-      typeof courseNameValue !== "string" || courseNameValue.trim() === ""
+      typeof courseCodeValue !== "string" ||
+      courseCodeValue.trim() === "" ||
+      typeof courseNameValue !== "string" ||
+      courseNameValue.trim() === ""
     ) {
-      return NextResponse.json({ error: "Missing required fields" }, {
-        status: 400,
-      });
+      return NextResponse.json(
+        { error: "Missing required fields" },
+        {
+          status: 400,
+        },
+      );
     }
 
-    const parsed = z.object({
-      courseCode: courseCodeSchema,
-      courseName: courseNameSchema,
-    }).safeParse(body);
+    const parsed = z
+      .object({
+        courseCode: courseCodeSchema,
+        courseName: courseNameSchema,
+      })
+      .safeParse(body);
 
     if (!parsed.success) {
-      return NextResponse.json({
-        error: parsed.error.issues[0]?.message ?? "Invalid course details",
-      }, { status: 422 });
+      return NextResponse.json(
+        {
+          error: parsed.error.issues[0]?.message ?? "Invalid course details",
+        },
+        { status: 422 },
+      );
     }
 
     const { courseCode: code, courseName: name } = parsed.data;
@@ -90,41 +107,54 @@ async function handler(
 
     if (profileError || !profile?.class_id) {
       logger.error("API Course Add: Failed to fetch user class", profileError);
-      return NextResponse.json({
-        error: "No class associated with your profile",
-      }, { status: 400 });
+      return NextResponse.json(
+        {
+          error: "No class associated with your profile",
+        },
+        { status: 400 },
+      );
     }
 
     // Insert into class_courses
-    const { error: insertError } = await supabase
-      .from("class_courses")
-      .insert({
-        class_id: profile.class_id,
-        course_code: code,
-        course_name: name,
-        created_by: user.id,
-      });
+    const { error: insertError } = await supabase.from("class_courses").insert({
+      class_id: profile.class_id,
+      course_code: code,
+      course_name: name,
+      created_by: user.id,
+    });
 
     if (insertError) {
       if (insertError.code === "23505") {
-        return NextResponse.json({
-          error: "This course is already in your class lineup.",
-        }, { status: 409 });
+        return NextResponse.json(
+          {
+            error: "This course is already in your class lineup.",
+          },
+          { status: 409 },
+        );
       }
       logger.error("API Course Add: Database insert failed", insertError);
-      return NextResponse.json({ error: "Failed to add course to lineup" }, {
-        status: 500,
-      });
+      return NextResponse.json(
+        { error: "Failed to add course to lineup" },
+        {
+          status: 500,
+        },
+      );
     }
 
-    return NextResponse.json({ message: "Course added successfully" }, {
-      status: 201,
-    });
+    return NextResponse.json(
+      { message: "Course added successfully" },
+      {
+        status: 201,
+      },
+    );
   } catch (error) {
     logger.error("API Course Add: Unexpected error", error);
-    return NextResponse.json({ error: "An internal error occurred" }, {
-      status: 500,
-    });
+    return NextResponse.json(
+      { error: "An internal error occurred" },
+      {
+        status: 500,
+      },
+    );
   }
 }
 

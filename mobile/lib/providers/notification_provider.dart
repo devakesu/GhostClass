@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
+import 'package:ghostclass/services/logger.dart';
+import 'package:ghostclass/services/secure_storage.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
 class AppNotification {
@@ -82,6 +84,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
   int _currentPage = 0;
   static const _pageSize = 20;
   final _toggleReadInFlight = <int>{};
+  int _revalidationGeneration = 0;
 
   @override
   Future<NotificationsState> build() async {
@@ -92,10 +95,108 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
       return NotificationsState.empty();
     }
 
-    return _fetchInitialData(userId);
+    // 1. Fast path: Hydrate from disk cache for instant badge on app open.
+    final storage = ref.read(secureStorageProvider);
+    final cacheKey = 'notifications_$userId';
+    try {
+      final cached = await storage.getCachedData(cacheKey);
+      if (cached is Map<String, dynamic>) {
+        final cachedState = _deserializeState(cached);
+        if (cachedState != null) {
+          // SWR: revalidate in background, update badge/list silently.
+          final currentGen = ++_revalidationGeneration;
+          AppLogger.safeUnawait(
+            _fetchInitialData(userId, storage: storage, cacheKey: cacheKey)
+                .then((fresh) {
+                  if (ref.mounted && currentGen == _revalidationGeneration) {
+                    state = AsyncValue.data(fresh);
+                  }
+                })
+                .catchError((Object e, StackTrace st) {
+                  if (ref.mounted) {
+                    AppLogger.e(
+                      'NotificationsNotifier: Background SWR revalidation failed',
+                      e,
+                      st,
+                    );
+                  }
+                }),
+            'NotificationsNotifier: background SWR revalidate',
+          );
+          return cachedState;
+        }
+      }
+    } on Object catch (e) {
+      AppLogger.e('NotificationsNotifier: Error loading disk cache', e);
+    }
+
+    // 2. Cold start: fetch from network.
+    return _fetchInitialData(userId, storage: storage, cacheKey: cacheKey);
   }
 
-  Future<NotificationsState> _fetchInitialData(String userId) async {
+  NotificationsState? _deserializeState(Map<String, dynamic> raw) {
+    try {
+      final actionRaw = raw['action'] as List<dynamic>?;
+      final regularRaw = raw['regular'] as List<dynamic>?;
+      final unreadCount = raw['unreadCount'] as int? ?? 0;
+      final hasNextPage = raw['hasNextPage'] as bool? ?? false;
+      if (actionRaw == null || regularRaw == null) return null;
+
+      return NotificationsState(
+        actionNotifications: actionRaw
+            .map((n) => AppNotification.fromJson(n as Map<String, dynamic>))
+            .toList(),
+        regularNotifications: regularRaw
+            .map((n) => AppNotification.fromJson(n as Map<String, dynamic>))
+            .toList(),
+        unreadCount: unreadCount,
+        hasNextPage: hasNextPage,
+      );
+    } on Object catch (e) {
+      AppLogger.e(
+        'NotificationsNotifier: Failed to deserialize cached state',
+        e,
+      );
+      return null;
+    }
+  }
+
+  Map<String, dynamic> _serializeState(NotificationsState s) {
+    return {
+      'action': s.actionNotifications
+          .map(
+            (n) => {
+              'id': n.id,
+              'title': n.title,
+              'description': n.description,
+              'created_at': n.createdAt.toIso8601String(),
+              'topic': n.topic,
+              'is_read': n.isRead,
+            },
+          )
+          .toList(),
+      'regular': s.regularNotifications
+          .map(
+            (n) => {
+              'id': n.id,
+              'title': n.title,
+              'description': n.description,
+              'created_at': n.createdAt.toIso8601String(),
+              'topic': n.topic,
+              'is_read': n.isRead,
+            },
+          )
+          .toList(),
+      'unreadCount': s.unreadCount,
+      'hasNextPage': s.hasNextPage,
+    };
+  }
+
+  Future<NotificationsState> _fetchInitialData(
+    String userId, {
+    SecureStorageService? storage,
+    String? cacheKey,
+  }) async {
     final supabase = Supabase.instance.client;
 
     // 1. Fetch ALL Unread Notifications (both conflicts and regular)
@@ -149,12 +250,31 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
 
     _currentPage = 0;
 
-    return NotificationsState(
+    final result = NotificationsState(
       actionNotifications: actionNotifications,
       regularNotifications: regularNotifications,
       unreadCount: allUnread.length,
       hasNextPage: feedItems.length == _pageSize,
     );
+
+    // Persist to disk cache for instant badge on next app open.
+    if (storage != null && cacheKey != null) {
+      AppLogger.safeUnawait(
+        storage.saveCachedData(cacheKey, _serializeState(result)).catchError((
+          Object e,
+          StackTrace st,
+        ) {
+          AppLogger.e(
+            'NotificationsNotifier: Failed to save cache',
+            e,
+            st,
+          );
+        }),
+        'NotificationsNotifier: saveCachedData',
+      );
+    }
+
+    return result;
   }
 
   Future<NotificationsState> _fetchNextPage({required int page}) async {

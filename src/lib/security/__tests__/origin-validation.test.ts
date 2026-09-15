@@ -125,7 +125,7 @@ describe("Origin Validation Security", () => {
       const req = {
         headers: new Headers({
           "x-forwarded-host": "proxy.com:443",
-          "host": "direct.com",
+          host: "direct.com",
         }),
         nextUrl: { hostname: "internal.com" },
       } as unknown as NextRequest;
@@ -134,7 +134,7 @@ describe("Origin Validation Security", () => {
 
     it("falls back to host then nextUrl", () => {
       const reqHost = {
-        headers: new Headers({ "host": "direct.com:80" }),
+        headers: new Headers({ host: "direct.com:80" }),
         nextUrl: { hostname: "internal.com" },
       } as unknown as NextRequest;
       expect(resolveRequestHostname(reqHost)).toBe("direct.com");

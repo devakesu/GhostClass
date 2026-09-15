@@ -25,8 +25,8 @@ describe("GET /api/docs", () => {
   it("returns 200 from ApiReference in development", async () => {
     vi.stubEnv("NODE_ENV", "development");
     const { ApiReference } = await import("@scalar/nextjs-api-reference");
-    vi.mocked(ApiReference).mockReturnValue(() =>
-      new Response("scalar ui", { status: 200 })
+    vi.mocked(ApiReference).mockReturnValue(
+      () => new Response("scalar ui", { status: 200 }),
     );
     const { GET } = await import("../route");
     const response = GET();

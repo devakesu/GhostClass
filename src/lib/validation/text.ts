@@ -34,10 +34,13 @@ type TextSchemaOptions = {
   collapseWhitespace?: boolean;
 };
 
-function makeTextSchema(
-  { min, max, pattern, error, collapseWhitespace = true }: TextSchemaOptions =
-    {},
-) {
+function makeTextSchema({
+  min,
+  max,
+  pattern,
+  error,
+  collapseWhitespace = true,
+}: TextSchemaOptions = {}) {
   let schema = z.string();
 
   if (typeof min === "number") {
@@ -50,23 +53,22 @@ function makeTextSchema(
     schema = schema.regex(pattern, error);
   }
 
-  return z.preprocess(
-    (value) => {
-      if (typeof value !== "string") return value;
-      return collapseWhitespace
-        ? sanitizeText(value)
-        : stripControlChars(value).trim();
-    },
-    schema,
-  );
+  return z.preprocess((value) => {
+    if (typeof value !== "string") return value;
+    return collapseWhitespace
+      ? sanitizeText(value)
+      : stripControlChars(value).trim();
+  }, schema);
 }
 
 export function makeOptionalTextSchema(options: TextSchemaOptions = {}) {
   const collapseWhitespace = options.collapseWhitespace !== false;
-  return z.preprocess(
-    (value) => normalizeTextValue(value, collapseWhitespace),
-    makeTextSchema(options).nullish(),
-  ).transform((value) => value ?? null);
+  return z
+    .preprocess(
+      (value) => normalizeTextValue(value, collapseWhitespace),
+      makeTextSchema(options).nullish(),
+    )
+    .transform((value) => value ?? null);
 }
 
 const NAME_PATTERN = /^[\p{L}\p{M}.'’\- ]+$/u;
@@ -119,33 +121,38 @@ export const reasonTextSchema = makeTextSchema({
   max: 255,
 });
 
-export const emailSchema = z.string().trim().email("Invalid email format").max(
-  255,
-  "Email too long",
-).transform((value) => value.toLowerCase());
+export const emailSchema = z
+  .string()
+  .trim()
+  .email("Invalid email format")
+  .max(255, "Email too long")
+  .transform((value) => value.toLowerCase());
 
 import { normalizeCourseCode } from "@/lib/utils";
 
-export const courseCodeSchema = z.string().trim().min(
-  1,
-  "Course code is required",
-).max(32, "Course code too long").transform((value) =>
-  normalizeCourseCode(value)
-);
+export const courseCodeSchema = z
+  .string()
+  .trim()
+  .min(1, "Course code is required")
+  .max(32, "Course code too long")
+  .transform((value) => normalizeCourseCode(value));
 
-export const academicYearSchema = z.string().trim().regex(
-  /^\d{4}-(\d{4}|\d{2})$/,
-  "Invalid academic year format (expected YYYY-YYYY or YYYY-YY)",
-);
+export const academicYearSchema = z
+  .string()
+  .trim()
+  .regex(
+    /^\d{4}-(\d{4}|\d{2})$/,
+    "Invalid academic year format (expected YYYY-YYYY or YYYY-YY)",
+  );
 
 export const semesterSchema = z.enum(["odd", "even"]);
 
 export const genderSchema = z.enum(["male", "female", "other"]);
 
-export const birthDateSchema = z.string().trim().regex(
-  /^\d{4}-\d{2}-\d{2}$/,
-  "Birth date must be in YYYY-MM-DD format",
-);
+export const birthDateSchema = z
+  .string()
+  .trim()
+  .regex(/^\d{4}-\d{2}-\d{2}$/, "Birth date must be in YYYY-MM-DD format");
 
 export const ezygoUsernameSchema = makeTextSchema({
   min: 1,
@@ -176,27 +183,36 @@ export const ezygoBirthDateSchema = makeOptionalTextSchema({
   error: "Birth date must be in YYYY-MM-DD format",
 });
 
-export const ezygoProfileSchema = z.object({
-  user_id: z.union([z.string(), z.number()]).transform((value) => String(value))
-    .optional(),
-  username: ezygoUsernameSchema.optional().nullable(),
-  email: emailSchema.optional().nullable(),
-  mobile: ezygoTextSchema.optional().nullable(),
-  first_name: ezygoNameSchema.optional().nullable(),
-  last_name: ezygoNameSchema.optional().nullable(),
-  full_name: ezygoNameSchema.optional().nullable(),
-  gender: ezygoGenderSchema.optional().nullable(),
-  sex: ezygoGenderSchema.optional().nullable(),
-  birth_date: ezygoBirthDateSchema.optional().nullable(),
-  dob: ezygoBirthDateSchema.optional().nullable(),
-  user: z.object({
+export const ezygoProfileSchema = z
+  .object({
+    user_id: z
+      .union([z.string(), z.number()])
+      .transform((value) => String(value))
+      .optional(),
     username: ezygoUsernameSchema.optional().nullable(),
     email: emailSchema.optional().nullable(),
     mobile: ezygoTextSchema.optional().nullable(),
-    id: z.union([z.string(), z.number()]).transform((value) => String(value))
+    first_name: ezygoNameSchema.optional().nullable(),
+    last_name: ezygoNameSchema.optional().nullable(),
+    full_name: ezygoNameSchema.optional().nullable(),
+    gender: ezygoGenderSchema.optional().nullable(),
+    sex: ezygoGenderSchema.optional().nullable(),
+    birth_date: ezygoBirthDateSchema.optional().nullable(),
+    dob: ezygoBirthDateSchema.optional().nullable(),
+    user: z
+      .object({
+        username: ezygoUsernameSchema.optional().nullable(),
+        email: emailSchema.optional().nullable(),
+        mobile: ezygoTextSchema.optional().nullable(),
+        id: z
+          .union([z.string(), z.number()])
+          .transform((value) => String(value))
+          .optional(),
+      })
+      .partial()
       .optional(),
-  }).partial().optional(),
-}).passthrough();
+  })
+  .passthrough();
 
 export const disabledCoursesSchema = z.record(
   z.string(),

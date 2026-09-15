@@ -47,13 +47,17 @@ describe("user actions", () => {
 
       await acceptTermsAction("v1");
 
-      expect(mockSupabase.update).toHaveBeenCalledWith(expect.objectContaining({
-        terms_version: "v1",
-      }));
-      expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({
-        name: "terms_version",
-        value: "v1",
-      }));
+      expect(mockSupabase.update).toHaveBeenCalledWith(
+        expect.objectContaining({
+          terms_version: "v1",
+        }),
+      );
+      expect(mockCookieStore.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "terms_version",
+          value: "v1",
+        }),
+      );
       expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
     });
 
@@ -88,33 +92,39 @@ describe("user actions", () => {
   describe("setTermsVersionCookie", () => {
     it("sets the cookie correctly", async () => {
       await setTermsVersionCookie("v2");
-      expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({
-        name: "terms_version",
-        value: "v2",
-        maxAge: 31536000,
-      }));
+      expect(mockCookieStore.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "terms_version",
+          value: "v2",
+          maxAge: 31536000,
+        }),
+      );
     });
   });
 
   describe("clearTermsVersionCookie", () => {
     it("clears the cookie", async () => {
       await clearTermsVersionCookie();
-      expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({
-        name: "terms_version",
-        value: "",
-        maxAge: 0,
-      }));
+      expect(mockCookieStore.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "terms_version",
+          value: "",
+          maxAge: 0,
+        }),
+      );
     });
   });
 
   describe("clearTermsRedirectCountCookie", () => {
     it("clears the redirect count cookie", async () => {
       await clearTermsRedirectCountCookie();
-      expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({
-        name: "terms_redirect_count",
-        value: "",
-        maxAge: 0,
-      }));
+      expect(mockCookieStore.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "terms_redirect_count",
+          value: "",
+          maxAge: 0,
+        }),
+      );
     });
   });
 });

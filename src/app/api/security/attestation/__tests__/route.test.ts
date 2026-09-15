@@ -225,7 +225,9 @@ describe("GET /api/security/attestation", () => {
 
   it("returns 429 when rate limit is exceeded", async () => {
     const { authRateLimiter } = await import("@/lib/ratelimit");
-    vi.mocked(authRateLimiter.limit).mockResolvedValueOnce({ success: false } as any);
+    vi.mocked(authRateLimiter.limit).mockResolvedValueOnce({
+      success: false,
+    } as any);
 
     const req = new NextRequest("http://localhost/api/security/attestation", {
       method: "GET",
@@ -237,6 +239,8 @@ describe("GET /api/security/attestation", () => {
     const res = await GET(req);
     expect(res.status).toBe(429);
     const data = await res.json();
-    expect(data.error).toBe("Too many attestation requests. Please try again later.");
+    expect(data.error).toBe(
+      "Too many attestation requests. Please try again later.",
+    );
   });
 });

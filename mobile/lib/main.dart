@@ -70,11 +70,8 @@ void main() async {
   // Configure edge-to-edge system UI styling for Android 15 & modern mobile platforms
   SystemChrome.setSystemUIOverlayStyle(
     const SystemUiOverlayStyle(
-      statusBarColor: Colors.transparent,
       statusBarIconBrightness: Brightness.light,
       statusBarBrightness: Brightness.dark,
-      systemNavigationBarColor: Colors.transparent,
-      systemNavigationBarDividerColor: Colors.transparent,
       systemNavigationBarIconBrightness: Brightness.light,
     ),
   );
@@ -137,15 +134,16 @@ void main() async {
   final sKey = AppConfig.supabasePublishableKey.value;
   final sOrigin = AppConfig.supabaseOrigin;
 
-  await Supabase.initialize(
-    url: sUrl,
-    publishableKey: sKey,
-    headers: {
-      'Origin': sOrigin,
-    },
-  );
-
-  await ThemeNotifier.preload();
+  await Future.wait([
+    Supabase.initialize(
+      url: sUrl,
+      publishableKey: sKey,
+      headers: {
+        'Origin': sOrigin,
+      },
+    ),
+    ThemeNotifier.preload(),
+  ]);
 
   // Defer font pre-warm so UI can render faster
   AppLogger.safeUnawait(

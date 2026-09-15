@@ -63,7 +63,7 @@ describe("POST /api/user/accept-terms", () => {
       },
     } as unknown as NextRequest;
 
-    const response = await POST(req, {}) as unknown as MockRes;
+    const response = (await POST(req, {})) as unknown as MockRes;
 
     expect(response.status).toBe(401);
     expect(response.data.error).toBe("Unauthorized");
@@ -81,7 +81,7 @@ describe("POST /api/user/accept-terms", () => {
       error: new Error("Invalid"),
     });
 
-    const response = await POST(req, {}) as unknown as MockRes;
+    const response = (await POST(req, {})) as unknown as MockRes;
 
     expect(response.status).toBe(401);
     expect(response.data.error).toBe("Invalid session");
@@ -107,7 +107,7 @@ describe("POST /api/user/accept-terms", () => {
       },
     );
 
-    const response = await POST(req, {}) as unknown as MockRes;
+    const response = (await POST(req, {})) as unknown as MockRes;
 
     expect(response.status).toBe(200);
     expect(response.data.success).toBe(true);
@@ -130,7 +130,7 @@ describe("POST /api/user/accept-terms", () => {
       error: null,
     });
 
-    const response = await POST(req, {}) as unknown as MockRes;
+    const response = (await POST(req, {})) as unknown as MockRes;
 
     expect(response.status).toBe(400);
     expect(response.data.error).toBe("Version is required");
@@ -149,7 +149,7 @@ describe("POST /api/user/accept-terms", () => {
       error: null,
     });
 
-    const response = await POST(req, {}) as unknown as MockRes;
+    const response = (await POST(req, {})) as unknown as MockRes;
 
     expect(response.status).toBe(400);
     expect(response.data.error).toBe("Invalid version format");
@@ -176,7 +176,7 @@ describe("POST /api/user/accept-terms", () => {
       },
     );
 
-    const response = await POST(req, {}) as unknown as MockRes;
+    const response = (await POST(req, {})) as unknown as MockRes;
 
     expect(response.status).toBe(500);
     expect(response.data.error).toBe("Failed to update terms acceptance");
@@ -196,7 +196,7 @@ describe("POST /api/user/accept-terms", () => {
       error: null,
     });
 
-    const response = await POST(req, {}) as unknown as MockRes;
+    const response = (await POST(req, {})) as unknown as MockRes;
 
     expect(response.status).toBe(400);
     expect(response.data.error).toBe("Invalid request body");

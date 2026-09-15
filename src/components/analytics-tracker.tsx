@@ -91,8 +91,8 @@ export function AnalyticsTracker() {
       window.requestAnimationFrame(() => {
         scrollTicking = false;
 
-        const maxScrollable = document.documentElement.scrollHeight -
-          window.innerHeight;
+        const maxScrollable =
+          document.documentElement.scrollHeight - window.innerHeight;
 
         // If there is no scrollable content, skip scroll depth tracking
         if (maxScrollable <= 0) {
@@ -106,7 +106,8 @@ export function AnalyticsTracker() {
         const thresholds = [25, 50, 75, 90];
         for (const threshold of thresholds) {
           if (
-            scrollPercent >= threshold && !scrollTracked.current.has(threshold)
+            scrollPercent >= threshold &&
+            !scrollTracked.current.has(threshold)
           ) {
             scrollTracked.current.add(threshold);
             trackEvent("scroll", { percent_scrolled: threshold });
@@ -136,7 +137,8 @@ export function AnalyticsTracker() {
         }
 
         const isOutbound = url.hostname !== window.location.hostname;
-        const isDownload = link.hasAttribute("download") ||
+        const isDownload =
+          link.hasAttribute("download") ||
           /\.(pdf|zip|doc|docx|xls|xlsx|ppt|pptx|txt|csv)$/i.test(url.pathname);
 
         if (isOutbound) {
@@ -160,8 +162,10 @@ export function AnalyticsTracker() {
       const form = (e.target as HTMLElement).closest("form");
       if (!form) return;
 
-      const formData = formInteractions.current.get(form) ||
-        { focused: false, submitted: false };
+      const formData = formInteractions.current.get(form) || {
+        focused: false,
+        submitted: false,
+      };
 
       // Use getAttribute to avoid HTMLFormElement named-element getter returning a
       // child <input name="name"> / <input name="action"> instead of the string attribute.
@@ -196,16 +200,16 @@ export function AnalyticsTracker() {
       if (!video || video.tagName !== "VIDEO") return;
 
       // Validate video duration to prevent NaN or Infinity
-      const hasValidDuration = Number.isFinite(video.duration) &&
-        video.duration > 0;
+      const hasValidDuration =
+        Number.isFinite(video.duration) && video.duration > 0;
       const videoDuration = hasValidDuration ? Math.round(video.duration) : 0;
       const videoPercent = hasValidDuration
         ? Math.round((video.currentTime / video.duration) * 100)
         : 0;
 
       const videoData = {
-        video_title: video.title ||
-          (video.currentSrc?.split("/").pop() ?? "unknown"),
+        video_title:
+          video.title || (video.currentSrc?.split("/").pop() ?? "unknown"),
         video_url: video.currentSrc,
         video_duration: videoDuration,
         video_current_time: Math.round(video.currentTime),

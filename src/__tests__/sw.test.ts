@@ -65,8 +65,8 @@ describe("Service Worker", () => {
     await import("../sw");
 
     fetchHandler = listeners.get("fetch")?.[0];
-    activateHandler = listeners.get("activate")?.[1] ||
-      listeners.get("activate")?.[0]; // activate listener
+    activateHandler =
+      listeners.get("activate")?.[1] || listeners.get("activate")?.[0]; // activate listener
     messageHandler = listeners.get("message")?.[0];
   });
 

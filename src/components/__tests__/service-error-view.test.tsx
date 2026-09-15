@@ -74,9 +74,9 @@ describe("ServiceErrorView", () => {
     const refresh = vi.fn();
     const signOut = vi.fn().mockResolvedValue({ error: null });
     vi.mocked(useRouter).mockReturnValue({ push, refresh } as any);
-    vi.mocked(createBrowserClient).mockReturnValue(
-      { auth: { signOut } } as any,
-    );
+    vi.mocked(createBrowserClient).mockReturnValue({
+      auth: { signOut },
+    } as any);
 
     render(<ServiceErrorView />);
     fireEvent.click(screen.getByText("Sign Out"));

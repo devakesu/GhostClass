@@ -179,8 +179,9 @@ describe("performProfileSync", () => {
       createMockResponse("", false, 500),
     );
 
-    await expect(performProfileSync(mockToken, mockEzygoId, mockAuthId)).rejects
-      .toThrow("EzyGo Profile failed: 500");
+    await expect(
+      performProfileSync(mockToken, mockEzygoId, mockAuthId),
+    ).rejects.toThrow("EzyGo Profile failed: 500");
   });
 
   it("handles missing EzyGo User ID", async () => {
@@ -313,14 +314,16 @@ describe("performProfileSync", () => {
     // Mock the second upsert (to 'users' table) to fail
     mockSupabase.upsert.mockImplementation((data: unknown) => {
       const record = data as Record<string, unknown> | undefined;
-      if (record && record.id === "12345") { // This is the users upsert
+      if (record && record.id === "12345") {
+        // This is the users upsert
         return { error: new Error("Database Error") };
       }
       return mockSupabase; // For other upserts (classes, course_mappings)
     });
 
-    await expect(performProfileSync(mockToken, mockEzygoId, mockAuthId)).rejects
-      .toThrow("Database Error");
+    await expect(
+      performProfileSync(mockToken, mockEzygoId, mockAuthId),
+    ).rejects.toThrow("Database Error");
   });
 
   it("handles safeEzygoJson read failure", async () => {
@@ -356,8 +359,9 @@ describe("performProfileSync", () => {
       return {};
     });
 
-    await expect(performProfileSync(mockToken, mockEzygoId, mockAuthId)).rejects
-      .toThrow("EzyGo Profile returned empty or invalid JSON: 200");
+    await expect(
+      performProfileSync(mockToken, mockEzygoId, mockAuthId),
+    ).rejects.toThrow("EzyGo Profile returned empty or invalid JSON: 200");
   });
 
   it("handles coursesRes read failure in catch block", async () => {
@@ -575,16 +579,18 @@ describe("performProfileSync", () => {
     vi.mocked(safeResponseJson).mockImplementation(async (res: unknown) => {
       const text = await (res as Response).text();
       if (text.includes("G1")) {
-        return [{
-          id: 101,
-          code: "C1",
-          usersubgroup: {
-            id: 1,
-            name: "G1",
-            programme_config_group_id: 710,
-            usergroup: { id: 1, name: "Programme A" },
+        return [
+          {
+            id: 101,
+            code: "C1",
+            usersubgroup: {
+              id: 1,
+              name: "G1",
+              programme_config_group_id: 710,
+              usergroup: { id: 1, name: "Programme A" },
+            },
           },
-        }];
+        ];
       }
       return { user_id: "123" };
     });
@@ -718,8 +724,9 @@ describe("performProfileSync", () => {
       return `h-${Buffer.from(value).toString("base64").slice(0, 8)}`;
     });
 
-    await expect(performProfileSync(mockToken, testEzygoId, testAuthId)).rejects
-      .toThrow("Upsert failed");
+    await expect(
+      performProfileSync(mockToken, testEzygoId, testAuthId),
+    ).rejects.toThrow("Upsert failed");
 
     // Verify Sentry was called with redacted IDs
     expect(vi.mocked(captureException)).toHaveBeenCalledOnce();
@@ -815,24 +822,26 @@ describe("performProfileSync", () => {
         return createMockResponse('{"user_id": "12345"}');
       }
       if (url === "institutionuser/courses/withusers") {
-        return createMockResponse(JSON.stringify([
-          {
-            id: 101,
-            code: "CS101",
-            usersubgroup: {
-              id: 9886,
-              name: "CS1B2025-2029 Batch even S2",
-              end_year: "2029",
-              programme_config_group_id: 709,
-              academic_semester: "even",
-              academic_year: "2024-25",
-              usergroup: {
-                id: 65,
-                name: "Computer Science",
+        return createMockResponse(
+          JSON.stringify([
+            {
+              id: 101,
+              code: "CS101",
+              usersubgroup: {
+                id: 9886,
+                name: "CS1B2025-2029 Batch even S2",
+                end_year: "2029",
+                programme_config_group_id: 709,
+                academic_semester: "even",
+                academic_year: "2024-25",
+                usergroup: {
+                  id: 65,
+                  name: "Computer Science",
+                },
               },
             },
-          },
-        ]));
+          ]),
+        );
       }
       return createMockResponse("{}");
     });
@@ -883,10 +892,12 @@ describe("performProfileSync", () => {
     // Verify it matches the cloned class and returns its ID
     expect(result.class?.id).toBe("cloned-class-uuid");
     // Verify it updates it with the new official subgroup name
-    expect(mockSupabase.update).toHaveBeenCalledWith(expect.objectContaining({
-      name: "CS1B2025-2029 Batch even S2",
-      external_group_id: 9886,
-    }));
+    expect(mockSupabase.update).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: "CS1B2025-2029 Batch even S2",
+        external_group_id: 9886,
+      }),
+    );
   });
 
   it("keeps EzyGo default academic context as source of truth even when course cohort differs", async () => {
@@ -903,24 +914,26 @@ describe("performProfileSync", () => {
         return createMockResponse("2024-25");
       }
       if (url === "institutionuser/courses/withusers") {
-        return createMockResponse(JSON.stringify([
-          {
-            id: 101,
-            code: "CS101",
-            usersubgroup: {
-              id: 9886,
-              name: "CS1B2025-2029 Batch even S2",
-              end_year: "2029",
-              programme_config_group_id: 709,
-              academic_semester: "even",
-              academic_year: "2024-25",
-              usergroup: {
-                id: 65,
-                name: "Computer Science",
+        return createMockResponse(
+          JSON.stringify([
+            {
+              id: 101,
+              code: "CS101",
+              usersubgroup: {
+                id: 9886,
+                name: "CS1B2025-2029 Batch even S2",
+                end_year: "2029",
+                programme_config_group_id: 709,
+                academic_semester: "even",
+                academic_year: "2024-25",
+                usergroup: {
+                  id: 65,
+                  name: "Computer Science",
+                },
               },
             },
-          },
-        ]));
+          ]),
+        );
       }
       return createMockResponse("{}");
     });
@@ -949,8 +962,9 @@ describe("performProfileSync", () => {
 
     // Verify no self-heal semester update was triggered
     const calls = vi.mocked(egressFetch).mock.calls;
-    const postCall = calls.find((c) =>
-      c[0] === "user/setting/default_semester" && c[1]?.method === "POST"
+    const postCall = calls.find(
+      (c) =>
+        c[0] === "user/setting/default_semester" && c[1]?.method === "POST",
     );
     expect(postCall).toBeUndefined();
   });

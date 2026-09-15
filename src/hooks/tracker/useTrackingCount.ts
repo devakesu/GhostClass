@@ -19,7 +19,9 @@ export function useTrackingCount(
     queryFn: async () => {
       // getSession() reads the JWT from local storage — no network call.
       // RLS on the tracker table validates the JWT server-side.
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user) return 0;
 
       // Explicit null checks to prevent race conditions

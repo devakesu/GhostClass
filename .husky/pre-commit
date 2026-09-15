@@ -1,3 +1,22 @@
+set -e
+
+# 1. Sync repository version
 node scripts/sync-version.js --pre-commit
+
+# 2. Format frontend code
+npx prettier --write src/
+
+# 3. Format mobile Dart code
+(cd mobile && dart format .)
+
+# 4. Stage formatted and synchronized files
+git add -u
+
+# 5. Run lint-staged (tsc typecheck and eslint --fix)
 npx lint-staged
-(cd mobile && dart format . && flutter analyze)
+
+# 6. Analyze mobile Dart code
+(cd mobile && flutter analyze)
+
+# 7. Ensure any remaining auto-fixes are staged
+git add -u

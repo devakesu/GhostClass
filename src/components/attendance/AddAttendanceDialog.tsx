@@ -328,7 +328,8 @@ function checkIfSessionBlocked(
   if (!isBlocked && trackingData) {
     const targetDbDate = normalizeDate(date);
     isBlocked = trackingData.some((t) => {
-      const isMatch = normalizeDate(t.date) === targetDbDate &&
+      const isMatch =
+        normalizeDate(t.date) === targetDbDate &&
         normalizeSession(t.session) === targetSession;
       return isMatch;
     });
@@ -610,12 +611,10 @@ export function AddAttendanceDialog({
                     className={cn(
                       "w-full justify-start text-left font-normal bg-accent/20 border-border/50 hover:bg-accent/30",
                     )}
-                    aria-label={`Selected date: ${
-                      format(
-                        date,
-                        "MMMM d, yyyy",
-                      )
-                    }. Click to change date`}
+                    aria-label={`Selected date: ${format(
+                      date,
+                      "MMMM d, yyyy",
+                    )}. Click to change date`}
                   >
                     <CalendarIcon className="mr-2 h-4 w-4" aria-hidden="true" />
                     {format(date, "PPP")}
@@ -635,7 +634,8 @@ export function AddAttendanceDialog({
                           size="icon"
                           className="h-7 w-7"
                           onClick={() =>
-                            setCurrentMonth(subMonths(currentMonth, 1))}
+                            setCurrentMonth(subMonths(currentMonth, 1))
+                          }
                           aria-label="Previous month"
                         >
                           <ChevronLeft className="h-4 w-4" aria-hidden="true" />
@@ -648,7 +648,8 @@ export function AddAttendanceDialog({
                           size="icon"
                           className="h-7 w-7"
                           onClick={() =>
-                            setCurrentMonth(addMonths(currentMonth, 1))}
+                            setCurrentMonth(addMonths(currentMonth, 1))
+                          }
                           aria-label="Next month"
                         >
                           <ChevronRight
@@ -684,7 +685,8 @@ export function AddAttendanceDialog({
                           // CHECK IF DATE IS VALID
                           let isDisabled = false;
                           if (semesterBounds.min && semesterBounds.max) {
-                            isDisabled = isBefore(day, semesterBounds.min) ||
+                            isDisabled =
+                              isBefore(day, semesterBounds.min) ||
                               isAfter(day, semesterBounds.max);
                           }
 
@@ -784,8 +786,11 @@ export function AddAttendanceDialog({
                   <Select
                     value={courseId}
                     onValueChange={setCourseId}
-                    disabled={!profile?.class?.id ||
-                      sortedCourses.length === 0 || isSessionBlocked}
+                    disabled={
+                      !profile?.class?.id ||
+                      sortedCourses.length === 0 ||
+                      isSessionBlocked
+                    }
                   >
                     <SelectTrigger
                       id="course-select"
@@ -801,10 +806,11 @@ export function AddAttendanceDialog({
                           )}
                         />
                         <SelectValue
-                          placeholder={!profile?.class?.id ||
-                              sortedCourses.length === 0
-                            ? "No courses available"
-                            : "Select Subject"}
+                          placeholder={
+                            !profile?.class?.id || sortedCourses.length === 0
+                              ? "No courses available"
+                              : "Select Subject"
+                          }
                         />
                       </div>
                     </SelectTrigger>
@@ -902,9 +908,11 @@ export function AddAttendanceDialog({
                     id="remarks-dialog"
                     value={remarks}
                     onChange={(e) => setRemarks(e.target.value)}
-                    placeholder={statusType === "Duty Leave"
-                      ? "Required for Duty Leave"
-                      : "Optional notes"}
+                    placeholder={
+                      statusType === "Duty Leave"
+                        ? "Required for Duty Leave"
+                        : "Optional notes"
+                    }
                     className={cn(
                       "bg-accent/20 border-border/50",
                       statusType === "Duty Leave" &&
@@ -958,11 +966,13 @@ export function AddAttendanceDialog({
           </Button>
           <Button
             onClick={handleSubmit}
-            disabled={isSubmitting ||
+            disabled={
+              isSubmitting ||
               !courseId ||
               !session ||
               isSessionBlocked ||
-              (statusType === "Duty Leave" && remarks.trim().length === 0)}
+              (statusType === "Duty Leave" && remarks.trim().length === 0)
+            }
             className={cn(
               "custom-button transition-colors min-w-30",
               statusType === "Present" &&

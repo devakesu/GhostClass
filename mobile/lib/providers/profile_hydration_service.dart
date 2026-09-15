@@ -27,6 +27,7 @@ final profileHydrationServiceProvider =
 class ProfileHydrationService extends Notifier<void> {
   Future<void>? _refreshProfileInFlight;
   Future<AuthenticatedUser>? _profileRefreshInFlight;
+  bool _profileRefreshInFlightIsForced = false;
   int _profileRefreshGeneration = 0;
   DateTime? _lastRefresh;
 
@@ -39,6 +40,7 @@ class ProfileHydrationService extends Notifier<void> {
     _profileRefreshGeneration++;
     _refreshProfileInFlight = null;
     _profileRefreshInFlight = null;
+    _profileRefreshInFlightIsForced = false;
     _lastRefresh = null;
   }
 
@@ -142,14 +144,18 @@ class ProfileHydrationService extends Notifier<void> {
     if (session == null) return null;
 
     final storage = ref.read(secureStorageProvider);
-    final ezygoToken = await storage.getNormalizedEzygoToken();
+    final results = await Future.wait<dynamic>([
+      storage.getNormalizedEzygoToken(),
+      storage.getAcademicState(),
+    ]);
+    final ezygoToken = results[0] as String?;
+    final localAcademic = results[1] as AcademicState?;
 
     final user = await buildStoredUserForIdentity(
       supabaseUserId: session.user.id,
       ezygoToken: ezygoToken ?? '',
     );
 
-    final localAcademic = await storage.getAcademicState();
     final hasAcademic =
         localAcademic != null &&
         localAcademic.semester.trim().isNotEmpty &&
@@ -184,9 +190,16 @@ class ProfileHydrationService extends Notifier<void> {
     if (result.hasChanges) {
       AppLogger.i(
         'ProfileHydrationService: Cron sync reported changes ($result). '
-        'Invalidating all screen providers.',
+        'Updating required fields across dashboard, calendar, tracking, and notifications.',
       );
-      invalidateAllScreenProviders();
+      ref.read(apiServiceProvider).clearCaches();
+
+      // 1. Reload notifications page
+      ref.invalidate(notificationsProvider);
+
+      // 2. Invalidate screen providers so fresh live data smoothly updates required fields
+      // and atomically overwrites disk cache without partial eviction race conditions.
+      invalidateAllScreenProviders(includeNotifications: false);
     } else {
       AppLogger.d(
         'ProfileHydrationService: Cron sync reported no changes ($result).',
@@ -427,7 +440,38 @@ class ProfileHydrationService extends Notifier<void> {
     bool force = false,
   }) {
     final inFlight = _profileRefreshInFlight;
-    if (inFlight != null) return inFlight;
+    // Only coalesce if the in-flight request has equal-or-greater priority.
+    // A force=true caller should NOT be coalesced into a non-forced in-flight
+    // because the non-forced request may skip the full EzyGo sync.
+    if (inFlight != null && (!force || _profileRefreshInFlightIsForced)) {
+      return inFlight;
+    }
+
+    // If a non-forced request is in-flight and we need a forced one, wait for
+    // the current one to complete then fire the forced refresh.
+    if (inFlight != null && force && !_profileRefreshInFlightIsForced) {
+      AppLogger.i(
+        'ProfileHydrationService: Forced refresh requested while non-forced is '
+        'in-flight. Will chain a forced refresh after current completes.',
+      );
+      final future = inFlight.then(
+        (_) => _fetchAndApplyServerProfile(
+          user,
+          supabaseToken: supabaseToken,
+          updateState: updateState,
+          sync: true,
+          force: true,
+        ),
+      );
+      _profileRefreshInFlight = future;
+      _profileRefreshInFlightIsForced = true;
+      return future.whenComplete(() {
+        if (identical(_profileRefreshInFlight, future)) {
+          _profileRefreshInFlight = null;
+          _profileRefreshInFlightIsForced = false;
+        }
+      });
+    }
 
     final future = _fetchAndApplyServerProfile(
       user,
@@ -437,10 +481,12 @@ class ProfileHydrationService extends Notifier<void> {
       force: force,
     );
     _profileRefreshInFlight = future;
+    _profileRefreshInFlightIsForced = force;
 
     return future.whenComplete(() {
       if (identical(_profileRefreshInFlight, future)) {
         _profileRefreshInFlight = null;
+        _profileRefreshInFlightIsForced = false;
       }
     });
   }
@@ -595,15 +641,20 @@ class ProfileHydrationService extends Notifier<void> {
     final newSem = profile.currentSemester;
     final newYear = profile.currentYear;
     final newClassLabel = profile.classField?.name;
+    final newClassId = profile.classField?.id;
 
     final localAcademic = await storage.getAcademicState();
     final oldSem =
         currentUser.profile?.currentSemester ?? localAcademic?.semester;
     final oldYear = currentUser.profile?.currentYear ?? localAcademic?.year;
     final oldClassLabel = currentUser.profile?.classField?.name;
+    final oldClassId = currentUser.profile?.classField?.id;
 
     final classChanged =
-        oldClassLabel != null && oldClassLabel != newClassLabel;
+        (oldClassLabel != newClassLabel &&
+            (oldClassLabel != null || newClassLabel != null)) ||
+        (oldClassId != newClassId &&
+            (oldClassId != null || newClassId != null));
     final academicChanged =
         semestersDiffer(oldSem, newSem) || yearsDiffer(oldYear, newYear);
 
@@ -613,7 +664,9 @@ class ProfileHydrationService extends Notifier<void> {
         'Purging caches and invalidating page providers.',
       );
       ref.read(apiServiceProvider).clearCaches();
-      await storage.clearAllCachedData();
+      if (classChanged) {
+        await storage.clearAllCachedData();
+      }
 
       if (nextAcademic != null) {
         await storage.saveAcademicState(nextAcademic);

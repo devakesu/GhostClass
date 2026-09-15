@@ -106,9 +106,7 @@ describe("useNotifications", () => {
 
     vi.mocked(useInfiniteQuery).mockReturnValue({
       data: {
-        pages: [
-          { data: [actionNotif, regularNotif], nextPage: null },
-        ],
+        pages: [{ data: [actionNotif, regularNotif], nextPage: null }],
       },
       isLoading: false,
     } as any);
@@ -144,13 +142,13 @@ describe("useNotifications", () => {
 
     const useQueryCalls = vi.mocked(useQuery).mock.calls;
 
-    const actionsQuery = useQueryCalls.find((call) =>
-      call[0].queryKey?.[1] === "unread"
+    const actionsQuery = useQueryCalls.find(
+      (call) => call[0].queryKey?.[1] === "unread",
     );
     expect(actionsQuery?.[0].enabled).toBe(false);
 
-    const unreadCountQuery = useQueryCalls.find((call) =>
-      call[0].queryKey?.[1] === "unreadCount"
+    const unreadCountQuery = useQueryCalls.find(
+      (call) => call[0].queryKey?.[1] === "unreadCount",
     );
     expect(unreadCountQuery?.[0].enabled).toBe(true);
 
@@ -184,9 +182,10 @@ describe("useNotifications", () => {
     it("fetches action notifications from supabase", async () => {
       renderHook(() => useNotifications());
 
-      const queryFn = vi.mocked(useQuery).mock.calls.find((call) =>
-        call[0].queryKey?.[1] === "unread"
-      )![0].queryFn as (...args: any[]) => any;
+      const queryFn = vi
+        .mocked(useQuery)
+        .mock.calls.find((call) => call[0].queryKey?.[1] === "unread")![0]
+        .queryFn as (...args: any[]) => any;
 
       mockSupabase.then.mockImplementationOnce((onFulfilled: any) => {
         return Promise.resolve({ data: [{ id: 1 }], error: null }).then(
@@ -209,8 +208,10 @@ describe("useNotifications", () => {
       ) => any;
 
       mockSupabase.then.mockImplementationOnce((onFulfilled: any) => {
-        return Promise.resolve({ data: Array(20).fill({ id: 1 }), error: null })
-          .then(onFulfilled);
+        return Promise.resolve({
+          data: Array(20).fill({ id: 1 }),
+          error: null,
+        }).then(onFulfilled);
       });
 
       const result = await queryFn({ pageParam: 0 });
@@ -222,9 +223,10 @@ describe("useNotifications", () => {
     it("fetches unread count using head-only query", async () => {
       renderHook(() => useNotifications());
 
-      const queryFn = vi.mocked(useQuery).mock.calls.find((call) =>
-        call[0].queryKey?.[1] === "unreadCount"
-      )![0].queryFn as (...args: any[]) => any;
+      const queryFn = vi
+        .mocked(useQuery)
+        .mock.calls.find((call) => call[0].queryKey?.[1] === "unreadCount")![0]
+        .queryFn as (...args: any[]) => any;
 
       mockSupabase.then.mockImplementationOnce((onFulfilled: any) => {
         return Promise.resolve({ count: 5, error: null }).then(onFulfilled);
@@ -299,10 +301,10 @@ describe("useNotifications", () => {
       expect(mockQueryClient.cancelQueries).toHaveBeenCalledWith({
         queryKey: ["notifications"],
       });
-      expect(setQueryData).toHaveBeenCalledWith([
-        "notifications",
-        "unreadCount",
-      ], expect.any(Function));
+      expect(setQueryData).toHaveBeenCalledWith(
+        ["notifications", "unreadCount"],
+        expect.any(Function),
+      );
       expect(setQueryData).toHaveBeenCalledWith(
         ["notifications", "feed"],
         expect.any(Object),
@@ -315,10 +317,10 @@ describe("useNotifications", () => {
       // Test mark all as read
       setQueryData.mockClear();
       await onMutate({ isRead: true });
-      expect(setQueryData).toHaveBeenCalledWith([
-        "notifications",
-        "unreadCount",
-      ], 0);
+      expect(setQueryData).toHaveBeenCalledWith(
+        ["notifications", "unreadCount"],
+        0,
+      );
       expect(setQueryData).toHaveBeenCalledWith(
         ["notifications", "unread"],
         [],
@@ -354,10 +356,10 @@ describe("useNotifications", () => {
         ["notifications", "feed"],
         context.previousFeed,
       );
-      expect(setQueryData).toHaveBeenCalledWith([
-        "notifications",
-        "unreadCount",
-      ], context.previousUnreadCount);
+      expect(setQueryData).toHaveBeenCalledWith(
+        ["notifications", "unreadCount"],
+        context.previousUnreadCount,
+      );
     });
   });
 });

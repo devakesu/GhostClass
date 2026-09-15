@@ -53,7 +53,9 @@ export function useTrackingData(
       // getSession() reads the JWT from local storage — no network call.
       // The actual Supabase query below is RLS-protected, so an expired/invalid
       // JWT will be rejected by Postgres regardless.
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user) return [];
 
       // Explicit null checks to prevent race conditions
@@ -86,7 +88,10 @@ export function useTrackingData(
 
       return (data as TrackAttendance[]) || [];
     },
-    enabled: !!user && (options?.enabled !== false) && !!resolvedSemester &&
+    enabled:
+      !!user &&
+      options?.enabled !== false &&
+      !!resolvedSemester &&
       !!resolvedAcademicYear,
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

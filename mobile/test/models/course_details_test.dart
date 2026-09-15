@@ -11,7 +11,7 @@ void main() {
         'academic_year': '2026',
         'academic_semester': 'S3',
         'usersubgroup': {
-          'usergroup': {'name': 'GroupA'},
+          'name': 'GroupA',
         },
         'institution_users': [
           {
@@ -27,6 +27,7 @@ void main() {
       expect(c.name, 'Algorithms');
       expect(c.safeId, 'CS201');
       expect(c.userGroupName, 'GroupA');
+      expect(c.userSubgroupName, 'GroupA');
       expect(c.institutionUsers.length, 1);
       expect(c.institutionUsers[0].firstName, 'Prof');
       expect(c.institutionUsers[0].pivot.courseroleId, 2);
@@ -38,6 +39,7 @@ void main() {
         'academic_year': '2026',
         'academic_semester': 'S3',
         'user_group_name': 'GroupA',
+        'usersubgroup_name': 'GroupA',
       };
       expect(c.toJson(), expectedJson);
     });
@@ -67,13 +69,12 @@ void main() {
         'id': 20,
         'name': 'OOP',
         'usersubgroup': {
-          'usergroup': {
-            'name': 'Lecture B',
-          },
+          'name': 'Lecture B',
         },
       };
       final course = CourseDetails.fromJson(json);
       expect(course.userGroupName, 'Lecture B');
+      expect(course.userSubgroupName, 'Lecture B');
     });
 
     test(

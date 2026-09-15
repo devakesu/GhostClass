@@ -32,19 +32,13 @@ vi.mock("@/components/error-boundary", () => ({
 // Mock framer-motion
 vi.mock("framer-motion", async () => {
   const React = await import("react");
-  const MotionDiv = React.forwardRef((
-    { children, animate, ...props }: any,
-    ref: any,
-  ) => (
-    <div
-      ref={ref}
-      data-testid="motion-div"
-      data-animate={animate}
-      {...props}
-    >
-      {children}
-    </div>
-  ));
+  const MotionDiv = React.forwardRef(
+    ({ children, animate, ...props }: any, ref: any) => (
+      <div ref={ref} data-testid="motion-div" data-animate={animate} {...props}>
+        {children}
+      </div>
+    ),
+  );
   MotionDiv.displayName = "MotionDiv";
   return {
     LazyMotion: ({ children }: any) => children,
@@ -65,9 +59,8 @@ describe("ProtectedLayout", () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.stubGlobal(
-      "requestAnimationFrame",
-      (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 0),
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
+      setTimeout(() => cb(Date.now()), 0),
     );
     vi.mocked(useScroll).mockReturnValue({
       scrollY: { on: mockOn } as any,
@@ -111,8 +104,9 @@ describe("ProtectedLayout", () => {
       scrollCallback(200);
     });
     await waitFor(() => {
-      expect(screen.getByTestId("motion-div").getAttribute("data-animate"))
-        .toBe("hidden");
+      expect(
+        screen.getByTestId("motion-div").getAttribute("data-animate"),
+      ).toBe("hidden");
     });
 
     // Scroll up
@@ -120,8 +114,9 @@ describe("ProtectedLayout", () => {
       scrollCallback(100);
     });
     await waitFor(() => {
-      expect(screen.getByTestId("motion-div").getAttribute("data-animate"))
-        .toBe("visible");
+      expect(
+        screen.getByTestId("motion-div").getAttribute("data-animate"),
+      ).toBe("visible");
     });
   });
 });

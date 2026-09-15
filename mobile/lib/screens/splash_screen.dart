@@ -10,10 +10,12 @@ import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
+import 'package:ghostclass/logic/attendance_utils.dart';
 import 'package:ghostclass/logic/error_utils.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/main.dart';
+import 'package:ghostclass/providers/academic_provider.dart';
 import 'package:ghostclass/providers/app_update_provider.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
@@ -148,10 +150,29 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       AppLogger.i('SplashScreen: Future.wait completed');
 
       if (integrityError != null) {
-        Error.throwWithStackTrace(
-          integrityError!,
-          integrityStack ?? StackTrace.current,
-        );
+        final currentError = integrityError!;
+        final appEx = currentError is AppException ? currentError : null;
+        final isCriticalSecurity =
+            appEx != null &&
+            appEx.details?['type'] == 'security' &&
+            appEx.details?['criticalRisk'] == true;
+
+        final isNetworkError =
+            currentError is DioException ||
+            (appEx != null &&
+                (appEx.type == AppExceptionType.network ||
+                    appEx.type == AppExceptionType.server));
+
+        if (!isCriticalSecurity && isNetworkError && user != null) {
+          AppLogger.w(
+            'SplashScreen: Non-blocking network error during integrity check ($currentError). Permitting offline cached boot.',
+          );
+        } else {
+          Error.throwWithStackTrace(
+            currentError,
+            integrityStack ?? StackTrace.current,
+          );
+        }
       }
       if (authError != null) {
         Error.throwWithStackTrace(authError!, authStack ?? StackTrace.current);
@@ -217,10 +238,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       );
     }
 
+    // Fire both in parallel immediately — do NOT delay tracking by a frame.
+    // The loading overlay must stay until tracking disk-cache resolves, so
+    // tracking must start as early as possible alongside the dashboard.
     prewarm(dashboardFuture, 'dashboard');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      prewarm(trackingFuture, 'tracking');
-    });
+    prewarm(trackingFuture, 'tracking');
   }
 
   @override
@@ -243,11 +265,28 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
   }
 
   Future<void> _initializeApp() async {
+    // 0. Fire startup queries early in background at splash beginning so cache is warm
+    final currentSession = ref.read(supabaseClientProvider).auth.currentSession;
+    if (currentSession != null) {
+      AppLogger.safeUnawait(
+        Future.wait<dynamic>([
+          ref.read(authProvider.future),
+          ref.read(academicProvider.future),
+          ref.read(dashboardProvider.future),
+          ref.read(trackingProvider.future),
+        ]).catchError((Object e, StackTrace st) {
+          AppLogger.d('SplashScreen: early query prewarm non-fatal error: $e');
+          return <dynamic>[];
+        }),
+        'SplashScreen: early startup queries trigger',
+      );
+    }
+
     // Keep the splash visible for 750ms to allow entrance animation to play cleanly
     final splashHold = Future<void>.delayed(
       const Duration(milliseconds: 750),
       () {
-        AppLogger.i('SplashScreen: 350ms entrance animation delay completed');
+        AppLogger.i('SplashScreen: 750ms entrance animation delay completed');
       },
     );
 
@@ -437,28 +476,63 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     final token = supabaseClient.auth.currentSession?.accessToken;
 
     if (finalUser != null) {
-      final storage = ref.read(secureStorageProvider);
-      final localAcademic = await storage.getAcademicState();
+      var localAcademic = ref.read(academicProvider).value;
+      if (localAcademic == null ||
+          localAcademic.semester.trim().isEmpty ||
+          localAcademic.year.trim().isEmpty) {
+        final storage = ref.read(secureStorageProvider);
+        localAcademic = await storage.getAcademicState();
+      }
       final hasLocalAcademic =
           localAcademic != null &&
           localAcademic.semester.trim().isNotEmpty &&
           localAcademic.year.trim().isNotEmpty;
 
       if (!hasLocalAcademic) {
-        AppLogger.i(
-          'SplashScreen: Missing local academic state. Running fallback blocking profile sync...',
-        );
-        try {
-          await ref
-              .read(profileHydrationServiceProvider.notifier)
-              .runProfileRefresh(finalUser, sync: true, force: true);
-        } on Object catch (syncErr, syncSt) {
-          AppLogger.e(
-            'SplashScreen: Fallback blocking profile sync failed',
-            syncErr,
-            syncSt,
+        final sem =
+            finalUser.profile?.currentSemester ?? finalUser.settings.semester;
+        final yr =
+            finalUser.profile?.currentYear ?? finalUser.settings.academicYear;
+        if (sem != null && yr != null) {
+          final seeded = AcademicState(semester: sem, year: yr);
+          ref.read(academicProvider.notifier).updateState(seeded);
+          final storage = ref.read(secureStorageProvider);
+          AppLogger.safeUnawait(
+            storage.saveAcademicState(seeded).catchError((
+              Object e,
+              StackTrace st,
+            ) {
+              AppLogger.e(
+                'SplashScreen: saveAcademicState fallback failed',
+                e,
+                st,
+              );
+            }),
+            'SplashScreen: saveAcademicState fallback',
           );
+        } else {
+          final fallback = calculateCurrentAcademicInfo();
+          final seeded = AcademicState(
+            semester: fallback['current_semester']!,
+            year: fallback['current_year']!,
+          );
+          ref.read(academicProvider.notifier).updateState(seeded);
         }
+
+        AppLogger.safeUnawait(
+          ref
+              .read(profileHydrationServiceProvider.notifier)
+              .runProfileRefresh(finalUser, sync: true, force: true)
+              .catchError((Object syncErr, StackTrace syncSt) {
+                AppLogger.e(
+                  'SplashScreen: Deferred background profile sync failed',
+                  syncErr,
+                  syncSt,
+                );
+                return finalUser;
+              }),
+          'SplashScreen: deferred background profile sync',
+        );
       }
 
       if (!mounted) return;

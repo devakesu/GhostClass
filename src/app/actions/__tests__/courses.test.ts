@@ -105,10 +105,12 @@ describe("course actions", () => {
       const result = await addCourseAction(formData);
 
       expect(result).toEqual({});
-      expect(mockSupabase.insert).toHaveBeenCalledWith(expect.objectContaining({
-        course_code: "CS101",
-        course_name: "intro to computer science",
-      }));
+      expect(mockSupabase.insert).toHaveBeenCalledWith(
+        expect.objectContaining({
+          course_code: "CS101",
+          course_name: "intro to computer science",
+        }),
+      );
       expect(revalidatePath).toHaveBeenCalledWith("/dashboard");
     });
 
@@ -118,9 +120,9 @@ describe("course actions", () => {
       formData.append("courseName", "Intro CS");
       formData.append("cf-turnstile-response", "valid");
 
-      vi.mocked(fetch).mockResolvedValue(
-        { json: async () => ({ success: true }) } as never,
-      );
+      vi.mocked(fetch).mockResolvedValue({
+        json: async () => ({ success: true }),
+      } as never);
 
       const mockSupabase = {
         auth: {

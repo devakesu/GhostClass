@@ -26,8 +26,10 @@ async function authenticateUser(
   const authHeader = req.headers.get("authorization");
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
-    const { data: { user: authUser }, error } = await supabaseAdmin.auth
-      .getUser(token);
+    const {
+      data: { user: authUser },
+      error,
+    } = await supabaseAdmin.auth.getUser(token);
     if (error || !authUser) {
       logger.error(
         "[register-fcm] Supabase auth.getUser error:",
@@ -42,7 +44,10 @@ async function authenticateUser(
   }
 
   const supabase = await createClient();
-  const { data: { user: authUser }, error } = await supabase.auth.getUser();
+  const {
+    data: { user: authUser },
+    error,
+  } = await supabase.auth.getUser();
   if (error || !authUser) {
     logger.error(
       "[register-fcm] Supabase client auth.getUser error:",
@@ -96,10 +101,13 @@ const postHandler = async (
         },
       );
     }
-    return NextResponse.json({ error: "Unauthorized" }, {
-      status: 401,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      {
+        status: 401,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   }
 
   let body = decryptedBody;
@@ -107,19 +115,25 @@ const postHandler = async (
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid JSON body" }, {
-        status: 400,
-        headers: { "Cache-Control": "no-store" },
-      });
+      return NextResponse.json(
+        { error: "Invalid JSON body" },
+        {
+          status: 400,
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
     }
   }
 
   const parsed = FcmTokenSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation failed" }, {
-      status: 422,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      { error: "Validation failed" },
+      {
+        status: 422,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   }
 
   const { fcm_token } = parsed.data;
@@ -138,10 +152,13 @@ const postHandler = async (
     Sentry.captureException(updateError, {
       tags: { type: "db_update_error", location: "api/auth/register-fcm" },
     });
-    return NextResponse.json({ error: "Failed to register FCM token" }, {
-      status: 500,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      { error: "Failed to register FCM token" },
+      {
+        status: 500,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   }
 
   return NextResponse.json({ success: true });

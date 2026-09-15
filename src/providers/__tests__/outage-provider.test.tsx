@@ -4,9 +4,13 @@ import { OutageProvider, useOutage } from "../outage-provider";
 
 // Mock ServiceErrorView to avoid Radix/Framer issues in tests
 vi.mock("@/components/service-error-view", () => ({
-  ServiceErrorView: (
-    { messages, error }: { messages: string[]; error?: string },
-  ) => (
+  ServiceErrorView: ({
+    messages,
+    error,
+  }: {
+    messages: string[];
+    error?: string;
+  }) => (
     <div data-testid="error-view">
       <div data-testid="messages">{messages.join(", ")}</div>
       {error && <div data-testid="details">{error}</div>}
@@ -25,7 +29,9 @@ function TestComponent() {
       >
         Set True
       </button>
-      <button data-testid="reset" onClick={() => resetOutage()}>Reset</button>
+      <button data-testid="reset" onClick={() => resetOutage()}>
+        Reset
+      </button>
     </div>
   );
 }

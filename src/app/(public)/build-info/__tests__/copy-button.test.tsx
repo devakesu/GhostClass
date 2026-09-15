@@ -63,10 +63,13 @@ describe("CopyButton", () => {
     expect(await screen.findByText("Copied")).toBeInTheDocument();
 
     // Use a longer timeout for the waitFor to account for the 2s delay
-    await waitFor(() => {
-      expect(screen.queryByText("Copied")).not.toBeInTheDocument();
-      expect(screen.getByText("Copy Me")).toBeInTheDocument();
-    }, { timeout: 3000 });
+    await waitFor(
+      () => {
+        expect(screen.queryByText("Copied")).not.toBeInTheDocument();
+        expect(screen.getByText("Copy Me")).toBeInTheDocument();
+      },
+      { timeout: 3000 },
+    );
   });
 });
 

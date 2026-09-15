@@ -18,73 +18,98 @@ class StatsGridSection extends StatelessWidget {
     final screenWidth = MediaQuery.of(context).size.width;
     final cardWidth = (screenWidth - 40 - 12) / 2;
     final targetHeight = (cardWidth / 1.8).clamp(96.0, double.infinity);
-    final childAspectRatio = cardWidth / targetHeight;
 
     return SliverPadding(
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
       sliver: SliverList(
         delegate: SliverChildListDelegate([
-          // 2x2 Grid for Attendance Stats
-          GridView.count(
-            padding: EdgeInsets.zero,
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: childAspectRatio,
+          // 2x2 Layout for Attendance Stats (Row-based to avoid shrinkWrap layout penalty)
+          Row(
             children: [
-              _StatCard(
-                title: 'Present (+DL)',
-                value: stats.officialPresent,
-                icon: LucideIcons.checkCircle,
-                color: Colors.green,
-                corrections: [
-                  if (stats.corrPresent > 0)
-                    _Correction(
-                      value: stats.corrPresent,
-                      color: const Color(0xFFF97316),
-                    ),
-                  if (stats.extraPresent > 0)
-                    _Correction(value: stats.extraPresent, color: Colors.blue),
-                ],
+              Expanded(
+                child: SizedBox(
+                  height: targetHeight,
+                  child: _StatCard(
+                    title: 'Present (+DL)',
+                    value: stats.officialPresent,
+                    icon: LucideIcons.checkCircle,
+                    color: Colors.green,
+                    corrections: [
+                      if (stats.corrPresent > 0)
+                        _Correction(
+                          value: stats.corrPresent,
+                          color: const Color(0xFFF97316),
+                        ),
+                      if (stats.extraPresent > 0)
+                        _Correction(
+                          value: stats.extraPresent,
+                          color: Colors.blue,
+                        ),
+                    ],
+                  ),
+                ),
               ),
-              _StatCard(
-                title: 'Absent',
-                value: stats.officialAbsent,
-                icon: LucideIcons.xCircle,
-                color: Colors.red,
-                corrections: [
-                  if (stats.savedAbsent > 0)
-                    _Correction(
-                      value: stats.savedAbsent,
-                      color: const Color(0xFFF97316),
-                      isNegative: true,
-                    ),
-                  if (stats.extraAbsent > 0)
-                    _Correction(value: stats.extraAbsent, color: Colors.blue),
-                ],
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: targetHeight,
+                  child: _StatCard(
+                    title: 'Absent',
+                    value: stats.officialAbsent,
+                    icon: LucideIcons.xCircle,
+                    color: Colors.red,
+                    corrections: [
+                      if (stats.savedAbsent > 0)
+                        _Correction(
+                          value: stats.savedAbsent,
+                          color: const Color(0xFFF97316),
+                          isNegative: true,
+                        ),
+                      if (stats.extraAbsent > 0)
+                        _Correction(
+                          value: stats.extraAbsent,
+                          color: Colors.blue,
+                        ),
+                    ],
+                  ),
+                ),
               ),
-              _StatCard(
-                title: 'Duty Leave(s)',
-                value: stats.officialDL,
-                icon: LucideIcons.calendarCheck,
-                color: Colors.amber,
-                corrections: [
-                  if (stats.corrDL > 0)
-                    _Correction(
-                      value: stats.corrDL,
-                      color: const Color(0xFFF97316),
-                    ),
-                  if (stats.extraDL > 0)
-                    _Correction(value: stats.extraDL, color: Colors.blue),
-                ],
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: SizedBox(
+                  height: targetHeight,
+                  child: _StatCard(
+                    title: 'Duty Leave(s)',
+                    value: stats.officialDL,
+                    icon: LucideIcons.calendarCheck,
+                    color: Colors.amber,
+                    corrections: [
+                      if (stats.corrDL > 0)
+                        _Correction(
+                          value: stats.corrDL,
+                          color: const Color(0xFFF97316),
+                        ),
+                      if (stats.extraDL > 0)
+                        _Correction(value: stats.extraDL, color: Colors.blue),
+                    ],
+                  ),
+                ),
               ),
-              _StatCard(
-                title: 'Special Leave(s)',
-                value: stats.specialLeaveCount,
-                icon: LucideIcons.star,
-                color: Colors.teal,
+              const SizedBox(width: 12),
+              Expanded(
+                child: SizedBox(
+                  height: targetHeight,
+                  child: _StatCard(
+                    title: 'Special Leave(s)',
+                    value: stats.specialLeaveCount,
+                    icon: LucideIcons.star,
+                    color: Colors.teal,
+                  ),
+                ),
               ),
             ],
           ),

@@ -1,4 +1,6 @@
 import { EventEmitter } from "node:events";
+import dns from "node:dns";
+import { Agent, setGlobalDispatcher } from "undici";
 import * as Sentry from "@sentry/nextjs";
 
 // Next.js 16 + OpenTelemetry + Sentry HTTP auto-instrumentation attach
@@ -6,6 +8,56 @@ import * as Sentry from "@sentry/nextjs";
 // Raising the default limit prevents false-positive MaxListenersExceededWarning.
 EventEmitter.defaultMaxListeners = 20;
 
+// Force IPv4-first DNS order in Node runtime
+try {
+  dns.setDefaultResultOrder("ipv4first");
+} catch {
+  // Ignore in environments where not supported
+}
+
+// Next.js global fetch runs on Undici in Node.js.
+// In Docker environments, AAAA (IPv6) lookups for IPv4-only domains (e.g. Upstash)
+// can hang for 10-15 seconds at the Docker DNS proxy (192.168.65.7).
+// Customizing the global Undici Agent lookup to resolve family 4 first prevents
+// the 10s connect timeout stalls across all outbound HTTP calls (Upstash, Supabase, Egress).
+try {
+  const ipv4Lookup = (
+    hostname: string,
+    options: unknown,
+    callback: (
+      err: NodeJS.ErrnoException | null,
+      address: string | dns.LookupAddress[],
+      family?: number,
+    ) => void,
+  ) => {
+    let cb = callback;
+    let opts: Record<string, unknown> = {};
+    if (typeof options === "function") {
+      cb = options as typeof callback;
+    } else if (options && typeof options === "object") {
+      opts = { ...options };
+    }
+    return dns.lookup(
+      hostname,
+      { ...opts, family: 4 },
+      cb as (
+        err: NodeJS.ErrnoException | null,
+        address: string,
+        family: number,
+      ) => void,
+    );
+  };
+
+  const globalAgent = new Agent({
+    connect: {
+      lookup: ipv4Lookup,
+      timeout: 8_000,
+    },
+  });
+  setGlobalDispatcher(globalAgent);
+} catch {
+  // Non-fatal if undici dispatcher customization is unsupported in current environment
+}
 
 /**
  * Sanitize commit SHA for use as a Sentry release name.
@@ -105,7 +157,8 @@ Sentry.init({
     if (Array.isArray(event.spans)) {
       for (const span of event.spans) {
         if (
-          span.data?.["http.url"] && typeof span.data["http.url"] === "string"
+          span.data?.["http.url"] &&
+          typeof span.data["http.url"] === "string"
         ) {
           span.data["http.url"] = scrubGaApiSecret(span.data["http.url"]);
         }

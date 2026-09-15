@@ -49,7 +49,8 @@ vi.mock("@tanstack/react-query", () => ({
 describe("NotificationsClient Minimal", () => {
   it("renders without hanging", () => {
     render(<NotificationsPage />);
-    expect(screen.getByRole("heading", { name: /^Notifications$/i }))
-      .toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /^Notifications$/i }),
+    ).toBeInTheDocument();
   });
 });

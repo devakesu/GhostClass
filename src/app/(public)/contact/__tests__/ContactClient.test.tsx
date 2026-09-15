@@ -61,8 +61,9 @@ describe("ContactClient", () => {
     const Result = await ContactClient();
     render(Result);
 
-    expect(screen.getByText("User: John Doe (john@example.com)"))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText("User: John Doe (john@example.com)"),
+    ).toBeInTheDocument();
   });
 
   it("handles profile fetch failure gracefully", async () => {

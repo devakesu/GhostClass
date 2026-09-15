@@ -17,20 +17,24 @@ export async function upsertInstructorAction(
   const instructorNameValue = formData.get("instructorName");
 
   if (
-    typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
-    typeof instructorNameValue !== "string" || instructorNameValue.trim() === ""
+    typeof courseCodeValue !== "string" ||
+    courseCodeValue.trim() === "" ||
+    typeof instructorNameValue !== "string" ||
+    instructorNameValue.trim() === ""
   ) {
     return { error: "Course code and instructor name are required" };
   }
 
   // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
-  const parsed = z.object({
-    courseCode: courseCodeSchema,
-    instructorName: personNameSchema,
-  }).safeParse({
-    courseCode: courseCodeValue,
-    instructorName: instructorNameValue,
-  });
+  const parsed = z
+    .object({
+      courseCode: courseCodeSchema,
+      instructorName: personNameSchema,
+    })
+    .safeParse({
+      courseCode: courseCodeValue,
+      instructorName: instructorNameValue,
+    });
 
   if (!parsed.success) {
     return {
@@ -47,7 +51,9 @@ export async function upsertInstructorAction(
   // 1. Validate CSRF Token
   const csrfValid = await validateCsrfToken(csrfToken);
   if (!csrfValid) {
-    logger.warn("Invalid or missing CSRF token in instructor update submission");
+    logger.warn(
+      "Invalid or missing CSRF token in instructor update submission",
+    );
     return { error: "Invalid security token. Please refresh and try again." };
   }
 
@@ -73,29 +79,33 @@ export async function upsertInstructorAction(
 
     const normalizedCode = normalizeCourseCode(courseCode);
     const courseNameValue = formData.get("courseName");
-    const optionalCourseName = typeof courseNameValue === "string"
-      ? courseNameValue.trim()
-      : "";
+    const optionalCourseName =
+      typeof courseNameValue === "string" ? courseNameValue.trim() : "";
 
     // Ensure class_courses record exists (satisfying foreign key course_instructors_class_course_fkey)
-    const { error: courseError } = await (supabase as {
-      from: (t: string) => {
-        upsert: (
-          d: Record<string, unknown>,
-          opt?: { onConflict?: string; ignoreDuplicates?: boolean },
-        ) => Promise<{ error: { code: string; message: string } | null }>;
-      };
-    })
+    const { error: courseError } = await (
+      supabase as {
+        from: (t: string) => {
+          upsert: (
+            d: Record<string, unknown>,
+            opt?: { onConflict?: string; ignoreDuplicates?: boolean },
+          ) => Promise<{ error: { code: string; message: string } | null }>;
+        };
+      }
+    )
       .from("class_courses")
-      .upsert({
-        class_id: classId,
-        course_code: normalizedCode,
-        course_name: optionalCourseName || normalizedCode,
-        created_by: user.id,
-      }, {
-        onConflict: "class_id, course_code",
-        ignoreDuplicates: true,
-      });
+      .upsert(
+        {
+          class_id: classId,
+          course_code: normalizedCode,
+          course_name: optionalCourseName || normalizedCode,
+          created_by: user.id,
+        },
+        {
+          onConflict: "class_id, course_code",
+          ignoreDuplicates: true,
+        },
+      );
 
     if (courseError) {
       logger.error(
@@ -105,23 +115,28 @@ export async function upsertInstructorAction(
     }
 
     // Upsert into course_instructors (communal mapping shared by the class)
-    const { error: upsertError } = await (supabase as {
-      from: (t: string) => {
-        upsert: (
-          d: Record<string, unknown>,
-          opt?: { onConflict?: string },
-        ) => Promise<{ error: { code: string; message: string } | null }>;
-      };
-    })
+    const { error: upsertError } = await (
+      supabase as {
+        from: (t: string) => {
+          upsert: (
+            d: Record<string, unknown>,
+            opt?: { onConflict?: string },
+          ) => Promise<{ error: { code: string; message: string } | null }>;
+        };
+      }
+    )
       .from("course_instructors")
-      .upsert({
-        class_id: classId,
-        course_code: normalizedCode,
-        instructor_name: instructorName,
-        updated_by: user.id,
-      }, {
-        onConflict: "class_id, course_code",
-      });
+      .upsert(
+        {
+          class_id: classId,
+          course_code: normalizedCode,
+          instructor_name: instructorName,
+          updated_by: user.id,
+        },
+        {
+          onConflict: "class_id, course_code",
+        },
+      );
 
     if (upsertError) {
       logger.error(

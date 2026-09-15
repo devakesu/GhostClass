@@ -58,9 +58,8 @@ describe("Instrumentation Client", () => {
   });
 
   it("captures router transitions", async () => {
-    const { onRouterTransitionStart } = await import(
-      "../instrumentation-client"
-    );
+    const { onRouterTransitionStart } =
+      await import("../instrumentation-client");
     onRouterTransitionStart("/test", "push");
     expect(Sentry.captureRouterTransitionStart).toHaveBeenCalledWith(
       "/test",

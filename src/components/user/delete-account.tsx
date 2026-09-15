@@ -189,8 +189,7 @@ export function DeleteAccount() {
                 htmlFor="confirm"
                 className="text-sm text-muted-foreground"
               >
-                Type <span className="font-bold text-foreground">DELETE</span>
-                {" "}
+                Type <span className="font-bold text-foreground">DELETE</span>{" "}
                 to confirm
               </Label>
               <Input
@@ -217,19 +216,17 @@ export function DeleteAccount() {
                 disabled={confirmation !== "DELETE" || isDeleting}
                 className="bg-destructive hover:bg-destructive/90 text-destructive-foreground rounded-xl px-6"
               >
-                {isDeleting
-                  ? (
-                    <>
-                      <Loader2
-                        className="mr-2 h-4 w-4 animate-spin"
-                        aria-label="Deleting account"
-                      />
-                      Deleting...
-                    </>
-                  )
-                  : (
-                    "Permanently Delete"
-                  )}
+                {isDeleting ? (
+                  <>
+                    <Loader2
+                      className="mr-2 h-4 w-4 animate-spin"
+                      aria-label="Deleting account"
+                    />
+                    Deleting...
+                  </>
+                ) : (
+                  "Permanently Delete"
+                )}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

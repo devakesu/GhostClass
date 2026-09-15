@@ -204,10 +204,17 @@ dependencies. All overrides are documented below with their security rationale:
 - **Scope**: Production dependency (used by Next.js image optimization)
 - **Status**: ✅ Up-to-date
 
-#### uuid: ^14.0.1
+#### uuid: ^14.0.2
 
 - **Reason**: CSPRNG generation hardening and prototype protection in v14+
 - **Scope**: Production & transitive dependency
+- **Status**: ✅ Up-to-date
+
+#### browserslist: 4.28.9
+
+- **Reason**: Target platform compatibility and consistent caniuse-lite database
+  resolution across build toolchains (PostCSS, LightningCSS, Next.js, Vitest)
+- **Scope**: Dev-only & build toolchain
 - **Status**: ✅ Up-to-date
 
 ### Egress Worker Overrides (workers/package.json)
@@ -420,7 +427,7 @@ View build provenance and security information directly in your browser:
 **Live Deployment**: Visit `/build-info` on any running instance to see:
 
 - Build ID with links to GitHub Actions workflow runs
-- Commit SHA and deployment timestamp
+- Commit SHA, immutable image digest, and deployment timestamp
 - Security audit status (Trivy scan results)
 - SLSA attestation status and links
 - Direct links to source code, build logs, and attestations

@@ -158,7 +158,9 @@ describe("Proxy Utils", () => {
       const read1 = await reader.read();
       expect(read1.done).toBe(false);
 
-      await expect(reader.read()).rejects.toThrow(UpstreamResponseTooLargeError);
+      await expect(reader.read()).rejects.toThrow(
+        UpstreamResponseTooLargeError,
+      );
       expect(onLimit).toHaveBeenCalledOnce();
     });
   });

@@ -146,9 +146,9 @@ describe("POST /api/auth/register-fcm", () => {
   });
 
   it("returns 500 if database update fails", async () => {
-    mockSupabaseAdminEq.mockResolvedValueOnce(
-      { error: new Error("DB failure") } as any,
-    );
+    mockSupabaseAdminEq.mockResolvedValueOnce({
+      error: new Error("DB failure"),
+    } as any);
     const { POST } = await import("../route");
     const req = new NextRequest("http://localhost/api/auth/register-fcm", {
       method: "POST",
@@ -165,10 +165,9 @@ describe("POST /api/auth/register-fcm", () => {
       method: "POST",
       headers: { authorization: "Bearer valid-token" },
     });
-    const res = await POST(
-      req,
-      { decryptedBody: { fcm_token: "decrypted-token-123" } } as any,
-    );
+    const res = await POST(req, {
+      decryptedBody: { fcm_token: "decrypted-token-123" },
+    } as any);
     expect(res.status).toBe(200);
     expect(mockSupabaseAdminUpdate).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -181,7 +180,11 @@ describe("POST /api/auth/register-fcm", () => {
   it("returns 503 when Supabase auth throws upstream network error", async () => {
     mockSupabaseAdminAuthGetUser.mockResolvedValueOnce({
       data: { user: null },
-      error: { name: "AuthRetryableFetchError", message: "fetch failed", status: 0 },
+      error: {
+        name: "AuthRetryableFetchError",
+        message: "fetch failed",
+        status: 0,
+      },
     });
     mockIsUpstreamAuthNetworkError.mockReturnValueOnce(true);
     const { POST } = await import("../route");

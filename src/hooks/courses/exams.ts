@@ -43,7 +43,7 @@ export const useExams = (options?: { enabled?: boolean }) => {
       if (!res) throw new Error("Failed to fetch exams data");
       return res.data;
     },
-    enabled: (options?.enabled !== false) && !!semester && !!year,
+    enabled: options?.enabled !== false && !!semester && !!year,
     staleTime: 2 * 60 * 1000,
     gcTime: 10 * 60 * 1000,
     refetchOnWindowFocus: true,
@@ -140,9 +140,7 @@ export const useAllExamAnswers = (examIds: number[]) => {
     queries: examIds.map((id) => ({
       queryKey: ["exam-answers", id, semester, year],
       queryFn: async () => {
-        const res = await axios.get(
-          `/exams/${id}/institutionuser/examanswers`,
-        );
+        const res = await axios.get(`/exams/${id}/institutionuser/examanswers`);
         if (!res) throw new Error("Failed to fetch exam answers");
         return res.data as ExamAnswer[];
       },
@@ -197,13 +195,17 @@ export const useBatchExamDetails = (
     queryKey: ["exam-details-batch", examIds, semester ?? null, year ?? null],
     queryFn: async () => {
       if (!examIds.length) return {};
-      const res = await axios.post("/api/scores/batch", { examIds }, {
-        baseURL: "",
-      });
+      const res = await axios.post(
+        "/api/scores/batch",
+        { examIds },
+        {
+          baseURL: "",
+        },
+      );
       return res.data;
     },
-    enabled: (options?.enabled !== false) && examIds.length > 0 && !!semester &&
-      !!year,
+    enabled:
+      options?.enabled !== false && examIds.length > 0 && !!semester && !!year,
     staleTime: 15 * 60 * 1000, // Cache batch heavily (15 mins)
     gcTime: 20 * 60 * 1000,
     retry: retryOnce,

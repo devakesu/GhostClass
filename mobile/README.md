@@ -1,7 +1,7 @@
 # GhostClass Mobile
 
-![Flutter](https://img.shields.io/badge/Flutter-3.44.0-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-3.11.4-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.47.4-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-3.13.3-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black)
 ![iOS](https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL%20v3-blue?style=for-the-badge)
@@ -47,8 +47,8 @@ are stored in hardware-backed secure storage — never in plain SharedPreference
 
 | Package     | Version | Purpose                     |
 | :---------- | :------ | :-------------------------- |
-| **Flutter** | 3.44.0  | Cross-platform UI framework |
-| **Dart**    | 3.11.4  | Language                    |
+| **Flutter** | 3.47.4  | Cross-platform UI framework |
+| **Dart**    | 3.13.3  | Language                    |
 
 ### State Management
 
@@ -68,7 +68,7 @@ are stored in hardware-backed secure storage — never in plain SharedPreference
 
 | Package     | Version | Purpose             |
 | :---------- | :------ | :------------------ |
-| `go_router` | ^17.1.0 | Declarative routing |
+| `go_router` | ^18.0.0 | Declarative routing |
 
 ### Security
 
@@ -76,7 +76,7 @@ are stored in hardware-backed secure storage — never in plain SharedPreference
 | :----------------------- | :------ | :--------------------------------- |
 | `firebase_core`          | ^4.7.0  | Firebase SDK                       |
 | `firebase_app_check`     | ^0.4.3  | Device integrity & API protection  |
-| `flutter_secure_storage` | ^10.0.0 | Hardware-backed credential storage |
+| `flutter_secure_storage` | ^11.0.0 | Hardware-backed credential storage |
 | `pointycastle`           | ^3.9.1  | Certificate & ASN1 parsing         |
 | `encrypt`                | ^5.0.3  | AES-256 symmetric encryption       |
 
@@ -216,9 +216,9 @@ mobile/
 
 ### Prerequisites
 
-- **Flutter SDK** — 3.44.0
+- **Flutter SDK** — 3.47.4
   ([install](https://docs.flutter.dev/get-started/install))
-- **Dart SDK** — 3.11.4 (bundled with Flutter)
+- **Dart SDK** — 3.13.3 (bundled with Flutter)
 - **Android Studio / Xcode** — for emulator/simulator
 - **Firebase CLI** — for App Check configuration
 - **A GhostClass backend** — see the [root README](../README.md) for web setup
@@ -354,7 +354,7 @@ GhostClass Mobile implements a zero-trust security model:
 
 | Platform | Minimum             | Target              | Compile      |
 | :------- | :------------------ | :------------------ | :----------- |
-| Android  | API 29 (Android 10) | API 35 (Android 15) | API 36       |
+| Android  | API 29 (Android 10) | API 35 (Android 15) | API 37       |
 | iOS      | iOS 13              | latest              | latest Xcode |
 
 ---

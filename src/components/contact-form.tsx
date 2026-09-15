@@ -213,38 +213,36 @@ export function ContactForm({ userDetails }: ContactFormProps) {
       </div>
 
       <div className="flex flex-col items-center justify-center py-2 min-h-16.25">
-        {captchaError
-          ? (
-            <p className="text-xs text-red-500 flex items-center gap-2 bg-red-500/10 p-2 rounded">
-              <AlertCircle
-                className="w-4 h-4"
-                aria-label="Security check failed"
-              />
-              Security check failed to load.
-            </p>
-          )
-          : (
-            <Turnstile
-              sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
-              onVerify={(t) => {
-                setToken(t);
-                setCaptchaError(false);
-              }}
-              onError={(err) => {
-                logger.error("Turnstile Error:", err);
-                setCaptchaError(true);
-                toast.error("Security check failed. Please refresh.");
-                Sentry.captureException(err, {
-                  tags: {
-                    type: "turnstile_client_error",
-                    location: "ContactForm/Turnstile",
-                  },
-                });
-              }}
-              onExpire={() => setToken("")}
-              theme="auto"
+        {captchaError ? (
+          <p className="text-xs text-red-500 flex items-center gap-2 bg-red-500/10 p-2 rounded">
+            <AlertCircle
+              className="w-4 h-4"
+              aria-label="Security check failed"
             />
-          )}
+            Security check failed to load.
+          </p>
+        ) : (
+          <Turnstile
+            sitekey={process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY!}
+            onVerify={(t) => {
+              setToken(t);
+              setCaptchaError(false);
+            }}
+            onError={(err) => {
+              logger.error("Turnstile Error:", err);
+              setCaptchaError(true);
+              toast.error("Security check failed. Please refresh.");
+              Sentry.captureException(err, {
+                tags: {
+                  type: "turnstile_client_error",
+                  location: "ContactForm/Turnstile",
+                },
+              });
+            }}
+            onExpire={() => setToken("")}
+            theme="auto"
+          />
+        )}
       </div>
 
       <Button
@@ -253,22 +251,20 @@ export function ContactForm({ userDetails }: ContactFormProps) {
         variant={captchaError ? "destructive" : "default"}
         className="w-full"
       >
-        {loading
-          ? (
-            <>
-              <Loader2
-                className="mr-2 h-4 w-4 animate-spin"
-                aria-label="Sending"
-              />
-              Sending...
-            </>
-          )
-          : (
-            <>
-              <Send className="mr-2 h-4 w-4" aria-label="Send message" />
-              {getSubmitButtonText()}
-            </>
-          )}
+        {loading ? (
+          <>
+            <Loader2
+              className="mr-2 h-4 w-4 animate-spin"
+              aria-label="Sending"
+            />
+            Sending...
+          </>
+        ) : (
+          <>
+            <Send className="mr-2 h-4 w-4" aria-label="Send message" />
+            {getSubmitButtonText()}
+          </>
+        )}
       </Button>
     </form>
   );

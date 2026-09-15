@@ -93,8 +93,9 @@ describe("AcceptTermsForm", () => {
 
       expect(screen.getByText("Welcome!")).toBeInTheDocument();
       expect(screen.getByRole("checkbox")).toBeInTheDocument();
-      expect(screen.getByRole("button", { name: /Enter GhostClass/i }))
-        .toBeInTheDocument();
+      expect(
+        screen.getByRole("button", { name: /Enter GhostClass/i }),
+      ).toBeInTheDocument();
     });
 
     it("should render the terms link", () => {

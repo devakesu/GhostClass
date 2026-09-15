@@ -35,24 +35,19 @@ export function ServiceErrorView({
 
   const handleContactUs = () => {
     const errorStr = error ? String(error) : "Unknown Error";
-    const sanitizedError = errorStr.length > 300
-      ? `${errorStr.substring(0, 300)}...`
-      : errorStr;
+    const sanitizedError =
+      errorStr.length > 300 ? `${errorStr.substring(0, 300)}...` : errorStr;
     const subject = encodeURIComponent("Connection Error");
     const message = encodeURIComponent(
       `I am experiencing a connection error with the Ezygo API.\n\nContext: ${sanitizedError}`,
     );
-    window.location.href =
-      `mailto:support@ghostclass.app?subject=${subject}&message=${message}`;
+    window.location.href = `mailto:support@ghostclass.app?subject=${subject}&message=${message}`;
   };
 
   const handleLogout = async () => {
     const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig("client");
 
-    const supabase = createBrowserClient(
-      supabaseUrl!,
-      supabaseKey!,
-    );
+    const supabase = createBrowserClient(supabaseUrl!, supabaseKey!);
     await supabase.auth.signOut();
     router.push("/");
     router.refresh();

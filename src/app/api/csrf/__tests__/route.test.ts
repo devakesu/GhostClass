@@ -73,9 +73,7 @@ describe("CSRF API Route", () => {
 
       const response = await GET();
 
-      expect(response.headers.get("Cache-Control")).toBe(
-        "no-store, max-age=0",
-      );
+      expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
     });
 
     it("should enforce rate limiting", async () => {
@@ -151,9 +149,9 @@ describe("CSRF API Route", () => {
       const { initializeCsrfToken } = await import("@/lib/security/csrf");
       vi.mocked(initializeCsrfToken).mockRejectedValue("Unexpected error");
 
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(
-        () => {},
-      );
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       const response = await GET();
 
@@ -170,9 +168,9 @@ describe("CSRF API Route", () => {
 
       const mockToken = "refreshed-token-456";
       vi.mocked(regenerateCsrfToken).mockResolvedValue(mockToken);
-      vi.mocked(authRateLimiter.limit).mockResolvedValue(
-        { success: true } as any,
-      );
+      vi.mocked(authRateLimiter.limit).mockResolvedValue({
+        success: true,
+      } as any);
 
       const response = await POST();
       const data = await response.json();
@@ -190,24 +188,22 @@ describe("CSRF API Route", () => {
       const { authRateLimiter } = await import("@/lib/ratelimit");
 
       vi.mocked(regenerateCsrfToken).mockResolvedValue("token");
-      vi.mocked(authRateLimiter.limit).mockResolvedValue(
-        { success: true } as any,
-      );
+      vi.mocked(authRateLimiter.limit).mockResolvedValue({
+        success: true,
+      } as any);
 
       const response = await POST();
 
-      expect(response.headers.get("Cache-Control")).toBe(
-        "no-store, max-age=0",
-      );
+      expect(response.headers.get("Cache-Control")).toBe("no-store, max-age=0");
     });
 
     it("should enforce rate limiting", async () => {
       const { regenerateCsrfToken } = await import("@/lib/security/csrf");
       const { authRateLimiter } = await import("@/lib/ratelimit");
 
-      vi.mocked(authRateLimiter.limit).mockResolvedValue(
-        { success: false } as any,
-      );
+      vi.mocked(authRateLimiter.limit).mockResolvedValue({
+        success: false,
+      } as any);
 
       const response = await POST();
       const data = await response.json();
@@ -224,9 +220,9 @@ describe("CSRF API Route", () => {
 
       const error = new Error("Token refresh failed");
       vi.mocked(regenerateCsrfToken).mockRejectedValue(error);
-      vi.mocked(authRateLimiter.limit).mockResolvedValue(
-        { success: true } as any,
-      );
+      vi.mocked(authRateLimiter.limit).mockResolvedValue({
+        success: true,
+      } as any);
 
       const response = await POST();
       const data = await response.json();
@@ -244,9 +240,9 @@ describe("CSRF API Route", () => {
       vi.mocked(regenerateCsrfToken)
         .mockResolvedValueOnce("token-1")
         .mockResolvedValueOnce("token-2");
-      vi.mocked(authRateLimiter.limit).mockResolvedValue(
-        { success: true } as any,
-      );
+      vi.mocked(authRateLimiter.limit).mockResolvedValue({
+        success: true,
+      } as any);
 
       const response1 = await POST();
       const data1 = await response1.json();
@@ -316,9 +312,9 @@ describe("CSRF API Route", () => {
       const sensitiveError = new Error("Database password: secret123");
       vi.mocked(initializeCsrfToken).mockRejectedValue(sensitiveError);
 
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(
-        () => {},
-      );
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
 
       const response = await GET();
       const data = await response.json();
@@ -341,9 +337,9 @@ describe("CSRF API Route", () => {
 
       // Error case
       vi.mocked(initializeCsrfToken).mockRejectedValue(new Error("error"));
-      const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(
-        () => {},
-      );
+      const consoleErrorSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       response = await GET();
       expect(response.status).toBe(500);
       consoleErrorSpy.mockRestore();

@@ -4,9 +4,13 @@ import { cn } from "@/lib/utils";
 import { AnimatePresence, motion } from "framer-motion";
 import React, { useEffect, useState } from "react";
 
-export const LoadingBlur = (
-  { isLoading, children }: { isLoading: boolean; children: React.ReactNode },
-) => {
+export const LoadingBlur = ({
+  isLoading,
+  children,
+}: {
+  isLoading: boolean;
+  children: React.ReactNode;
+}) => {
   const { buildInfo } = useBuildInfo();
   const isLegacy = buildInfo?.is_legacy ?? false;
 

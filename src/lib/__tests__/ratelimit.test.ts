@@ -7,6 +7,7 @@ vi.mock("@/lib/redis", () => ({
 vi.mock("@/lib/logger", () => ({
   logger: {
     dev: vi.fn(),
+    warn: vi.fn(),
   },
 }));
 
@@ -103,5 +104,16 @@ describe("ratelimit.ts", () => {
   it("throws if CONTACT_RATE_LIMIT_REQUESTS is out of range", async () => {
     vi.stubEnv("CONTACT_RATE_LIMIT_REQUESTS", "1001");
     await expect(import("../ratelimit")).rejects.toThrow();
+  });
+
+  it("fails open gracefully when Redis errors occur", async () => {
+    const { createResilientLimiter } = await import("../ratelimit");
+    const limiter = createResilientLimiter("@ghostclass/test-limit", 15, 60);
+    // Since mock redis has no eval/evalsha, call fails and triggers fallback
+    const res = await limiter.limit("test-user");
+    expect(res.success).toBe(true);
+    expect(res.limit).toBe(15);
+    expect(res.remaining).toBe(15);
+    expect(res.reset).toBeGreaterThan(Date.now());
   });
 });

@@ -36,33 +36,29 @@ export async function createClient() {
     throw error;
   }
 
-  return createServerClient(
-    url,
-    key,
-    {
-      cookies: {
-        getAll() {
-          return cookieStore.getAll();
-        },
-        setAll(cookiesToSet) {
-          try {
-            cookiesToSet.forEach(({ name, value, options }) =>
-              cookieStore.set(name, value, options)
-            );
-          } catch (error) {
-            // The 'setAll' method was called from a Server Component.
-            // This can be ignored if you have middleware refreshing the session.
-            if (process.env.NODE_ENV === "development") {
-              logger.warn(
-                `Supabase cookie set ignored (Server Component context) - This is usually normal. Error: ${
-                  error instanceof Error ? error.message : String(error)
-                }`,
-              );
-            }
-          }
-        },
+  return createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return cookieStore.getAll();
       },
-      ...(_customFetch ? { global: { fetch: _customFetch } } : {}),
+      setAll(cookiesToSet) {
+        try {
+          cookiesToSet.forEach(({ name, value, options }) =>
+            cookieStore.set(name, value, options),
+          );
+        } catch (error) {
+          // The 'setAll' method was called from a Server Component.
+          // This can be ignored if you have middleware refreshing the session.
+          if (process.env.NODE_ENV === "development") {
+            logger.warn(
+              `Supabase cookie set ignored (Server Component context) - This is usually normal. Error: ${
+                error instanceof Error ? error.message : String(error)
+              }`,
+            );
+          }
+        }
+      },
     },
-  );
+    ...(_customFetch ? { global: { fetch: _customFetch } } : {}),
+  });
 }

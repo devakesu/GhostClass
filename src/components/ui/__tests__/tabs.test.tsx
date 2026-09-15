@@ -25,8 +25,9 @@ describe("Tabs Component", () => {
     fireEvent.mouseUp(tab2);
     fireEvent.click(tab2);
 
-    expect(await screen.findByText("Content 2", {}, { timeout: 2000 }))
-      .toBeDefined();
+    expect(
+      await screen.findByText("Content 2", {}, { timeout: 2000 }),
+    ).toBeDefined();
   });
 
   it("applies custom classNames", () => {

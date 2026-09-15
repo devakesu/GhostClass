@@ -97,9 +97,9 @@ describe("instructor actions", () => {
       formData.append("instructorName", "John");
       formData.append("cf-turnstile-response", "valid");
 
-      vi.mocked(fetch).mockResolvedValue(
-        { json: async () => ({ success: true }) } as never,
-      );
+      vi.mocked(fetch).mockResolvedValue({
+        json: async () => ({ success: true }),
+      } as never);
 
       const mockSupabase = {
         auth: {

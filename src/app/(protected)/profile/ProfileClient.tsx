@@ -50,10 +50,10 @@ export default function ProfileClient() {
   const joinedTargetDate = profile?.ezygo_created_at || profile?.created_at;
   const joinedDateString = joinedTargetDate
     ? new Date(joinedTargetDate).toLocaleDateString("en-GB", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    })
+        day: "2-digit",
+        month: "short",
+        year: "numeric",
+      })
     : "N/A";
 
   // Priority: 1. User Upload Preview -> 2. Fetched DB URL -> 3. Fallback Placeholder
@@ -85,9 +85,10 @@ export default function ProfileClient() {
     toast.info("Compressing large image...", { duration: 2000 });
     try {
       const compressed = await compressImage(originalFile, 0.7);
-      const bestCompressed = compressed.size > 5 * 1024 * 1024
-        ? await compressImage(originalFile, 0.5)
-        : compressed;
+      const bestCompressed =
+        compressed.size > 5 * 1024 * 1024
+          ? await compressImage(originalFile, 0.5)
+          : compressed;
       if (bestCompressed.size > 5 * 1024 * 1024) {
         throw new Error(
           "Image is too large to upload even after compression. Please choose a smaller image (under 5 MB).",
@@ -295,14 +296,12 @@ export default function ProfileClient() {
 
                 <div className="text-center md:text-left w-full flex flex-col gap-0.5 relative z-10">
                   <h3 className="text-lg md:text-xl font-semibold mt-2">
-                    {
-                      /* Fall back to username when both name fields are null/undefined so the
-                        heading is never empty (layout gap + inaccessible blank heading). */
-                    }
-                    {(profile?.first_name || profile?.last_name)
+                    {/* Fall back to username when both name fields are null/undefined so the
+                        heading is never empty (layout gap + inaccessible blank heading). */}
+                    {profile?.first_name || profile?.last_name
                       ? `${profile?.first_name ?? ""} ${
-                        profile?.last_name ?? ""
-                      }`.trim()
+                          profile?.last_name ?? ""
+                        }`.trim()
                       : (profile?.username ?? "Your Name")}
                   </h3>
                   <p className="text-muted-foreground text-sm lowercase font-medium">
@@ -360,9 +359,7 @@ export default function ProfileClient() {
                 >
                   <Card className="custom-container">
                     <CardHeader className="p-4 md:p-6 pb-0 md:pb-0 flex flex-col gap-0.5">
-                      <CardTitle className="text-lg">
-                        EzyGo Account
-                      </CardTitle>
+                      <CardTitle className="text-lg">EzyGo Account</CardTitle>
                       <CardDescription className="md:block font-medium">
                         Fetched from Ezygo. Cannot be changed here.
                       </CardDescription>

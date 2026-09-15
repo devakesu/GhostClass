@@ -83,7 +83,9 @@ const parsePrefetchedSession = (currentUserId: string): UserSettings | null => {
   try {
     const parsed = JSON.parse(prefetchedRaw);
     if (
-      parsed && typeof parsed === "object" && parsed.userId === currentUserId &&
+      parsed &&
+      typeof parsed === "object" &&
+      parsed.userId === currentUserId &&
       parsed.settings
     ) {
       const s = parsed.settings;
@@ -171,13 +173,14 @@ function getInitialMigrationPayload(
   const legacyBunk = localStorage.getItem("showBunkCalc");
   const legacyTarget = localStorage.getItem("targetPercentage");
 
-  const initialBunk = legacyBunk !== null
-    ? legacyBunk === "true"
-    : (prefetchedSettings?.bunk_calculator_enabled ?? true);
-  const initialTarget = legacyTarget !== null
-    ? normalizeTarget(parseInt(legacyTarget, 10))
-    : (prefetchedSettings?.target_percentage ??
-      DEFAULT_TARGET_PERCENTAGE);
+  const initialBunk =
+    legacyBunk !== null
+      ? legacyBunk === "true"
+      : (prefetchedSettings?.bunk_calculator_enabled ?? true);
+  const initialTarget =
+    legacyTarget !== null
+      ? normalizeTarget(parseInt(legacyTarget, 10))
+      : (prefetchedSettings?.target_percentage ?? DEFAULT_TARGET_PERCENTAGE);
   const initialDisabled = prefetchedSettings?.disabled_courses ?? {};
 
   // Cleanup legacy keys if they existed
@@ -215,7 +218,9 @@ function useUserSettingsState() {
 
   // Subscribe to auth state changes to re-fetch settings on login/logout
   useEffect(() => {
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange(
       (
         event: unknown,
         session: { user?: { id?: string | null } | null } | null,
@@ -225,7 +230,8 @@ function useUserSettingsState() {
         currentUserIdRef.current = currentUserId;
 
         if (
-          event === "SIGNED_IN" || event === "INITIAL_SESSION" ||
+          event === "SIGNED_IN" ||
+          event === "INITIAL_SESSION" ||
           event === "USER_UPDATED" ||
           event === "PASSWORD_RECOVERY"
         ) {
@@ -266,18 +272,19 @@ function useUserSettingsState() {
   }, [supabase, queryClient]); // Removed userId from dependencies
 
   // Determine the placeholder data for the query (Stage 2 hydration)
-  const prefetchedSettings = useMemo(
-    () => {
-      if (!userId) {
-        return null;
-      }
-      return loadPrefetchedSettings(userId);
-    },
-    [userId],
-  );
+  const prefetchedSettings = useMemo(() => {
+    if (!userId) {
+      return null;
+    }
+    return loadPrefetchedSettings(userId);
+  }, [userId]);
 
   // Supabase Query
-  const { data: dbSettings, isLoading, isFetching } = useQuery({
+  const {
+    data: dbSettings,
+    isLoading,
+    isFetching,
+  } = useQuery({
     queryKey: ["userSettings", userId],
     queryFn: async () => {
       // Security check: only fetch if authenticated.
@@ -306,14 +313,16 @@ function useUserSettingsState() {
     retry: (failureCount: number, error: unknown) => {
       // Type guard for Supabase/PostgREST errors
       if (
-        error && typeof error === "object" && "code" in error &&
+        error &&
+        typeof error === "object" &&
+        "code" in error &&
         error.code === "PGRST116"
       ) {
         return false; // Not found (no record yet)
       }
       return failureCount < 3;
     },
-    placeholderData: userId ? prefetchedSettings ?? undefined : undefined,
+    placeholderData: userId ? (prefetchedSettings ?? undefined) : undefined,
   });
 
   // Supabase Mutation
@@ -321,20 +330,18 @@ function useUserSettingsState() {
     mutationFn: async (updates: Partial<UserSettings>) => {
       if (!userId) return;
 
-      const { error } = await supabase
-        .from("user_settings")
-        .upsert({
-          user_id: userId,
-          ...updates,
-          ...(updates.disabled_courses
-            ? {
+      const { error } = await supabase.from("user_settings").upsert({
+        user_id: userId,
+        ...updates,
+        ...(updates.disabled_courses
+          ? {
               disabled_courses: disabledCoursesSchema.parse(
                 updates.disabled_courses,
               ),
             }
-            : {}),
-          updated_at: new Date().toISOString(),
-        });
+          : {}),
+        updated_at: new Date().toISOString(),
+      });
 
       if (error) {
         Sentry.captureException(error);
@@ -364,9 +371,8 @@ function useUserSettingsState() {
   const { mutate: executeMutation, isPending: isMutationPending } = mutation;
 
   useEffect(() => {
-    if (
-      !userId || isLoading || isMutationPending || dbSettings === undefined
-    ) return;
+    if (!userId || isLoading || isMutationPending || dbSettings === undefined)
+      return;
 
     try {
       // 1. If DB has no record for this user, create one using local preferences (migration)
@@ -390,7 +396,10 @@ function useUserSettingsState() {
         `showBunkCalc_${userId}`,
         String(dbSettings.bunk_calculator_enabled),
       );
-      syncStorageItem(`targetPercentage_${userId}`, String(dbSettings.target_percentage));
+      syncStorageItem(
+        `targetPercentage_${userId}`,
+        String(dbSettings.target_percentage),
+      );
       syncStorageItem(
         `disabledCourses_${userId}`,
         JSON.stringify(dbSettings.disabled_courses),
@@ -403,7 +412,14 @@ function useUserSettingsState() {
       // Non-fatal error; just log to dev console
       logger.dev("Error during storage sync:", err);
     }
-  }, [dbSettings, userId, isLoading, isMutationPending, executeMutation, prefetchedSettings]);
+  }, [
+    dbSettings,
+    userId,
+    isLoading,
+    isMutationPending,
+    executeMutation,
+    prefetchedSettings,
+  ]);
 
   // ---------------------------------------------------------------------------
   // Public API
@@ -474,9 +490,11 @@ function useUserSettingsState() {
 // Provider Component
 // ---------------------------------------------------------------------------
 
-export function UserSettingsProvider(
-  { children }: { children: React.ReactNode },
-) {
+export function UserSettingsProvider({
+  children,
+}: {
+  children: React.ReactNode;
+}) {
   const state = useUserSettingsState();
 
   return (

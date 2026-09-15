@@ -38,7 +38,7 @@ vi.mock("@/lib/supabase/server", () => ({
   createClient: vi.fn(() =>
     Promise.resolve({
       auth: { getUser: mockGetUser },
-    })
+    }),
   ),
 }));
 
@@ -101,8 +101,9 @@ vi.mock("@/lib/ratelimit", () => ({
 }));
 
 // --- Mock sync logic ---
-const mockPerformProfileSync = vi.fn().mockImplementation(
-  async (token, _ezygoId, authId) => {
+const mockPerformProfileSync = vi
+  .fn()
+  .mockImplementation(async (token, _ezygoId, authId) => {
     const supabaseAdmin = getAdminClient();
 
     // Fetch from the mocked egressFetch
@@ -128,8 +129,8 @@ const mockPerformProfileSync = vi.fn().mockImplementation(
       username: d.username || d.user?.username || null,
       email: d.email || d.user?.email || null,
       first_name: d.first_name || d.full_name?.split(" ")[0] || "Test",
-      last_name: d.last_name || d.full_name?.split(" ").slice(1).join(" ") ||
-        "User",
+      last_name:
+        d.last_name || d.full_name?.split(" ").slice(1).join(" ") || "User",
       phone: encPhone?.content || null,
       phone_iv: encPhone?.iv || null,
       gender: encGender?.content || null,
@@ -150,8 +151,7 @@ const mockPerformProfileSync = vi.fn().mockImplementation(
         current_semester: d.current_semester || d.current_term || null,
       },
     };
-  },
-);
+  });
 vi.mock("@/lib/user/sync", () => ({
   performProfileSync: mockPerformProfileSync,
 }));
@@ -268,8 +268,8 @@ describe("GET /api/profile", () => {
           username: d.username || d.user?.username || null,
           email: d.email || d.user?.email || null,
           first_name: d.first_name || d.full_name?.split(" ")[0] || "Test",
-          last_name: d.last_name ||
-            d.full_name?.split(" ").slice(1).join(" ") || "User",
+          last_name:
+            d.last_name || d.full_name?.split(" ").slice(1).join(" ") || "User",
           phone: encPhone?.content || null,
           phone_iv: encPhone?.iv || null,
           gender: encGender?.content || null,
@@ -337,7 +337,7 @@ describe("GET /api/profile", () => {
     });
     const res = await GET(req, { params: {} });
     expect(res.status).toBe(500);
-    const body = await res.json() as { error: string };
+    const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Server misconfiguration");
   });
 
@@ -364,7 +364,7 @@ describe("GET /api/profile", () => {
     const { GET } = await import("../route");
     const res = await GET(makeGetReq(), { params: {} });
     expect(res.status).toBe(401);
-    const body = await res.json() as { error: string };
+    const body = (await res.json()) as { error: string };
     expect(body.error).toBe("Unauthorized");
   });
 
@@ -373,7 +373,7 @@ describe("GET /api/profile", () => {
     const { GET } = await import("../route");
     const res = await GET(makeGetReq(), { params: {} });
     expect(res.status).toBe(502);
-    const body = await res.json() as { error: string };
+    const body = (await res.json()) as { error: string };
     expect(body.error.toLowerCase()).toContain("failed");
   });
 
@@ -382,7 +382,7 @@ describe("GET /api/profile", () => {
     const { GET } = await import("../route");
     const res = await GET(makeGetReq(), { params: {} });
     expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
 
     expect(body.phone).toBe(MOCK_EZYGO_PROFILE.mobile);
     expect(body.gender).toBe(MOCK_EZYGO_PROFILE.gender);
@@ -408,7 +408,7 @@ describe("GET /api/profile", () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
     const res = await GET(makeGetReq(), { params: {} });
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
 
     expect(body).not.toHaveProperty("phone_iv");
     expect(body).not.toHaveProperty("gender_iv");
@@ -461,7 +461,7 @@ describe("GET /api/profile", () => {
 
     const { GET } = await import("../route");
     const res = await GET(makeGetReq(), { params: {} });
-    const body = await res.json() as { gender: string; birth_date: string };
+    const body = (await res.json()) as { gender: string; birth_date: string };
 
     // Local user-edited values must take precedence
     expect(body.gender).toBe("other");
@@ -472,7 +472,7 @@ describe("GET /api/profile", () => {
     makeEzygoFetchOk();
     const { GET } = await import("../route");
     const res = await GET(makeGetReq(), { params: {} });
-    const body = await res.json() as { gender: string; birth_date: string };
+    const body = (await res.json()) as { gender: string; birth_date: string };
 
     expect(body.gender).toBe(MOCK_EZYGO_PROFILE.gender);
     expect(body.birth_date).toBe(MOCK_EZYGO_PROFILE.birth_date);
@@ -492,7 +492,7 @@ describe("GET /api/profile", () => {
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
       expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
-      const body = await res.json() as { error: string };
+      const body = (await res.json()) as { error: string };
       expect(body.error).toMatch(/too many requests/i);
     });
 
@@ -577,7 +577,7 @@ describe("PATCH /api/profile", () => {
     });
     const res = await PATCH(req, { params: {} });
     expect(res.status).toBe(200);
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body.first_name).toBe("Alice");
     expect(body.gender).toBe("female");
     expect(body.birth_date).toBe("1995-06-20");
@@ -591,7 +591,7 @@ describe("PATCH /api/profile", () => {
       birth_date: "1995-06-20",
     });
     const res = await PATCH(req, { params: {} });
-    const body = await res.json() as Record<string, unknown>;
+    const body = (await res.json()) as Record<string, unknown>;
     expect(body).not.toHaveProperty("gender_iv");
     expect(body).not.toHaveProperty("birth_date_iv");
   });
@@ -675,7 +675,7 @@ describe("PATCH /api/profile", () => {
       expect(res.headers.get("Cache-Control")).toBe("no-store");
       expect(res.headers.get("Retry-After")).toBeDefined();
       expect(res.headers.get("X-RateLimit-Remaining")).toBe("0");
-      const body = await res.json() as { error: string };
+      const body = (await res.json()) as { error: string };
       expect(body.error).toMatch(/too many requests/i);
     });
 
@@ -759,8 +759,8 @@ describe("Edge Case & Branch Coverage", () => {
           username: d.username || d.user?.username || null,
           email: d.email || d.user?.email || null,
           first_name: d.first_name || d.full_name?.split(" ")[0] || "Test",
-          last_name: d.last_name ||
-            d.full_name?.split(" ").slice(1).join(" ") || "User",
+          last_name:
+            d.last_name || d.full_name?.split(" ").slice(1).join(" ") || "User",
           phone: encPhone?.content || null,
           phone_iv: encPhone?.iv || null,
           gender: encGender?.content || null,
@@ -910,9 +910,8 @@ describe("Edge Case & Branch Coverage", () => {
   });
 
   it("performs synchronous profile sync when class sem/year match expected settings but sync=true is requested", async () => {
-    const { calculateCurrentAcademicInfo } = await import(
-      "@/lib/logic/academic"
-    );
+    const { calculateCurrentAcademicInfo } =
+      await import("@/lib/logic/academic");
     const expected = calculateCurrentAcademicInfo();
 
     mockAdminSelect.mockImplementation(() => ({
@@ -943,9 +942,8 @@ describe("Edge Case & Branch Coverage", () => {
   });
 
   it("performs blocking profile sync synchronously when class sem/year do not match expected settings (conflict)", async () => {
-    const { calculateCurrentAcademicInfo } = await import(
-      "@/lib/logic/academic"
-    );
+    const { calculateCurrentAcademicInfo } =
+      await import("@/lib/logic/academic");
     const expected = calculateCurrentAcademicInfo();
     const wrongSem = expected.current_semester === "even" ? "odd" : "even";
 
@@ -977,9 +975,8 @@ describe("Edge Case & Branch Coverage", () => {
   });
 
   it("performs blocking profile sync synchronously when force=true even when class sem/year match expected settings (no conflict)", async () => {
-    const { calculateCurrentAcademicInfo } = await import(
-      "@/lib/logic/academic"
-    );
+    const { calculateCurrentAcademicInfo } =
+      await import("@/lib/logic/academic");
     const expected = calculateCurrentAcademicInfo();
 
     mockAdminSelect.mockImplementation(() => ({

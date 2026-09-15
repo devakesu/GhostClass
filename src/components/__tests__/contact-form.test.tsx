@@ -131,10 +131,12 @@ describe("ContactForm", () => {
 
     fireEvent.click(screen.getByTestId("turnstile-error"));
 
-    expect(await screen.findByText(/Security check failed to load/i))
-      .toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Security Check Failed/i }))
-      .toBeInTheDocument();
+    expect(
+      await screen.findByText(/Security check failed to load/i),
+    ).toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Security Check Failed/i }),
+    ).toBeInTheDocument();
     expect(toast.error).toHaveBeenCalledWith(
       "Security check failed. Please refresh.",
     );
@@ -144,8 +146,9 @@ describe("ContactForm", () => {
     render(<ContactForm />);
 
     fireEvent.click(screen.getByTestId("turnstile-verify"));
-    expect(await screen.findByRole("button", { name: /Send Message/i }))
-      .toBeInTheDocument();
+    expect(
+      await screen.findByRole("button", { name: /Send Message/i }),
+    ).toBeInTheDocument();
 
     fireEvent.click(screen.getByTestId("turnstile-expire"));
     expect(

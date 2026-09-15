@@ -385,22 +385,18 @@ describe("attendance hooks", () => {
       expect(result.current.data?.CS102.total).toBe(20);
 
       // Check if individual cache was updated
-      expect(setQueryDataSpy).toHaveBeenCalledWith([
-        "attendance-report",
-        "CS101",
-        123,
-      ], expect.any(Object));
-      expect(setQueryDataSpy).toHaveBeenCalledWith([
-        "attendance-report",
-        "CS102",
-        456,
-      ], expect.any(Object));
+      expect(setQueryDataSpy).toHaveBeenCalledWith(
+        ["attendance-report", "CS101", 123],
+        expect.any(Object),
+      );
+      expect(setQueryDataSpy).toHaveBeenCalledWith(
+        ["attendance-report", "CS102", 456],
+        expect.any(Object),
+      );
     });
 
     it("should normalize cache keys for courses with spaces and hyphens", async () => {
-      const courses = [
-        { code: "CS-101 2", id: 123, name: "Intro" },
-      ];
+      const courses = [{ code: "CS-101 2", id: 123, name: "Intro" }];
       const mockBatchData = {
         "CS-101 2": { totel: 10, persantage: 90 },
       };
@@ -422,11 +418,10 @@ describe("attendance hooks", () => {
       await waitFor(() => expect(result.current.isSuccess).toBe(true));
 
       // The cached key should be normalized (uppercase, spaces and hyphens removed)
-      expect(setQueryDataSpy).toHaveBeenCalledWith([
-        "attendance-report",
-        "CS1012",
-        123,
-      ], expect.any(Object));
+      expect(setQueryDataSpy).toHaveBeenCalledWith(
+        ["attendance-report", "CS1012", 123],
+        expect.any(Object),
+      );
     });
 
     it("should handle missing course in batch courses list", async () => {

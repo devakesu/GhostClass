@@ -32,9 +32,10 @@ export function AddRecordTrigger({ user, onSuccess }: AddRecordTriggerProps) {
   // Transform user object to match AddAttendanceDialog's expected interface
   const dialogUser: DialogUser = {
     id: String(user.id),
-    auth_id: "auth_id" in user
-      ? (user as User & { auth_id?: string | null }).auth_id ?? undefined
-      : undefined,
+    auth_id:
+      "auth_id" in user
+        ? ((user as User & { auth_id?: string | null }).auth_id ?? undefined)
+        : undefined,
   };
 
   const { data: selectedSemester } = useFetchSemester();

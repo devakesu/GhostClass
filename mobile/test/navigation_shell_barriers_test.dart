@@ -1,3 +1,5 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -28,20 +30,23 @@ class FakeAppUpdateNotifier extends AppUpdateNotifier {
   }
 }
 
+class MockEmptyDashboardNotifier extends DashboardNotifier {
+  @override
+  FutureOr<DashboardData> build() => throw Exception('Service Outage');
+}
+
+class MockEmptyTrackingNotifier extends TrackingNotifier {
+  @override
+  FutureOr<TrackingState> build() => throw Exception('Service Outage');
+}
+
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
   testWidgets('NavigationShell shows outage barrier when outageProvider true', (
     tester,
   ) async {
-    final mockDashboard = createMockDashboardData();
     final mockUser = createMockUser();
-    final mockTracking = TrackingState(
-      groupedByCourse: {'TEST101': []},
-      totalCount: 0,
-      isSyncing: false,
-      syncCompleted: true,
-    );
 
     final router = GoRouter(
       initialLocation: '/',
@@ -57,13 +62,9 @@ void main() {
     await tester.pumpWidget(
       ProviderScope(
         overrides: [
-          dashboardProvider.overrideWith(
-            () => MockDashboardNotifier(mockDashboard),
-          ),
+          dashboardProvider.overrideWith(MockEmptyDashboardNotifier.new),
           authProvider.overrideWith(() => MockAuthNotifier(mockUser)),
-          trackingProvider.overrideWith(
-            () => MockTrackingNotifier(mockTracking),
-          ),
+          trackingProvider.overrideWith(MockEmptyTrackingNotifier.new),
           outageProvider.overrideWith(() => MockOutageNotifier(data: true)),
         ],
         child: MaterialApp.router(

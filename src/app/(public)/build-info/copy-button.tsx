@@ -60,9 +60,13 @@ interface CopyButtonProps {
  * A client-side copy-to-clipboard button.
  * Shows a "Copied" confirmation for 2 seconds after a successful copy.
  */
-export function CopyButton(
-  { text, label, className, size = "sm", variant = "ghost" }: CopyButtonProps,
-) {
+export function CopyButton({
+  text,
+  label,
+  className,
+  size = "sm",
+  variant = "ghost",
+}: CopyButtonProps) {
   const { copied, handleCopy } = useClipboardCopy(text);
 
   return (
@@ -73,19 +77,17 @@ export function CopyButton(
       onClick={handleCopy}
       aria-label={label}
     >
-      {copied
-        ? (
-          <>
-            <Check className="w-3 h-3 mr-1" aria-hidden="true" />
-            Copied
-          </>
-        )
-        : (
-          <>
-            <Copy className="w-3 h-3 mr-1" aria-hidden="true" />
-            {label}
-          </>
-        )}
+      {copied ? (
+        <>
+          <Check className="w-3 h-3 mr-1" aria-hidden="true" />
+          Copied
+        </>
+      ) : (
+        <>
+          <Copy className="w-3 h-3 mr-1" aria-hidden="true" />
+          {label}
+        </>
+      )}
     </Button>
   );
 }
@@ -108,9 +110,11 @@ export function InlineCopyButton({ text }: InlineCopyButtonProps) {
       title="Copy digest"
       aria-label="Copy digest"
     >
-      {copied
-        ? <Check className="w-3 h-3 inline" aria-hidden="true" />
-        : <Copy className="w-3 h-3 inline" aria-hidden="true" />}
+      {copied ? (
+        <Check className="w-3 h-3 inline" aria-hidden="true" />
+      ) : (
+        <Copy className="w-3 h-3 inline" aria-hidden="true" />
+      )}
     </button>
   );
 }

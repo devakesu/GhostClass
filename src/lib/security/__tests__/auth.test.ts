@@ -258,10 +258,9 @@ describe("handleLogout", () => {
 
     await handleLogout();
 
-    expect(mockCaptureException).toHaveBeenCalledWith(
-      testError,
-      { tags: { location: "handleLogout" } },
-    );
+    expect(mockCaptureException).toHaveBeenCalledWith(testError, {
+      tags: { location: "handleLogout" },
+    });
   });
 
   it("should handle missing window object gracefully", async () => {

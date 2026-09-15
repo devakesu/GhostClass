@@ -427,7 +427,8 @@ export function getAppDomain(
 
     const isLocalhost = LOCALHOST_VARIANTS.has(hostname);
     const isIPv4 = IPV4_PATTERN.test(hostname);
-    const isIPv6 = hostname.includes(":") ||
+    const isIPv6 =
+      hostname.includes(":") ||
       (hostname.startsWith("[") && hostname.endsWith("]"));
 
     if (hostname && !isLocalhost && !isIPv4 && !isIPv6) {
@@ -435,8 +436,8 @@ export function getAppDomain(
     }
   }
 
-  const defaultDomain = process.env.NEXT_PUBLIC_DEFAULT_DOMAIN ||
-    fallbackDomain;
+  const defaultDomain =
+    process.env.NEXT_PUBLIC_DEFAULT_DOMAIN || fallbackDomain;
 
   if (
     isProduction &&
@@ -461,7 +462,9 @@ export function isValidAvatarUrl(
 ): url is string {
   if (!url) return false;
   if (
-    url.startsWith("/") || url.startsWith("blob:") || url.startsWith("data:")
+    url.startsWith("/") ||
+    url.startsWith("blob:") ||
+    url.startsWith("data:")
   ) {
     return true;
   }

@@ -84,7 +84,7 @@ export async function GET(req: Request | NextRequest) {
     reason: result.reason || "Device verified successfully",
     action: result.isValid
       ? "No action required."
-      : (result.action || "Please try again."),
+      : result.action || "Please try again.",
     latestVersion,
     minVersion,
     type: "security",

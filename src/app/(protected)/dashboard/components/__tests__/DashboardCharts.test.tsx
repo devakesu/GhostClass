@@ -26,9 +26,13 @@ vi.mock("@/components/error-boundary", () => ({
 }));
 
 vi.mock("framer-motion", () => {
-  const mockComponent = (
-    { children, ...rest }: { children?: ReactNode; [key: string]: unknown },
-  ) => {
+  const mockComponent = ({
+    children,
+    ...rest
+  }: {
+    children?: ReactNode;
+    [key: string]: unknown;
+  }) => {
     return <div {...rest}>{children}</div>;
   };
   return {

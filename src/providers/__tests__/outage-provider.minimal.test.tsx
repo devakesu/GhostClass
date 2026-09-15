@@ -5,9 +5,13 @@ import { render, screen, waitFor } from "@testing-library/react";
 import { OutageProvider, useOutage } from "../outage-provider";
 
 vi.mock("@/components/service-error-view", () => ({
-  ServiceErrorView: (
-    { messages, error }: { messages: string[]; error?: string },
-  ) => (
+  ServiceErrorView: ({
+    messages,
+    error,
+  }: {
+    messages: string[];
+    error?: string;
+  }) => (
     <div data-testid="error-view">
       <div data-testid="messages">{messages[0]}</div>
       <div data-testid="details">{error}</div>
@@ -29,10 +33,7 @@ describe("OutageProvider Minimal", () => {
     const TestComponent = () => {
       const { setOutage } = useOutage();
       return (
-        <button
-          data-testid="set"
-          onClick={() => setOutage(["Error"], "500")}
-        >
+        <button data-testid="set" onClick={() => setOutage(["Error"], "500")}>
           Set
         </button>
       );

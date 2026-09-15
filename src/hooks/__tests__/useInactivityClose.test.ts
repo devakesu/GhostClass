@@ -29,8 +29,7 @@ function fireVisibilityChange(hidden: boolean) {
 }
 
 describe("useInactivityClose", () => {
-  let useInactivityClose:
-    typeof import("@/hooks/useInactivityClose").useInactivityClose;
+  let useInactivityClose: typeof import("@/hooks/useInactivityClose").useInactivityClose;
   let restoreMatchMedia: () => void;
   let closeSpy: ReturnType<typeof vi.spyOn>;
 

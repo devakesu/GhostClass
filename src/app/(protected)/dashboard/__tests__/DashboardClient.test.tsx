@@ -206,19 +206,19 @@ vi.mock("next/dynamic", () => ({
 
 // Mock Select to trigger onValueChange
 vi.mock("@/components/ui/select", () => ({
-  Select: (
-    { children, onValueChange, value, disabled }: {
-      children?: ReactNode;
-      onValueChange?: (value: string) => void;
-      value?: string;
-      disabled?: boolean;
-    },
-  ) => (
+  Select: ({
+    children,
+    onValueChange,
+    value,
+    disabled,
+  }: {
+    children?: ReactNode;
+    onValueChange?: (value: string) => void;
+    value?: string;
+    disabled?: boolean;
+  }) => (
     <div data-testid="mock-select" data-value={value} data-disabled={disabled}>
-      <button
-        onClick={() =>
-          !disabled && onValueChange?.("even")}
-      >
+      <button onClick={() => !disabled && onValueChange?.("even")}>
         Change to EVEN
       </button>
       {children}
@@ -228,21 +228,38 @@ vi.mock("@/components/ui/select", () => ({
     <button>{children}</button>
   ),
   SelectContent: ({ children }: MockComponentProps) => <div>{children}</div>,
-  SelectItem: (
-    { children, value }: { children?: ReactNode; value?: string },
-  ) => <div data-value={value}>{children}</div>,
+  SelectItem: ({
+    children,
+    value,
+  }: {
+    children?: ReactNode;
+    value?: string;
+  }) => <div data-value={value}>{children}</div>,
 }));
 
 // Mock AlertDialog
 vi.mock("@/components/ui/alert-dialog", () => ({
-  AlertDialog: ({ children, open }: { children?: ReactNode; open?: boolean }) =>
-    open ? <div data-testid="alert-dialog">{children}</div> : null,
-  AlertDialogAction: (
-    { children, onClick }: { children?: ReactNode; onClick?: () => void },
-  ) => <button onClick={onClick}>{children}</button>,
-  AlertDialogCancel: (
-    { children, onClick }: { children?: ReactNode; onClick?: () => void },
-  ) => <button onClick={onClick}>{children}</button>,
+  AlertDialog: ({
+    children,
+    open,
+  }: {
+    children?: ReactNode;
+    open?: boolean;
+  }) => (open ? <div data-testid="alert-dialog">{children}</div> : null),
+  AlertDialogAction: ({
+    children,
+    onClick,
+  }: {
+    children?: ReactNode;
+    onClick?: () => void;
+  }) => <button onClick={onClick}>{children}</button>,
+  AlertDialogCancel: ({
+    children,
+    onClick,
+  }: {
+    children?: ReactNode;
+    onClick?: () => void;
+  }) => <button onClick={onClick}>{children}</button>,
   AlertDialogContent: ({ children }: MockComponentProps) => (
     <div>{children}</div>
   ),
@@ -259,17 +276,18 @@ vi.mock("@/components/ui/alert-dialog", () => ({
 }));
 
 vi.mock("@/components/attendance/AddAttendanceDialog", () => ({
-  AddAttendanceDialog: (
-    { onSuccess, open }: { onSuccess?: () => void; open?: boolean },
-  ) => (
-    open
-      ? (
-        <div data-testid="add-attendance-dialog">
-          <button onClick={onSuccess}>Trigger Success</button>
-        </div>
-      )
-      : null
-  ),
+  AddAttendanceDialog: ({
+    onSuccess,
+    open,
+  }: {
+    onSuccess?: () => void;
+    open?: boolean;
+  }) =>
+    open ? (
+      <div data-testid="add-attendance-dialog">
+        <button onClick={onSuccess}>Trigger Success</button>
+      </div>
+    ) : null,
 }));
 
 vi.mock("@/components/attendance/AddCourseDialog", () => ({
@@ -340,7 +358,7 @@ describe("DashboardClient", () => {
     fireEvent.click(confirmButton);
 
     await waitFor(() =>
-      expect(screen.queryByTestId("alert-dialog")).not.toBeInTheDocument()
+      expect(screen.queryByTestId("alert-dialog")).not.toBeInTheDocument(),
     );
   });
 

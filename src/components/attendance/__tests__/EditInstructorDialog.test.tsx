@@ -22,7 +22,7 @@ vi.mock("lucide-react", async () => {
 
 // Mock UI components simply
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: ({ children, open }: any) => open ? <div>{children}</div> : null,
+  Dialog: ({ children, open }: any) => (open ? <div>{children}</div> : null),
   DialogContent: ({ children }: any) => <div>{children}</div>,
   DialogHeader: ({ children }: any) => <div>{children}</div>,
   DialogTitle: ({ children }: any) => <div>{children}</div>,
@@ -38,7 +38,9 @@ vi.mock("@/components/ui/alert", () => ({
 
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>{children}</button>
+    <button onClick={onClick} {...props}>
+      {children}
+    </button>
   ),
 }));
 
@@ -59,10 +61,7 @@ vi.mock("@tanstack/react-query", () => ({
 
 vi.mock("react-turnstile", () => ({
   default: ({ onVerify }: any) => (
-    <div
-      data-testid="turnstile"
-      onClick={() => onVerify("mock-token")}
-    >
+    <div data-testid="turnstile" onClick={() => onVerify("mock-token")}>
       Mock Turnstile
     </div>
   ),
@@ -112,9 +111,8 @@ describe("EditInstructorDialog", () => {
 
   it("handles form submission successfully", async () => {
     vi.useRealTimers();
-    const { upsertInstructorAction } = await import(
-      "@/app/actions/instructors"
-    );
+    const { upsertInstructorAction } =
+      await import("@/app/actions/instructors");
     const { toast } = await import("sonner");
     const mockOnOpenChange = vi.fn();
 
@@ -126,7 +124,7 @@ describe("EditInstructorDialog", () => {
     );
     // Wait for Turnstile to be ready (it uses a 150ms timeout)
     await waitFor(() =>
-      expect(screen.getByTestId("turnstile")).toBeInTheDocument()
+      expect(screen.getByTestId("turnstile")).toBeInTheDocument(),
     );
 
     // Fill form

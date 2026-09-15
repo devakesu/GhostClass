@@ -15,8 +15,10 @@ import {
 export const isLegacyRemark = (remark: string | null | undefined): boolean => {
   if (!remark) return true;
   const trimmed = remark.trim();
-  return DUTY_LEAVE_PLACEHOLDER_REMARKS.has(trimmed) ||
-    trimmed.startsWith("Self-Marked:");
+  return (
+    DUTY_LEAVE_PLACEHOLDER_REMARKS.has(trimmed) ||
+    trimmed.startsWith("Self-Marked:")
+  );
 };
 
 export { ATTENDANCE_STATUS, isAbsent, isPositive };
@@ -204,16 +206,14 @@ export function getReconciledStats(
     processCourseTracks(courseId, courseTracks, officialMap, stats);
   }
 
-  stats.finalPresent = stats.realPresent + stats.correctionPresent +
-    stats.extraPresent;
+  stats.finalPresent =
+    stats.realPresent + stats.correctionPresent + stats.extraPresent;
   stats.finalTotal = stats.realTotal + stats.extrasCount;
 
-  const officialPct = stats.realTotal > 0
-    ? (stats.realPresent / stats.realTotal) * 100
-    : 0;
-  const finalPct = stats.finalTotal > 0
-    ? (stats.finalPresent / stats.finalTotal) * 100
-    : 0;
+  const officialPct =
+    stats.realTotal > 0 ? (stats.realPresent / stats.realTotal) * 100 : 0;
+  const finalPct =
+    stats.finalTotal > 0 ? (stats.finalPresent / stats.finalTotal) * 100 : 0;
 
   return {
     ...stats,

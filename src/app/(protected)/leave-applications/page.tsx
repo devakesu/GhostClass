@@ -19,7 +19,10 @@ export const metadata: Metadata = {
 
 export default async function LeaveApplicationsPage() {
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
   if (authError || !user) {
     logger.dev("[LeaveApp] User not authenticated, redirecting", {

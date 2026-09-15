@@ -87,7 +87,8 @@ export function useBackToExit(options: UseBackToExitOptions = {}): void {
       if (exitModeRef.current === "root") resetExitState();
 
       if (
-        exitArmedRef.current && exitModeRef.current === "deep" &&
+        exitArmedRef.current &&
+        exitModeRef.current === "deep" &&
         firstBackTimeRef.current
       ) {
         if (now - firstBackTimeRef.current < threshold) {
@@ -142,7 +143,9 @@ export function useBackToExit(options: UseBackToExitOptions = {}): void {
     const handlePopState = (event: PopStateEvent) => {
       const now = Date.now();
       const state = event.state as Record<string, unknown> | null;
-      const hasSentinel = state && typeof state === "object" &&
+      const hasSentinel =
+        state &&
+        typeof state === "object" &&
         Reflect.get(state, SENTINEL_KEY) === true;
 
       if (!hasSentinel) {

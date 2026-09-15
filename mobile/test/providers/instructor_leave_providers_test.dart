@@ -37,12 +37,27 @@ class ErrorDashboardNotifier extends DashboardNotifier {
 void main() {
   TestWidgetsFlutterBinding.ensureInitialized();
 
+  setUpAll(() {
+    registerFallbackValue(Duration.zero);
+  });
+
   late MockSecureStorageService mockStorage;
   late MockApiService mockApi;
 
   setUp(() {
     mockStorage = MockSecureStorageService();
     mockApi = MockApiService();
+
+    when(
+      () => mockStorage.getCachedData(any<String>()),
+    ).thenAnswer((_) async => null);
+    when(
+      () => mockStorage.saveCachedData(
+        any<String>(),
+        any<dynamic>(),
+        ttl: any<Duration>(named: 'ttl'),
+      ),
+    ).thenAnswer((_) async {});
   });
 
   group('instructorProvider Coverage', () {
@@ -84,9 +99,13 @@ void main() {
         ],
       );
 
-      // Matches course ID
+      // Matches course ID exactly
       final match = container.read(instructorProvider('CS101'));
       expect(match, instructor);
+
+      // Matches course ID with lowercase and whitespace
+      final matchFuzzy = container.read(instructorProvider('  cs 101  '));
+      expect(matchFuzzy, instructor);
 
       // Does not match
       final mismatch = container.read(instructorProvider('CS102'));

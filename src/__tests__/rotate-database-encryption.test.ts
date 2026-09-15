@@ -65,7 +65,9 @@ describe("rotate-database-encryption script", () => {
       ezygo_iv: encrypted.iv,
     };
 
-    const mockSelect = vi.fn().mockResolvedValue({ data: [{ id: "user-123" }], error: null });
+    const mockSelect = vi
+      .fn()
+      .mockResolvedValue({ data: [{ id: "user-123" }], error: null });
     const mockEqIv = vi.fn().mockReturnValue({ select: mockSelect });
     const mockEqId = vi.fn().mockReturnValue({ eq: mockEqIv });
     const mockUpdate = vi.fn().mockReturnValue({ eq: mockEqId });

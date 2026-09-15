@@ -83,13 +83,15 @@ describe("POST /api/csp-report", () => {
   });
 
   it("processes modern Reporting API format", async () => {
-    const body = [{
-      body: {
-        documentURL: "http://example.com/modern",
-        blockedURL: "http://evil.com/modern.js",
-        effectiveDirective: "img-src",
+    const body = [
+      {
+        body: {
+          documentURL: "http://example.com/modern",
+          blockedURL: "http://evil.com/modern.js",
+          effectiveDirective: "img-src",
+        },
       },
-    }];
+    ];
     const req = createReq(body, "application/reports+json");
     const response = await POST(req);
 
@@ -108,10 +110,7 @@ describe("POST /api/csp-report", () => {
     const req = createReq("invalid-json", "application/csp-report");
     const response = await POST(req);
     expect(response.status).toBe(204);
-    expect(logger.warn).toHaveBeenCalledWith(
-      expect.any(String),
-      {},
-    );
+    expect(logger.warn).toHaveBeenCalledWith(expect.any(String), {});
   });
 
   it("handles oversized body detected during reading", async () => {
@@ -134,13 +133,16 @@ describe("POST /api/csp-report", () => {
 
   it("returns 429 when rate limit is exceeded", async () => {
     const { cspReportRateLimiter } = await import("@/lib/ratelimit");
-    vi.mocked(cspReportRateLimiter.limit).mockResolvedValueOnce({ success: false } as any);
+    vi.mocked(cspReportRateLimiter.limit).mockResolvedValueOnce({
+      success: false,
+    } as any);
 
     const buffer = Buffer.from(JSON.stringify({ "csp-report": {} }));
     const req = {
       headers: {
         get: vi.fn((name) => {
-          if (name.toLowerCase() === "content-type") return "application/csp-report";
+          if (name.toLowerCase() === "content-type")
+            return "application/csp-report";
           if (name.toLowerCase() === "x-forwarded-for") return "203.0.113.1";
           return null;
         }),

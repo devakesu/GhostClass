@@ -41,15 +41,15 @@ const createMockLeave = (
 ) => {
   const approvers = actionType
     ? [
-      {
-        id: id * 10,
-        action_type: actionType,
-        action_by: "user-123",
-        action_by_user: { first_name: "Test", last_name: "User" },
-        action_at: "2026-03-26T10:00:00Z",
-        updated_at: "2026-03-26T10:00:00Z",
-      },
-    ]
+        {
+          id: id * 10,
+          action_type: actionType,
+          action_by: "user-123",
+          action_by_user: { first_name: "Test", last_name: "User" },
+          action_at: "2026-03-26T10:00:00Z",
+          updated_at: "2026-03-26T10:00:00Z",
+        },
+      ]
     : [];
 
   return {
@@ -74,12 +74,14 @@ describe("LeaveClient", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.clearAllMocks();
-    mockUseFetchSemester.mockReturnValue(
-      { data: "even", isLoading: false } as any,
-    );
-    mockUseFetchAcademicYear.mockReturnValue(
-      { data: "2025-26", isLoading: false } as any,
-    );
+    mockUseFetchSemester.mockReturnValue({
+      data: "even",
+      isLoading: false,
+    } as any);
+    mockUseFetchAcademicYear.mockReturnValue({
+      data: "2025-26",
+      isLoading: false,
+    } as any);
   });
 
   const renderWithClient = (ui: React.ReactElement) => {
@@ -87,16 +89,15 @@ describe("LeaveClient", () => {
       defaultOptions: { queries: { retry: false } },
     });
     return render(
-      <QueryClientProvider client={queryClient}>
-        {ui}
-      </QueryClientProvider>,
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
     );
   };
 
   it("renders error state when initialData is missing", () => {
     renderWithClient(<LeaveClient initialData={null as any} />);
-    expect(screen.getByText(/Leave Data Sync Unavailable/i))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText(/Leave Data Sync Unavailable/i),
+    ).toBeInTheDocument();
   });
 
   it("renders empty state when there are no leaves after filtering", () => {
@@ -118,8 +119,9 @@ describe("LeaveClient", () => {
 
     // Total should be 0, and empty card should show
     expect(screen.getAllByText("0").length).toBeGreaterThan(0);
-    expect(screen.getByText(/No leave applications found/i))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText(/No leave applications found/i),
+    ).toBeInTheDocument();
   });
 
   it("renders correctly filtered leaves and calculates counts", () => {
@@ -313,11 +315,13 @@ describe("LeaveClient", () => {
       studentLeaves: {
         student_leaves: [
           createMockLeave(1, null, {
-            files: [{
-              id: 101,
-              file_name: "medical_cert.pdf",
-              size_byte: 1048576,
-            }],
+            files: [
+              {
+                id: 101,
+                file_name: "medical_cert.pdf",
+                size_byte: 1048576,
+              },
+            ],
           }),
         ],
         student_leave_sessions: {},
@@ -396,14 +400,16 @@ describe("LeaveClient", () => {
         student_leaves: [
           createMockLeave(1, "forward"),
           createMockLeave(2, "unknown" as any, {
-            approvers: [{
-              id: 1,
-              action_type: "unknown",
-              action_by: "u1",
-              action_by_user: { first_name: "X", last_name: "Y" },
-              action_at: "2026-03-26T10:00:00Z",
-              updated_at: "2026-03-26T10:00:00Z",
-            }],
+            approvers: [
+              {
+                id: 1,
+                action_type: "unknown",
+                action_by: "u1",
+                action_by_user: { first_name: "X", last_name: "Y" },
+                action_at: "2026-03-26T10:00:00Z",
+                updated_at: "2026-03-26T10:00:00Z",
+              },
+            ],
           }),
         ],
         student_leave_sessions: {},

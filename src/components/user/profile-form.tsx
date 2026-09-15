@@ -72,8 +72,10 @@ type ProfileFormInput = {
   birth_date: string | null;
 };
 
-interface ReadOnlyFieldProps
-  extends Omit<React.InputHTMLAttributes<HTMLInputElement>, "value"> {
+interface ReadOnlyFieldProps extends Omit<
+  React.InputHTMLAttributes<HTMLInputElement>,
+  "value"
+> {
   value?: string | null;
   placeholder?: string;
 }
@@ -235,20 +237,15 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                   <FormControl>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-                      {isEditing
-                        ? (
-                          <Input
-                            placeholder="Enter first name"
-                            className="pl-9 custom-input bg-background/50 h-11"
-                            {...field}
-                          />
-                        )
-                        : (
-                          <ReadOnlyField
-                            value={field.value}
-                            className="pl-9"
-                          />
-                        )}
+                      {isEditing ? (
+                        <Input
+                          placeholder="Enter first name"
+                          className="pl-9 custom-input bg-background/50 h-11"
+                          {...field}
+                        />
+                      ) : (
+                        <ReadOnlyField value={field.value} className="pl-9" />
+                      )}
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -269,21 +266,16 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                   <FormControl>
                     <div className="relative">
                       <User className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-                      {isEditing
-                        ? (
-                          <Input
-                            placeholder="Enter last name"
-                            className="pl-9 custom-input bg-background/50 h-11"
-                            {...field}
-                            value={field.value ?? ""}
-                          />
-                        )
-                        : (
-                          <ReadOnlyField
-                            value={field.value}
-                            className="pl-9"
-                          />
-                        )}
+                      {isEditing ? (
+                        <Input
+                          placeholder="Enter last name"
+                          className="pl-9 custom-input bg-background/50 h-11"
+                          {...field}
+                          value={field.value ?? ""}
+                        />
+                      ) : (
+                        <ReadOnlyField value={field.value} className="pl-9" />
+                      )}
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -303,33 +295,31 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                   </FormLabel>
                   <div className="relative">
                     <Info className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50 z-10" />
-                    {isEditing
-                      ? (
-                        <Select
-                          onValueChange={field.onChange}
-                          value={field.value}
-                        >
-                          <FormControl>
-                            <SelectTrigger
-                              className="pl-9 custom-input bg-background/50 h-11"
-                              aria-label="Select gender"
-                            >
-                              <SelectValue placeholder="Select gender" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent className="custom-dropdown">
-                            <SelectItem value="male">Male</SelectItem>
-                            <SelectItem value="female">Female</SelectItem>
-                            <SelectItem value="other">Other</SelectItem>
-                          </SelectContent>
-                        </Select>
-                      )
-                      : (
-                        <ReadOnlyField
-                          value={displayGender(field.value)}
-                          className="pl-9"
-                        />
-                      )}
+                    {isEditing ? (
+                      <Select
+                        onValueChange={field.onChange}
+                        value={field.value}
+                      >
+                        <FormControl>
+                          <SelectTrigger
+                            className="pl-9 custom-input bg-background/50 h-11"
+                            aria-label="Select gender"
+                          >
+                            <SelectValue placeholder="Select gender" />
+                          </SelectTrigger>
+                        </FormControl>
+                        <SelectContent className="custom-dropdown">
+                          <SelectItem value="male">Male</SelectItem>
+                          <SelectItem value="female">Female</SelectItem>
+                          <SelectItem value="other">Other</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    ) : (
+                      <ReadOnlyField
+                        value={displayGender(field.value)}
+                        className="pl-9"
+                      />
+                    )}
                   </div>
                   <FormMessage />
                 </FormItem>
@@ -349,23 +339,21 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                   <FormControl>
                     <div className="relative">
                       <Calendar className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground/50" />
-                      {isEditing
-                        ? (
-                          <Input
-                            type="date"
-                            className="pl-9 custom-input bg-background/50 h-11"
-                            {...field}
-                            value={field.value || ""}
-                            aria-label="Enter date of birth"
-                          />
-                        )
-                        : (
-                          <ReadOnlyField
-                            value={field.value}
-                            placeholder="YYYY-MM-DD"
-                            className="pl-9"
-                          />
-                        )}
+                      {isEditing ? (
+                        <Input
+                          type="date"
+                          className="pl-9 custom-input bg-background/50 h-11"
+                          {...field}
+                          value={field.value || ""}
+                          aria-label="Enter date of birth"
+                        />
+                      ) : (
+                        <ReadOnlyField
+                          value={field.value}
+                          placeholder="YYYY-MM-DD"
+                          className="pl-9"
+                        />
+                      )}
                     </div>
                   </FormControl>
                   <FormMessage />
@@ -401,18 +389,20 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
                 size="sm"
                 disabled={updateProfileMutation.isPending}
                 className="h-9 min-w-25"
-                aria-label={updateProfileMutation.isPending
-                  ? "Saving profile changes"
-                  : "Save profile changes"}
+                aria-label={
+                  updateProfileMutation.isPending
+                    ? "Saving profile changes"
+                    : "Save profile changes"
+                }
               >
-                {updateProfileMutation.isPending
-                  ? (
-                    <Loader2
-                      className="w-4 h-4 animate-spin mr-2"
-                      aria-hidden="true"
-                    />
-                  )
-                  : <Check className="w-4 h-4 mr-2" aria-hidden="true" />}
+                {updateProfileMutation.isPending ? (
+                  <Loader2
+                    className="w-4 h-4 animate-spin mr-2"
+                    aria-hidden="true"
+                  />
+                ) : (
+                  <Check className="w-4 h-4 mr-2" aria-hidden="true" />
+                )}
                 Save
               </Button>
             </motion.div>
@@ -434,10 +424,10 @@ export function ProfileForm({ profile }: { profile: UserProfile }) {
           <span className="text-sm font-bold text-foreground/90">
             {profile?.created_at
               ? new Date(profile.created_at).toLocaleDateString("en-GB", {
-                day: "2-digit",
-                month: "short",
-                year: "numeric",
-              })
+                  day: "2-digit",
+                  month: "short",
+                  year: "numeric",
+                })
               : "N/A"}
           </span>
         </div>

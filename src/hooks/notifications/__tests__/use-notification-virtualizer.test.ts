@@ -25,7 +25,7 @@ describe("useNotificationVirtualizer", () => {
   it("calculates estimateSize correctly for header", () => {
     const parentRef = { current: null };
     renderHook(() =>
-      useNotificationVirtualizer({ virtualItems: mockItems, parentRef })
+      useNotificationVirtualizer({ virtualItems: mockItems, parentRef }),
     );
 
     const { estimateSize } = vi.mocked(useVirtualizerBridge).mock.calls[0][0];
@@ -36,7 +36,7 @@ describe("useNotificationVirtualizer", () => {
   it("calculates estimateSize correctly for notification", () => {
     const parentRef = { current: null };
     renderHook(() =>
-      useNotificationVirtualizer({ virtualItems: mockItems, parentRef })
+      useNotificationVirtualizer({ virtualItems: mockItems, parentRef }),
     );
 
     const { estimateSize } = vi.mocked(useVirtualizerBridge).mock.calls[0][0];
@@ -47,7 +47,7 @@ describe("useNotificationVirtualizer", () => {
   it("calculates larger size for long notification", () => {
     const parentRef = { current: null };
     renderHook(() =>
-      useNotificationVirtualizer({ virtualItems: mockItems, parentRef })
+      useNotificationVirtualizer({ virtualItems: mockItems, parentRef }),
     );
 
     const { estimateSize } = vi.mocked(useVirtualizerBridge).mock.calls[0][0];
@@ -58,7 +58,7 @@ describe("useNotificationVirtualizer", () => {
   it("provides a measureElement function that returns height", () => {
     const parentRef = { current: null };
     renderHook(() =>
-      useNotificationVirtualizer({ virtualItems: mockItems, parentRef })
+      useNotificationVirtualizer({ virtualItems: mockItems, parentRef }),
     );
 
     const { measureElement } = vi.mocked(useVirtualizerBridge).mock.calls[0][0];

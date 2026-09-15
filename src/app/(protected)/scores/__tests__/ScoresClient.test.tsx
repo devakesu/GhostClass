@@ -128,14 +128,16 @@ describe("ScoresClient", () => {
         <ScoresClient />
       </QueryClientProvider>,
     );
-    expect(screen.getByText(/Failed to load internal marks/i))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText(/Failed to load internal marks/i),
+    ).toBeInTheDocument();
   });
 
   it("renders exams and allows filtering", async () => {
-    vi.mocked(examsHooks.useExams).mockReturnValue(
-      { data: mockExams, isLoading: false } as any,
-    );
+    vi.mocked(examsHooks.useExams).mockReturnValue({
+      data: mockExams,
+      isLoading: false,
+    } as any);
     vi.mocked(examsHooks.useBatchExamDetails).mockReturnValue({
       isPending: false,
       data: {
@@ -164,9 +166,11 @@ describe("ScoresClient", () => {
 
   it("refetches exams when refresh button is clicked", async () => {
     const refetch = vi.fn();
-    vi.mocked(examsHooks.useExams).mockReturnValue(
-      { data: mockExams, isLoading: false, refetch } as any,
-    );
+    vi.mocked(examsHooks.useExams).mockReturnValue({
+      data: mockExams,
+      isLoading: false,
+      refetch,
+    } as any);
 
     render(
       <QueryClientProvider client={queryClient}>
@@ -182,19 +186,20 @@ describe("ScoresClient", () => {
   });
 
   it("opens detail drawer when an exam card is clicked", async () => {
-    vi.mocked(examsHooks.useExams).mockReturnValue(
-      { data: mockExams, isLoading: false } as any,
-    );
-    vi.mocked(examsHooks.useExamQuestions).mockReturnValue(
-      {
-        data: [{ id: 1, question_no: "1", maximum_mark: 10 }],
-        isLoading: false,
-      } as any,
-    );
+    vi.mocked(examsHooks.useExams).mockReturnValue({
+      data: mockExams,
+      isLoading: false,
+    } as any);
+    vi.mocked(examsHooks.useExamQuestions).mockReturnValue({
+      data: [{ id: 1, question_no: "1", maximum_mark: 10 }],
+      isLoading: false,
+    } as any);
     const push = vi.fn();
-    vi.mocked(navigation.useRouter).mockReturnValue(
-      { push, replace: vi.fn(), prefetch: vi.fn() } as any,
-    );
+    vi.mocked(navigation.useRouter).mockReturnValue({
+      push,
+      replace: vi.fn(),
+      prefetch: vi.fn(),
+    } as any);
 
     // Simulate panel in URL
     vi.mocked(navigation.useSearchParams).mockReturnValue(
@@ -210,8 +215,9 @@ describe("ScoresClient", () => {
     // Should render ExamDetailDrawer (mocked as part of ScoresClient or its dependencies)
     // Since we mock useSearchParams to have panel=1, it should show the drawer for exam 1
     expect(screen.getByRole("dialog")).toBeInTheDocument();
-    expect(screen.getByText(/Per-question breakdown|Question paper/i))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText(/Per-question breakdown|Question paper/i),
+    ).toBeInTheDocument();
   });
 
   it("calculates resolved scores correctly from batch data", () => {
@@ -227,9 +233,10 @@ describe("ScoresClient", () => {
         ],
       },
     };
-    vi.mocked(examsHooks.useExams).mockReturnValue(
-      { data: mockExams, isLoading: false } as any,
-    );
+    vi.mocked(examsHooks.useExams).mockReturnValue({
+      data: mockExams,
+      isLoading: false,
+    } as any);
     vi.mocked(examsHooks.useBatchExamDetails).mockReturnValue({
       isPending: false,
       data: batchData,

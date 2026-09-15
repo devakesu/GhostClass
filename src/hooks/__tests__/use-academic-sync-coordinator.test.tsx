@@ -69,7 +69,9 @@ describe("use-academic-sync-coordinator", () => {
           return Promise.resolve({ data: { default_semester: "even" } });
         }
         if (url === "/user/setting/default_academic_year") {
-          return Promise.resolve({ data: { default_academic_year: "2024-25" } });
+          return Promise.resolve({
+            data: { default_academic_year: "2024-25" },
+          });
         }
         return Promise.reject(new Error("Not found"));
       });
@@ -172,6 +174,9 @@ describe("use-academic-sync-coordinator", () => {
         if (url === "/user/setting/default_academic_year") {
           return Promise.resolve({ data: "2024-25" });
         }
+        if (url === "/api/profile") {
+          return Promise.resolve({ data: { id: "1" } });
+        }
         return Promise.reject(new Error("Not found"));
       });
 
@@ -180,6 +185,18 @@ describe("use-academic-sync-coordinator", () => {
       await waitFor(() => {
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["courses"] });
       });
+
+      expect(axios.get).toHaveBeenCalledWith(
+        "/api/profile",
+        expect.objectContaining({
+          baseURL: "",
+          params: expect.objectContaining({
+            sync: "true",
+            force: "true",
+            _t: expect.any(Number),
+          }),
+        }),
+      );
 
       expect(queryClient.getQueryData(["semester"])).toBe("even");
       expect(mockRefresh).toHaveBeenCalledTimes(1);
@@ -201,6 +218,9 @@ describe("use-academic-sync-coordinator", () => {
         if (url === "/user/setting/default_academic_year") {
           return Promise.resolve({ data: "2024-25" });
         }
+        if (url === "/api/profile") {
+          return Promise.resolve({ data: { id: "1" } });
+        }
         return Promise.reject(new Error("Not found"));
       });
 
@@ -209,6 +229,17 @@ describe("use-academic-sync-coordinator", () => {
       await waitFor(() => {
         expect(invalidateSpy).toHaveBeenCalledWith({ queryKey: ["courses"] });
       });
+
+      expect(axios.get).toHaveBeenCalledWith(
+        "/api/profile",
+        expect.objectContaining({
+          baseURL: "",
+          params: expect.objectContaining({
+            sync: "true",
+            force: "true",
+          }),
+        }),
+      );
 
       expect(queryClient.getQueryData(["academic-year"])).toBe("2024-25");
       expect(mockRefresh).toHaveBeenCalledTimes(1);

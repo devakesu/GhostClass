@@ -127,4 +127,58 @@ void main() {
     // Allow the auto-dismiss timer of ServiceToast to complete to avoid pending timer error
     await tester.pumpAndSettle(const Duration(seconds: 4));
   });
+
+  testWidgets(
+    'HeaderSection - displays term-specific className over profile fallback',
+    (tester) async {
+      final mockUser =
+          createMockUser(); // Has profile class "Engineering - CSE"
+      final mockDashboard = DashboardData(
+        courses: const [],
+        attendance: const AttendanceReportDetailed(
+          studentAttendanceData: <String, Map<String, AttendanceSession>>{},
+          courses: <String, AttendanceCourse>{},
+          attendanceDates: <String, dynamic>{},
+        ),
+        tracking: const [],
+        stats: DashboardStats.calculate(
+          attendanceData: const AttendanceReportDetailed(
+            studentAttendanceData: <String, Map<String, AttendanceSession>>{},
+            courses: <String, AttendanceCourse>{},
+            attendanceDates: <String, dynamic>{},
+          ),
+          trackingRecords: const <TrackingRecord>[],
+          selectedSemester: 'odd',
+          selectedYear: '2025-26',
+        ),
+        selectedSemester: 'odd',
+        selectedYear: '2025-26',
+        className: 'CSE-A (Section 1)',
+      );
+      const mockAcademic = AcademicState(semester: 'odd', year: '2025-26');
+
+      await tester.pumpWidget(
+        ProviderScope(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(mockUser)),
+            academicProvider.overrideWith(
+              () => MockAcademicNotifier(mockAcademic),
+            ),
+          ],
+          child: MaterialApp(
+            home: Scaffold(
+              body: CustomScrollView(
+                slivers: [
+                  HeaderSection(data: mockDashboard),
+                ],
+              ),
+            ),
+          ),
+        ),
+      );
+
+      await tester.pumpAndSettle();
+      expect(find.text('CSE-A (SECTION 1)'), findsOneWidget);
+    },
+  );
 }

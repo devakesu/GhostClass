@@ -104,6 +104,40 @@ Map<String, String> calculateCurrentAcademicInfo({
   return {'current_semester': currentSemester, 'current_year': currentYearStr};
 }
 
+/// Canonicalizes an academic semester into standard lowercase format ('odd' or 'even').
+/// E.g., 'Odd', 'ODD', '1' -> 'odd'; 'Even', 'EVEN', '2' -> 'even'.
+String canonicalSemester(String? s) {
+  if (s == null) return '';
+  final trimmed = s.trim().toLowerCase();
+  if (trimmed.contains('odd') || trimmed == '1') return 'odd';
+  if (trimmed.contains('even') || trimmed == '2') return 'even';
+  return trimmed;
+}
+
+/// Canonicalizes an academic year into standard 'YYYY-YY' format (e.g. '2024-25').
+/// Matches '2024-2025', '2024-25', '24-25' -> '2024-25'.
+String canonicalAcademicYear(String? y) {
+  if (y == null) return '';
+  final trimmed = y.trim();
+  final nums = RegExp(
+    r'\d+',
+  ).allMatches(trimmed).map((m) => m.group(0)!).toList();
+  if (nums.length >= 2) {
+    var startNum = int.tryParse(nums[0]) ?? 0;
+    if (startNum > 0 && startNum < 100) {
+      startNum += 2000;
+    }
+    final endNum = int.tryParse(nums[1]) ?? (startNum + 1);
+    final endStr = (endNum >= 100)
+        ? (endNum % 100).toString().padLeft(2, '0')
+        : endNum.toString().padLeft(2, '0');
+    if (startNum > 0) {
+      return '$startNum-$endStr';
+    }
+  }
+  return trimmed;
+}
+
 /// Checks whether two 2-digit/4-digit year segments refer to the same year (e.g. "24" and "2024").
 bool yearSegmentsMatch(String n1, String n2) {
   if (n1 == n2) return true;
@@ -115,12 +149,16 @@ bool yearSegmentsMatch(String n1, String n2) {
 /// Matches e.g. "2025-2026", "25-26", "2025-26".
 bool yearsDiffer(String? y1, String? y2) {
   if (y1 == null || y2 == null) return false;
-  final s1 = y1.trim();
-  final s2 = y2.trim();
+  final s1 = canonicalAcademicYear(y1);
+  final s2 = canonicalAcademicYear(y2);
   if (s1 == s2) return false;
 
-  final nums1 = RegExp(r'\d+').allMatches(s1).map((m) => m.group(0)!).toList();
-  final nums2 = RegExp(r'\d+').allMatches(s2).map((m) => m.group(0)!).toList();
+  final nums1 = RegExp(
+    r'\d+',
+  ).allMatches(y1.trim()).map((m) => m.group(0)!).toList();
+  final nums2 = RegExp(
+    r'\d+',
+  ).allMatches(y2.trim()).map((m) => m.group(0)!).toList();
 
   if (nums1.isNotEmpty && nums1.length == nums2.length) {
     var allMatch = true;
@@ -138,14 +176,7 @@ bool yearsDiffer(String? y1, String? y2) {
 /// Normalizes and compares two academic semesters (e.g. "even" vs "EVEN", "1" vs "odd").
 bool semestersDiffer(String? s1, String? s2) {
   if (s1 == null || s2 == null) return false;
-  String normalize(String s) {
-    final trimmed = s.trim().toLowerCase();
-    if (trimmed.contains('odd') || trimmed == '1') return 'odd';
-    if (trimmed.contains('even') || trimmed == '2') return 'even';
-    return trimmed;
-  }
-
-  return normalize(s1) != normalize(s2);
+  return canonicalSemester(s1) != canonicalSemester(s2);
 }
 
 /// Determines whether an academic rollover has occurred between two periods.
@@ -461,11 +492,13 @@ bool isValidCourseName(String text) {
   ).hasMatch(trimmed);
 }
 
+final _whitespaceRegex = RegExp(r'\s');
+
 String standardizeCourseCode(String input) {
   return input
       .trim()
       .toUpperCase()
-      .replaceAll(RegExp(r'\s'), '')
+      .replaceAll(_whitespaceRegex, '')
       .replaceAll('\u00A0', '')
       .replaceAll('-', '');
 }

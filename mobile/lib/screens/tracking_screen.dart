@@ -51,9 +51,10 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
     final user = ref.watch(authProvider).value;
     final isSyncing = user?.isSyncing ?? false;
 
-    if (isSyncing ||
-        academicAsync.isLoading ||
-        ((trackingState.isLoading || isSyncing) && data == null)) {
+    final hasData = data != null;
+    if ((isSyncing && !hasData) ||
+        (academicAsync.isLoading && !hasData) ||
+        (trackingState.isLoading && !hasData)) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -74,6 +75,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
                   .timeout(AppConfig.defaultTimeout);
             } on Object catch (e, st) {
               AppLogger.e('TrackingScreen: Retry failed', e, st);
+              rethrow;
             }
           },
         ),

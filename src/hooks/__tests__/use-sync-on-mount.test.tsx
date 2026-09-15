@@ -55,9 +55,12 @@ describe("useSyncOnMount", () => {
 
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
-    await waitFor(() => {
-      expect(result.current.syncSettled).toBe(true);
-    }, { timeout: 10000 });
+    await waitFor(
+      () => {
+        expect(result.current.syncSettled).toBe(true);
+      },
+      { timeout: 10000 },
+    );
 
     expect(axios.get).toHaveBeenCalledWith(
       "/api/cron/sync",
@@ -67,7 +70,7 @@ describe("useSyncOnMount", () => {
 
   it("should not sync if disabled", () => {
     const { result } = renderHook(() =>
-      useSyncOnMount({ ...defaultOptions, enabled: false })
+      useSyncOnMount({ ...defaultOptions, enabled: false }),
     );
 
     expect(result.current.isSyncing).toBe(false);
@@ -77,7 +80,7 @@ describe("useSyncOnMount", () => {
 
   it("should not sync if username is missing but userId is present (short-circuit)", () => {
     const { result } = renderHook(() =>
-      useSyncOnMount({ ...defaultOptions, username: undefined })
+      useSyncOnMount({ ...defaultOptions, username: undefined }),
     );
 
     expect(result.current.isSyncing).toBe(false);
@@ -94,9 +97,12 @@ describe("useSyncOnMount", () => {
 
     renderHook(() => useSyncOnMount({ ...defaultOptions, onPartialSync }));
 
-    await waitFor(() => {
-      expect(onPartialSync).toHaveBeenCalled();
-    }, { timeout: 10000 });
+    await waitFor(
+      () => {
+        expect(onPartialSync).toHaveBeenCalled();
+      },
+      { timeout: 10000 },
+    );
   });
 
   it("should handle successful sync with updates", async () => {
@@ -108,9 +114,12 @@ describe("useSyncOnMount", () => {
 
     renderHook(() => useSyncOnMount({ ...defaultOptions, onSuccess }));
 
-    await waitFor(() => {
-      expect(onSuccess).toHaveBeenCalled();
-    }, { timeout: 10000 });
+    await waitFor(
+      () => {
+        expect(onSuccess).toHaveBeenCalled();
+      },
+      { timeout: 10000 },
+    );
   });
 
   it("should handle axios error", async () => {
@@ -118,9 +127,12 @@ describe("useSyncOnMount", () => {
 
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
-    await waitFor(() => {
-      expect(result.current.syncSettled).toBe(true);
-    }, { timeout: 10000 });
+    await waitFor(
+      () => {
+        expect(result.current.syncSettled).toBe(true);
+      },
+      { timeout: 10000 },
+    );
 
     expect(logger.error).toHaveBeenCalled();
   });
@@ -133,9 +145,12 @@ describe("useSyncOnMount", () => {
 
     const { result } = renderHook(() => useSyncOnMount(defaultOptions));
 
-    await waitFor(() => {
-      expect(result.current.syncSettled).toBe(true);
-    }, { timeout: 10000 });
+    await waitFor(
+      () => {
+        expect(result.current.syncSettled).toBe(true);
+      },
+      { timeout: 10000 },
+    );
 
     expect(logger.error).toHaveBeenCalled();
   });
@@ -151,9 +166,12 @@ describe("useSyncOnMount", () => {
     // Re-render immediately (as Strict Mode does)
     rerender();
 
-    await waitFor(() => {
-      expect(axios.get).toHaveBeenCalledTimes(1);
-    }, { timeout: 10000 });
+    await waitFor(
+      () => {
+        expect(axios.get).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 10000 },
+    );
   });
 
   it("should handle AbortError and log it", async () => {
@@ -164,11 +182,14 @@ describe("useSyncOnMount", () => {
 
     renderHook(() => useSyncOnMount(defaultOptions));
 
-    await waitFor(() => {
-      expect(logger.dev).toHaveBeenCalledWith(
-        expect.stringContaining("Sync request aborted"),
-      );
-    }, { timeout: 10000 });
+    await waitFor(
+      () => {
+        expect(logger.dev).toHaveBeenCalledWith(
+          expect.stringContaining("Sync request aborted"),
+        );
+      },
+      { timeout: 10000 },
+    );
   });
 
   it("should share in-flight request across concurrent mounts", async () => {
@@ -190,10 +211,11 @@ describe("useSyncOnMount", () => {
 
   it("should skip state updates if unmounted after request", async () => {
     let resolveAxios: (v: any) => void;
-    vi.mocked(axios.get).mockImplementation(() =>
-      new Promise((resolve) => {
-        resolveAxios = resolve;
-      })
+    vi.mocked(axios.get).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolveAxios = resolve;
+        }),
     );
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
@@ -218,10 +240,11 @@ describe("useSyncOnMount", () => {
 
   it("should skip state updates if unmounted after request error", async () => {
     let rejectAxios: (v: any) => void;
-    vi.mocked(axios.get).mockImplementation(() =>
-      new Promise((_, reject) => {
-        rejectAxios = reject;
-      })
+    vi.mocked(axios.get).mockImplementation(
+      () =>
+        new Promise((_, reject) => {
+          rejectAxios = reject;
+        }),
     );
 
     const { unmount } = renderHook(() => useSyncOnMount(defaultOptions));
@@ -262,9 +285,12 @@ describe("useSyncOnMount", () => {
 
     window.dispatchEvent(new Event("load"));
 
-    await waitFor(() => {
-      expect(axios.get).toHaveBeenCalledTimes(1);
-    }, { timeout: 10000 });
+    await waitFor(
+      () => {
+        expect(axios.get).toHaveBeenCalledTimes(1);
+      },
+      { timeout: 10000 },
+    );
 
     Object.defineProperty(document, "readyState", {
       get() {

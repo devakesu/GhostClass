@@ -70,10 +70,9 @@ vi.mock("@/lib/supabase/client", () => ({
   })),
 }));
 
-vi.mock(
-  "sonner",
-  () => ({ toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() } }),
-);
+vi.mock("sonner", () => ({
+  toast: { error: vi.fn(), success: vi.fn(), info: vi.fn() },
+}));
 
 vi.mock("framer-motion", () => ({
   AnimatePresence: ({ children }: React.PropsWithChildren) => children,
@@ -125,9 +124,11 @@ vi.mock("@/components/ui/select", () => ({
 }));
 
 vi.mock("@/components/ui/alert-dialog", () => ({
-  AlertDialog: (
-    { children, open }: React.PropsWithChildren<{ open?: boolean }>,
-  ) => (open ? <div>{children}</div> : null),
+  AlertDialog: ({
+    children,
+    open,
+  }: React.PropsWithChildren<{ open?: boolean }>) =>
+    open ? <div>{children}</div> : null,
   AlertDialogContent: ({ children }: React.PropsWithChildren) => (
     <div>{children}</div>
   ),
@@ -143,18 +144,23 @@ vi.mock("@/components/ui/alert-dialog", () => ({
   AlertDialogFooter: ({ children }: React.PropsWithChildren) => (
     <div>{children}</div>
   ),
-  AlertDialogAction: (
-    { children, onClick }: React.PropsWithChildren<{ onClick?: () => void }>,
-  ) => <button onClick={onClick}>{children}</button>,
-  AlertDialogCancel: (
-    { children, onClick }: React.PropsWithChildren<{ onClick?: () => void }>,
-  ) => <button onClick={onClick}>{children}</button>,
+  AlertDialogAction: ({
+    children,
+    onClick,
+  }: React.PropsWithChildren<{ onClick?: () => void }>) => (
+    <button onClick={onClick}>{children}</button>
+  ),
+  AlertDialogCancel: ({
+    children,
+    onClick,
+  }: React.PropsWithChildren<{ onClick?: () => void }>) => (
+    <button onClick={onClick}>{children}</button>
+  ),
 }));
 
 vi.mock("@/components/ui/dialog", () => ({
-  Dialog: (
-    { children, open }: React.PropsWithChildren<{ open?: boolean }>,
-  ) => (open ? <div>{children}</div> : null),
+  Dialog: ({ children, open }: React.PropsWithChildren<{ open?: boolean }>) =>
+    open ? <div>{children}</div> : null,
   DialogContent: ({ children }: React.PropsWithChildren) => (
     <div>{children}</div>
   ),
@@ -172,7 +178,9 @@ vi.mock("@/components/ui/dialog", () => ({
 
 vi.mock("@/components/ui/button", () => ({
   Button: ({ children, onClick, ...props }: React.ComponentProps<"button">) => (
-    <button {...props} onClick={onClick}>{children}</button>
+    <button {...props} onClick={onClick}>
+      {children}
+    </button>
   ),
 }));
 
@@ -212,9 +220,11 @@ describe("AttendanceCalendar Coverage Hardening", () => {
 
     render(
       <AttendanceCalendar
-        attendanceData={mockAttendanceData as unknown as React.ComponentProps<
-          typeof AttendanceCalendar
-        >["attendanceData"]}
+        attendanceData={
+          mockAttendanceData as unknown as React.ComponentProps<
+            typeof AttendanceCalendar
+          >["attendanceData"]
+        }
         semester="odd"
         year="2024-25"
       />,
@@ -232,16 +242,18 @@ describe("AttendanceCalendar Coverage Hardening", () => {
   it("handles delete confirmation dialog", async () => {
     const { useTrackingData } = await import("@/hooks/tracker/useTrackingData");
     vi.mocked(useTrackingData).mockReturnValue({
-      data: [{
-        id: "t1",
-        course: "CS101",
-        session: "2nd Hour",
-        date: "20240901",
-        status: "extra",
-        semester: "odd",
-        year: "2024-25",
-        attendance: 110,
-      }],
+      data: [
+        {
+          id: "t1",
+          course: "CS101",
+          session: "2nd Hour",
+          date: "20240901",
+          status: "extra",
+          semester: "odd",
+          year: "2024-25",
+          attendance: 110,
+        },
+      ],
       isLoading: false,
       refetch: vi.fn(),
     } as unknown as ReturnType<typeof useTrackingData>);
@@ -256,9 +268,11 @@ describe("AttendanceCalendar Coverage Hardening", () => {
     };
     render(
       <AttendanceCalendar
-        attendanceData={mockAttendanceData as unknown as React.ComponentProps<
-          typeof AttendanceCalendar
-        >["attendanceData"]}
+        attendanceData={
+          mockAttendanceData as unknown as React.ComponentProps<
+            typeof AttendanceCalendar
+          >["attendanceData"]
+        }
         semester="odd"
         year="2024-25"
       />,

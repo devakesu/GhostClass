@@ -110,6 +110,28 @@ void main() {
 
         expect(profile.classField, isNull);
       });
+
+      test('handles class_id and classId fallback when class is null', () {
+        final json1 = {
+          'first_name': 'Alice',
+          'email': 'alice@example.com',
+          'class_id': 'class-uuid-123',
+        };
+
+        final profile1 = UserProfile.fromJson(json1);
+        expect(profile1.classField, isNotNull);
+        expect(profile1.classField?.id, 'class-uuid-123');
+
+        final json2 = {
+          'first_name': 'Alice',
+          'email': 'alice@example.com',
+          'classId': 'class-uuid-456',
+        };
+
+        final profile2 = UserProfile.fromJson(json2);
+        expect(profile2.classField, isNotNull);
+        expect(profile2.classField?.id, 'class-uuid-456');
+      });
     });
 
     group('fullName getter', () {

@@ -68,10 +68,11 @@ function validateOrigin(headerList: Headers, isMobileApp: boolean) {
 
   if (!origin) {
     const secFetchSite = headerList.get("sec-fetch-site")?.toLowerCase();
-    if (
-      !(secFetchSite === "same-origin" && !!requestHostname &&
-        (allowedHosts.has(requestHostname) || isLoopbackHost(requestHostname)))
-    ) {
+    if (!(
+      secFetchSite === "same-origin" &&
+      !!requestHostname &&
+      (allowedHosts.has(requestHostname) || isLoopbackHost(requestHostname))
+    )) {
       return "Invalid origin";
     }
     return null;
@@ -79,7 +80,8 @@ function validateOrigin(headerList: Headers, isMobileApp: boolean) {
 
   try {
     const originHostname = new URL(origin).hostname.toLowerCase();
-    const isAllowed = allowedHosts.has(originHostname) ||
+    const isAllowed =
+      allowedHosts.has(originHostname) ||
       (isLoopbackHost(originHostname) && isLoopbackHost(requestHostname));
     if (!isAllowed) return "Invalid origin";
   } catch {
@@ -133,7 +135,7 @@ async function handleOrphanUser(
     throw new Error("Orphan user lookup failed");
   }
 
-  const payload = await response.json().catch(() => null) as {
+  const payload = (await response.json().catch(() => null)) as {
     users?: Array<{ email?: string; id: string }>;
   } | null;
   const found = payload?.users?.find((u) => u.email === email);
@@ -149,9 +151,12 @@ async function validateClientIpAndRateLimit(
 ): Promise<NextResponse | null> {
   const ip = getClientIp(headerList);
   if (!ip) {
-    return NextResponse.json({ message: "Unable to determine client IP" }, {
-      status: 400,
-    });
+    return NextResponse.json(
+      { message: "Unable to determine client IP" },
+      {
+        status: 400,
+      },
+    );
   }
 
   const { success } = await authRateLimiter.limit(ip);
@@ -166,9 +171,11 @@ async function provisionSupabaseAuthUser(
   supabaseAdmin: ReturnType<typeof getAdminClient>,
   email: string,
   verifiedId: string,
-): Promise<
-  { authUserId: string; passwordToUse: string; isFirstLogin: boolean }
-> {
+): Promise<{
+  authUserId: string;
+  passwordToUse: string;
+  isFirstLogin: boolean;
+}> {
   const { data: existing } = await supabaseAdmin
     .from("users")
     .select("*")
@@ -207,8 +214,8 @@ async function provisionSupabaseAuthUser(
   }
 
   const canonicalPass = crypto.randomBytes(32).toString("hex");
-  const { data: createData, error: createError } = await supabaseAdmin.auth
-    .admin.createUser({
+  const { data: createData, error: createError } =
+    await supabaseAdmin.auth.admin.createUser({
       email,
       password: canonicalPass,
       email_confirm: true,
@@ -224,8 +231,8 @@ async function provisionSupabaseAuthUser(
   }
 
   await handleOrphanUser(supabaseAdmin, email);
-  const { data: retry, error: retryError } = await supabaseAdmin.auth.admin
-    .createUser({
+  const { data: retry, error: retryError } =
+    await supabaseAdmin.auth.admin.createUser({
       email,
       password: canonicalPass,
       email_confirm: true,
@@ -258,11 +265,12 @@ async function signInToSupabase(
   if (signInRes.error) {
     // First attempt failed — try to resolve the canonical email and retry.
     try {
-      const { data: adminUserData } = await supabaseAdmin.auth.admin
-        .getUserById(authUserId);
+      const { data: adminUserData } =
+        await supabaseAdmin.auth.admin.getUserById(authUserId);
       const fetchedEmail = adminUserData?.user?.email;
       if (
-        fetchedEmail && typeof fetchedEmail === "string" &&
+        fetchedEmail &&
+        typeof fetchedEmail === "string" &&
         fetchedEmail.trim().length > 0
       ) {
         signInEmail = fetchedEmail;
@@ -324,9 +332,9 @@ async function upsertUserData(
     updateData.auth_password_iv = pIv;
   }
 
-  const { error: upsertErr } = await supabaseAdmin.from("users").upsert(
-    updateData,
-  );
+  const { error: upsertErr } = await supabaseAdmin
+    .from("users")
+    .upsert(updateData);
   if (upsertErr) throw new Error("Upsert failed");
 }
 
@@ -349,20 +357,25 @@ async function validateRequestHeaders(
 function handleAuthError(error: unknown) {
   logger.error("Auth Failed:", error);
   const errObj = error as
-    | { status?: number; message?: string; name?: string }
-    | undefined;
+    { status?: number; message?: string; name?: string } | undefined;
   if (errObj?.status) {
-    return NextResponse.json({ message: errObj.message || "Auth error" }, {
-      status: errObj.status,
-    });
+    return NextResponse.json(
+      { message: errObj.message || "Auth error" },
+      {
+        status: errObj.status,
+      },
+    );
   }
   if (errObj?.name === "AbortError" || errObj?.message === "AbortError") {
     return NextResponse.json({ message: "Gateway Timeout" }, { status: 504 });
   }
   if (errObj?.message?.includes("Redis")) {
-    return NextResponse.json({ message: "Service Unavailable" }, {
-      status: 503,
-    });
+    return NextResponse.json(
+      { message: "Service Unavailable" },
+      {
+        status: 503,
+      },
+    );
   }
   // L-1: Standardised to {message} to match all other error responses in this handler.
   return NextResponse.json({ message: "Auth failed" }, { status: 500 });
@@ -375,10 +388,7 @@ const handler = async (
   const headerList = await headers();
   const cookieStore = await cookies();
   const isAppCheck = authType === "app-check";
-  const headerErr = await validateRequestHeaders(
-    headerList,
-    isAppCheck,
-  );
+  const headerErr = await validateRequestHeaders(headerList, isAppCheck);
   if (headerErr) return headerErr;
 
   let lockValue: string | null = null;
@@ -388,9 +398,12 @@ const handler = async (
     const body = decryptedBody || (await req.json());
     const validation = SaveTokenRequestSchema.safeParse(body);
     if (!validation.success) {
-      return NextResponse.json({ message: "Invalid request format" }, {
-        status: 400,
-      });
+      return NextResponse.json(
+        { message: "Invalid request format" },
+        {
+          status: 400,
+        },
+      );
     }
 
     const { token, fcm_token } = validation.data;
@@ -398,9 +411,12 @@ const handler = async (
     verifiedId = ezyUser.id;
 
     if (!/^[a-zA-Z0-9-_]+$/.test(verifiedId)) {
-      return NextResponse.json({ message: "Invalid user identifier" }, {
-        status: 400,
-      });
+      return NextResponse.json(
+        { message: "Invalid user identifier" },
+        {
+          status: 400,
+        },
+      );
     }
 
     // C-3: Use canonical auth-lock module (removes duplicated Lua script).
@@ -414,37 +430,29 @@ const handler = async (
     const email = `ezygo_${verifiedId}@${ghostDomain}`;
 
     const { authUserId, passwordToUse, isFirstLogin } =
-      await provisionSupabaseAuthUser(
-        supabaseAdmin,
-        email,
-        verifiedId,
-      );
+      await provisionSupabaseAuthUser(supabaseAdmin, email, verifiedId);
 
     // C-1: Mirror the isProd guard from proxy.ts so dev/staging sessions are set
     // against the correct Supabase project and match the middleware's session cookies.
     const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig("client");
 
-    const supabase = createServerClient(
-      supabaseUrl,
-      supabaseKey,
-      {
-        cookies: {
-          getAll: () => cookieStore.getAll(),
-          setAll: (cookiesToSet) => {
-            try {
-              cookiesToSet.forEach(({ name, value, options }) =>
-                cookieStore.set(name, value, options)
-              );
-            } catch (error) {
-              logger.warn(
-                "Non-critical: Failed to set Supabase session cookies in save-token route",
-                error,
-              );
-            }
-          },
+    const supabase = createServerClient(supabaseUrl, supabaseKey, {
+      cookies: {
+        getAll: () => cookieStore.getAll(),
+        setAll: (cookiesToSet) => {
+          try {
+            cookiesToSet.forEach(({ name, value, options }) =>
+              cookieStore.set(name, value, options),
+            );
+          } catch (error) {
+            logger.warn(
+              "Non-critical: Failed to set Supabase session cookies in save-token route",
+              error,
+            );
+          }
         },
       },
-    );
+    });
 
     const signInData = await signInToSupabase(
       supabase,
@@ -471,8 +479,8 @@ const handler = async (
     const response = {
       success: true,
       userId: authUserId,
-      current_semester: syncRes?.academic?.current_semester ??
-        info.current_semester,
+      current_semester:
+        syncRes?.academic?.current_semester ?? info.current_semester,
       current_year: syncRes?.academic?.current_year ?? info.current_year,
     };
 

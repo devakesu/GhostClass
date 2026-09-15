@@ -103,9 +103,8 @@ export function decrypt(
     throw new Error("Invalid input: IV and content are required");
   }
   const ivHex = typeof ivHexOrData === "string" ? ivHexOrData : ivHexOrData.iv;
-  const content = typeof ivHexOrData === "string"
-    ? contentArg!
-    : ivHexOrData.content;
+  const content =
+    typeof ivHexOrData === "string" ? contentArg! : ivHexOrData.content;
 
   if (!ivHex || !content) {
     throw new Error("Invalid input: IV and content are required");

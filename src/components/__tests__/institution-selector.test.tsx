@@ -54,32 +54,37 @@ describe("InstitutionSelector", () => {
   });
 
   it("renders loading state", () => {
-    vi.mocked(institutionsHooks.useInstitutions).mockReturnValue(
-      { data: undefined, isLoading: true } as any,
-    );
-    vi.mocked(institutionsHooks.useDefaultInstitutionUser).mockReturnValue(
-      { data: undefined } as any,
-    );
-    vi.mocked(institutionsHooks.useUpdateDefaultInstitutionUser)
-      .mockReturnValue({ mutate: vi.fn() } as any);
+    vi.mocked(institutionsHooks.useInstitutions).mockReturnValue({
+      data: undefined,
+      isLoading: true,
+    } as any);
+    vi.mocked(institutionsHooks.useDefaultInstitutionUser).mockReturnValue({
+      data: undefined,
+    } as any);
+    vi.mocked(
+      institutionsHooks.useUpdateDefaultInstitutionUser,
+    ).mockReturnValue({ mutate: vi.fn() } as any);
 
     render(<InstitutionSelector />, { wrapper });
     expect(screen.getByLabelText(/Loading/i)).toBeInTheDocument();
   });
 
   it("renders empty state", () => {
-    vi.mocked(institutionsHooks.useInstitutions).mockReturnValue(
-      { data: [], isLoading: false } as any,
-    );
-    vi.mocked(institutionsHooks.useDefaultInstitutionUser).mockReturnValue(
-      { data: undefined } as any,
-    );
-    vi.mocked(institutionsHooks.useUpdateDefaultInstitutionUser)
-      .mockReturnValue({ mutate: vi.fn() } as any);
+    vi.mocked(institutionsHooks.useInstitutions).mockReturnValue({
+      data: [],
+      isLoading: false,
+    } as any);
+    vi.mocked(institutionsHooks.useDefaultInstitutionUser).mockReturnValue({
+      data: undefined,
+    } as any);
+    vi.mocked(
+      institutionsHooks.useUpdateDefaultInstitutionUser,
+    ).mockReturnValue({ mutate: vi.fn() } as any);
 
     render(<InstitutionSelector />, { wrapper });
-    expect(screen.getByText(/You are not enrolled in any institutions/i))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText(/You are not enrolled in any institutions/i),
+    ).toBeInTheDocument();
   });
 
   it("renders list of institutions and handles selection", async () => {
@@ -95,16 +100,18 @@ describe("InstitutionSelector", () => {
         institution_role: { name: "Instructor" },
       },
     ];
-    vi.mocked(institutionsHooks.useInstitutions).mockReturnValue(
-      { data: mockInstitutions, isLoading: false } as any,
-    );
-    vi.mocked(institutionsHooks.useDefaultInstitutionUser).mockReturnValue(
-      { data: 1 } as any,
-    );
+    vi.mocked(institutionsHooks.useInstitutions).mockReturnValue({
+      data: mockInstitutions,
+      isLoading: false,
+    } as any);
+    vi.mocked(institutionsHooks.useDefaultInstitutionUser).mockReturnValue({
+      data: 1,
+    } as any);
 
     const mockMutate = vi.fn();
-    vi.mocked(institutionsHooks.useUpdateDefaultInstitutionUser)
-      .mockReturnValue({ mutate: mockMutate, isPending: false } as any);
+    vi.mocked(
+      institutionsHooks.useUpdateDefaultInstitutionUser,
+    ).mockReturnValue({ mutate: mockMutate, isPending: false } as any);
 
     render(<InstitutionSelector />, { wrapper });
 
@@ -150,16 +157,18 @@ describe("InstitutionSelector", () => {
         institution_role: { name: "Role 2" },
       },
     ];
-    vi.mocked(institutionsHooks.useInstitutions).mockReturnValue(
-      { data: mockInstitutions, isLoading: false } as any,
-    );
-    vi.mocked(institutionsHooks.useDefaultInstitutionUser).mockReturnValue(
-      { data: 1 } as any,
-    );
+    vi.mocked(institutionsHooks.useInstitutions).mockReturnValue({
+      data: mockInstitutions,
+      isLoading: false,
+    } as any);
+    vi.mocked(institutionsHooks.useDefaultInstitutionUser).mockReturnValue({
+      data: 1,
+    } as any);
 
     const mockMutate = vi.fn();
-    vi.mocked(institutionsHooks.useUpdateDefaultInstitutionUser)
-      .mockReturnValue({ mutate: mockMutate, isPending: false } as any);
+    vi.mocked(
+      institutionsHooks.useUpdateDefaultInstitutionUser,
+    ).mockReturnValue({ mutate: mockMutate, isPending: false } as any);
 
     render(<InstitutionSelector />, { wrapper });
 

@@ -14,22 +14,19 @@ interface UpdateProfileData {
   class_id?: string | null;
 }
 
-export const useProfile = (
-  options?: {
-    initialData?: UserProfile | null;
-    sync?: boolean;
-    force?: boolean;
-  },
-) => {
+export const useProfile = (options?: {
+  initialData?: UserProfile | null;
+  sync?: boolean;
+  force?: boolean;
+}) => {
   // Force/Sync callers (e.g. dashboard) use a separate query key so they are never
   // deduplicated with the navbar's no-force fetch. When both share the same key,
   // React Query merges observers into one in-flight request and the navbar's
   // queryFn (no sync/force params) wins — the EzyGo sync never runs.
   // staleTime:0 on the force/sync key means it is always considered stale and always
   // re-fetches on mount, regardless of what the shared ["profile"] cache holds.
-  const queryKey: unknown[] = (options?.force || options?.sync)
-    ? ["profile", "synced"]
-    : ["profile"];
+  const queryKey: unknown[] =
+    options?.force || options?.sync ? ["profile", "synced"] : ["profile"];
 
   return useQuery<UserProfile | null>({
     queryKey,
@@ -51,7 +48,7 @@ export const useProfile = (
     initialData: options?.initialData ?? undefined,
     // Force/Sync variant: staleTime 0 so it always re-fetches on mount.
     // Normal variant: 5-min cache to avoid hammering the sync logic.
-    staleTime: (options?.force || options?.sync) ? 0 : 1000 * 60 * 5,
+    staleTime: options?.force || options?.sync ? 0 : 1000 * 60 * 5,
     gcTime: 30 * 60 * 1000,
     // Never retry 4xx errors (rate limit, auth, bad request) — retrying a 429
     // would waste a rate-limit slot. Retries once for 5xx / network errors.

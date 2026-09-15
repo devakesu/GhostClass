@@ -51,6 +51,8 @@ final trackingProvider = AsyncNotifierProvider<TrackingNotifier, TrackingState>(
 );
 
 class TrackingNotifier extends AsyncNotifier<TrackingState> {
+  int _revalidationGeneration = 0;
+
   @override
   FutureOr<TrackingState> build() async {
     // 1. Reactive Dependency: Clear data immediately on logout OR Semester Change
@@ -64,9 +66,12 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       ]);
     }
 
-    final academic = academicAsync.value;
+    // Re-read resolved values after any suspension — the captured AsyncValue
+    // snapshots above reflect the loading-era state and may have null .value.
+    final resolvedAuth = ref.read(authProvider).value ?? authState.value;
+    final academic = ref.read(academicProvider).value ?? academicAsync.value;
 
-    if (authState.value == null || academic == null) {
+    if (resolvedAuth == null || academic == null) {
       return TrackingState(
         groupedByCourse: {},
         totalCount: 0,
@@ -76,18 +81,31 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     }
 
     final storage = ref.read(secureStorageProvider);
-    final user = authState.value!;
-    final cacheKeySuffix =
-        '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+    final user = resolvedAuth;
+    final cacheKeySuffix = '${user.supabaseUserId}_${academic.cacheKeySuffix}';
 
     // 1. Try disk cache first for instant boot (<15ms)
     try {
-      final cachedReportRaw = await storage.getCachedData(
-        'tracking_report_$cacheKeySuffix',
-      );
-      final cachedRecordsRaw = await storage.getCachedData(
-        'tracking_records_$cacheKeySuffix',
-      );
+      Future<dynamic> readWithFallback(String prefix) async {
+        final canonicalData = await storage.getCachedData(
+          '${prefix}_$cacheKeySuffix',
+        );
+        if (canonicalData != null) return canonicalData;
+        final legacyKey =
+            '${prefix}_${user.supabaseUserId}_${academic.semester}_${academic.year}';
+        if (legacyKey != '${prefix}_$cacheKeySuffix') {
+          return storage.getCachedData(legacyKey);
+        }
+        return null;
+      }
+
+      final cacheResults = await Future.wait([
+        readWithFallback('tracking_report'),
+        readWithFallback('tracking_records'),
+        readWithFallback('dashboard_attendance'),
+      ]);
+      final cachedReportRaw = cacheResults[0] ?? cacheResults[2];
+      final cachedRecordsRaw = cacheResults[1];
 
       if (cachedReportRaw is Map && cachedRecordsRaw is List) {
         final officialReport = AttendanceReportDetailed.fromJson(
@@ -117,17 +135,22 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         }
 
         // Revalidate in background quietly
+        final currentGen = ++_revalidationGeneration;
         AppLogger.safeUnawait(
           _fetchAndProcess(academic: academic)
               .then((fresh) {
-                state = AsyncValue.data(fresh);
+                if (ref.mounted && currentGen == _revalidationGeneration) {
+                  state = AsyncValue.data(fresh);
+                }
               })
               .catchError((Object e, StackTrace st) {
-                AppLogger.e(
-                  'TrackingNotifier: Background revalidation failed',
-                  e,
-                  st,
-                );
+                if (ref.mounted) {
+                  AppLogger.e(
+                    'TrackingNotifier: Background revalidation failed',
+                    e,
+                    st,
+                  );
+                }
               }),
           'TrackingNotifier: background revalidate',
         );
@@ -220,8 +243,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       grouped[course]!.sort(utils.compareTrackingRecords);
     }
 
-    final cacheKeySuffix =
-        '${auth.supabaseUserId}_${academic.semester}_${academic.year}';
+    final cacheKeySuffix = '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
     AppLogger.safeUnawait(
       storage.saveCachedData(
         'tracking_report_$cacheKeySuffix',
@@ -371,6 +393,20 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
             totalCount: current.totalCount + 1,
           ),
         );
+
+        final allRecords = newGrouped.values.expand((e) => e).toList();
+        final cacheKeySuffix =
+            '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
+        AppLogger.safeUnawait(
+          ref
+              .read(secureStorageProvider)
+              .saveCachedData(
+                'tracking_records_$cacheKeySuffix',
+                allRecords.map((r) => r.toJson()).toList(),
+              ),
+          'TrackingNotifier: persist cache on insert',
+        );
+
         // Analytics: attendance added
         try {
           await AnalyticsService.instance.logAttendanceMarked(
@@ -426,6 +462,24 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
               totalCount: current.totalCount - 1,
             ),
           );
+
+          final auth = ref.read(authProvider).value;
+          final academic = ref.read(academicProvider).value;
+          if (auth != null && academic != null) {
+            final allRecords = newGrouped.values.expand((e) => e).toList();
+            final cacheKeySuffix =
+                '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
+            AppLogger.safeUnawait(
+              ref
+                  .read(secureStorageProvider)
+                  .saveCachedData(
+                    'tracking_records_$cacheKeySuffix',
+                    allRecords.map((r) => r.toJson()).toList(),
+                  ),
+              'TrackingNotifier: persist cache on delete',
+            );
+          }
+
           // Analytics: attendance deleted
           try {
             await AnalyticsService.instance.logAttendanceDeleted(
@@ -482,6 +536,19 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       }
 
       await query;
+      if (courseId == null) {
+        final cacheKeySuffix =
+            '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
+        AppLogger.safeUnawait(
+          ref
+              .read(secureStorageProvider)
+              .saveCachedData(
+                'tracking_records_$cacheKeySuffix',
+                <dynamic>[],
+              ),
+          'TrackingNotifier: clear cache on clearRecords',
+        );
+      }
       await refresh();
     } on Object catch (e) {
       AppLogger.e('TrackingNotifier: Failed to clear records', e);

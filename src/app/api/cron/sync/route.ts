@@ -2,7 +2,12 @@ import crypto from "node:crypto";
 import { createClient } from "@/lib/supabase/server";
 import { NextResponse } from "next/server";
 import { decrypt, encrypt } from "@/lib/crypto";
-import { getUserDisplayName, normalizeSession, toRoman, toTitleCase } from "@/lib/utils";
+import {
+  getUserDisplayName,
+  normalizeSession,
+  toRoman,
+  toTitleCase,
+} from "@/lib/utils";
 import { egressFetch, redact } from "@/lib/utils.server";
 import { z } from "zod";
 import { logger } from "@/lib/logger";
@@ -164,9 +169,12 @@ function handleAuthentication(
     if (!authHeader.startsWith("Bearer ")) {
       return {
         isCron: false,
-        errorResponse: NextResponse.json({ error: "Unauthorized" }, {
-          status: 403,
-        }),
+        errorResponse: NextResponse.json(
+          { error: "Unauthorized" },
+          {
+            status: 403,
+          },
+        ),
       };
     }
     const providedSecret = authHeader.slice("Bearer ".length);
@@ -175,7 +183,8 @@ function handleAuthentication(
     const cronBuf = Buffer.from(cronSecret, "utf8");
 
     if (
-      cronBuf.length > 0 && providedBuf.length === cronBuf.length &&
+      cronBuf.length > 0 &&
+      providedBuf.length === cronBuf.length &&
       crypto.timingSafeEqual(providedBuf, cronBuf)
     ) {
       return { isCron: true };
@@ -217,16 +226,20 @@ async function purgeStaleCronToken(
   err?: unknown,
 ): Promise<{ expired: true }> {
   logger.warn(
-    `[cron/sync] ${reason} for ${redact("username", user.username)} (${
-      redact("id", user.auth_id)
-    }) — purging stale token`,
+    `[cron/sync] ${reason} for ${redact("username", user.username)} (${redact(
+      "id",
+      user.auth_id,
+    )}) — purging stale token`,
     err,
   );
-  await supabaseAdmin.from("users").update({
-    ezygo_token: null,
-    ezygo_iv: null,
-    last_synced_at: new Date().toISOString(),
-  }).eq("auth_id", user.auth_id);
+  await supabaseAdmin
+    .from("users")
+    .update({
+      ezygo_token: null,
+      ezygo_iv: null,
+      last_synced_at: new Date().toISOString(),
+    })
+    .eq("auth_id", user.auth_id);
   return { expired: true };
 }
 
@@ -283,10 +296,13 @@ async function attemptCookieFallback(
   );
   if (res.ok) {
     const { iv, content } = encrypt(cookieToken);
-    await supabaseAdmin.from("users").update({
-      ezygo_token: content,
-      ezygo_iv: iv,
-    }).eq("auth_id", user.auth_id);
+    await supabaseAdmin
+      .from("users")
+      .update({
+        ezygo_token: content,
+        ezygo_iv: iv,
+      })
+      .eq("auth_id", user.auth_id);
     return { token: cookieToken, res };
   }
   return null;
@@ -298,14 +314,14 @@ async function getValidTokenAndAttendance(
   supabaseAdmin: ReturnType<typeof getAdminClient>,
 ): Promise<
   | {
-    expired: false;
-    token: string;
-    officialData: OfficialAttendanceData;
-    officialCourses?: Record<string, unknown>;
-  }
+      expired: false;
+      token: string;
+      officialData: OfficialAttendanceData;
+      officialCourses?: Record<string, unknown>;
+    }
   | {
-    expired: true;
-  }
+      expired: true;
+    }
 > {
   const tokenResolution = await resolveDecryptedToken(
     user,
@@ -351,9 +367,8 @@ async function getValidTokenAndAttendance(
     Array.isArray(officialDataRaw) && officialDataRaw.length === 0
       ? {}
       : officialDataRaw;
-  const officialParse = OfficialAttendanceDataSchema.safeParse(
-    normalizedOfficial,
-  );
+  const officialParse =
+    OfficialAttendanceDataSchema.safeParse(normalizedOfficial);
   if (!officialParse.success) throw new Error("Invalid attendance data shape");
 
   return {
@@ -378,7 +393,7 @@ function buildOfficialMap(
         !isNaN(parseInt(String(s))) && parseInt(String(s)) > 20;
       if (!rawSession || rawSession === "null" || isNumericId(rawSession)) {
         const skNum = parseInt(String(slotKey), 10);
-        rawSession = (!isNaN(skNum) && skNum < 20) ? slotKey : String(idx + 1);
+        rawSession = !isNaN(skNum) && skNum < 20 ? slotKey : String(idx + 1);
       }
 
       const romanSession = toRoman(
@@ -411,8 +426,7 @@ function handleRevisionClass(
     notifications.push({
       auth_user_id: user.auth_id,
       title: "Revision Class — Not Counted 📚",
-      description:
-        `Manual entry for ${courseLabel} on ${item.date} (Session ${romanSession}) removed as official slot is a Revision class.`,
+      description: `Manual entry for ${courseLabel} on ${item.date} (Session ${romanSession}) removed as official slot is a Revision class.`,
       topic: `revision-${key}`,
     });
     emails.push({
@@ -425,6 +439,21 @@ function handleRevisionClass(
         dashboardUrl,
       },
     });
+  }
+}
+
+function getAttendanceLabel(code: number): string {
+  switch (code) {
+    case 110:
+      return "Present";
+    case 111:
+      return "Absent";
+    case 225:
+      return "Duty Leave";
+    case 112:
+      return "Medically Excused";
+    default:
+      return String(code);
   }
 }
 
@@ -450,7 +479,7 @@ function handleCourseMismatch(
   const trackerCourseRaw = String(item.course);
   const resolvedTrackerId =
     universityCodeToEzygoId.get(trackerCourseRaw.toUpperCase()) ??
-      trackerCourseRaw;
+    trackerCourseRaw;
 
   if (resolvedTrackerId === String(officialEntry.course)) return false;
 
@@ -461,17 +490,7 @@ function handleCourseMismatch(
     courseInfoMap,
   );
 
-  const attCodeNum = Number(item.attendance);
-  let attendanceLabel = String(item.attendance);
-  if (attCodeNum === 110) {
-    attendanceLabel = "Present";
-  } else if (attCodeNum === 111) {
-    attendanceLabel = "Absent";
-  } else if (attCodeNum === 225) {
-    attendanceLabel = "Duty Leave";
-  } else if (attCodeNum === 112) {
-    attendanceLabel = "Medically Excused";
-  }
+  const attendanceLabel = getAttendanceLabel(Number(item.attendance));
 
   const remarksSuffix = item.remarks?.trim()
     ? ` Your Manual Record Remarks: ${item.remarks.trim()}`
@@ -480,8 +499,7 @@ function handleCourseMismatch(
   notifications.push({
     auth_user_id: user.auth_id,
     title: "Course Mismatch 💀",
-    description:
-      `Course mismatch on ${item.date} (Session ${romanSession}). Manual: ${manualCourseLabel}, Official: ${officialCourseLabel}.${remarksSuffix}`,
+    description: `Course mismatch on ${item.date} (Session ${romanSession}). Manual: ${manualCourseLabel}, Official: ${officialCourseLabel}.${remarksSuffix}`,
     topic: `conflict-course-${key}`,
   });
   emails.push({
@@ -522,10 +540,10 @@ function handleAttendanceStatus(
 ): void {
   const officialCode = officialEntry.attendance;
   const trackerCode = Number(item.attendance);
-  const isOfficialPositive = officialCode === 110 || officialCode === 225 ||
-    officialCode === 112;
-  const isTrackerPositive = trackerCode === 110 || trackerCode === 225 ||
-    trackerCode === 112;
+  const isOfficialPositive =
+    officialCode === 110 || officialCode === 225 || officialCode === 112;
+  const isTrackerPositive =
+    trackerCode === 110 || trackerCode === 225 || trackerCode === 112;
   const courseLabel = formatCourseLabel(item.course, courseInfoMap);
 
   if (isOfficialPositive) {
@@ -533,8 +551,7 @@ function handleAttendanceStatus(
     notifications.push({
       auth_user_id: user.auth_id,
       title: getResolvedTitle(officialCode, trackerCode),
-      description:
-        `Attendance for ${courseLabel} on ${item.date} (Session ${romanSession}) resolved to official status.`,
+      description: `Attendance for ${courseLabel} on ${item.date} (Session ${romanSession}) resolved to official status.`,
       topic: `sync-surprise-${key}`,
     });
     return;
@@ -542,11 +559,11 @@ function handleAttendanceStatus(
 
   if (officialCode === trackerCode) {
     toDelete.add(item.id);
+    const statusText = getAttendanceLabel(officialCode).toLowerCase();
     notifications.push({
       auth_user_id: user.auth_id,
       title: "Attendance Updated 🥳",
-      description:
-        `Official record for ${courseLabel} on ${item.date} (Session ${romanSession}) matches manual entry.`,
+      description: `Official record for ${courseLabel} on ${item.date} (Session ${romanSession}) matches manual entry: ${statusText}.`,
       topic: `sync-surprise-${key}`,
     });
     return;
@@ -564,8 +581,7 @@ function handleAttendanceStatus(
         notifications.push({
           auth_user_id: user.auth_id,
           title: "Apply for DL! 📝",
-          description:
-            `Your extra DL entry for ${courseLabel} on ${item.date} (Session ${romanSession}) is now updated as absent. You can now apply for duty leave.${remarksSuffix}`,
+          description: `Your extra DL entry for ${courseLabel} on ${item.date} (Session ${romanSession}) is now updated as absent. You can now apply for duty leave.${remarksSuffix}`,
           topic: `conflict-dl-${key}`,
         });
         emails.push({
@@ -585,8 +601,7 @@ function handleAttendanceStatus(
         notifications.push({
           auth_user_id: user.auth_id,
           title: "Attendance Conflict 💀",
-          description:
-            `Conflict: Marked present for ${courseLabel} on ${item.date} (Session ${romanSession}) but official record is absent.${remarksSuffix}`,
+          description: `Conflict: Marked present for ${courseLabel} on ${item.date} (Session ${romanSession}) but official record is absent.${remarksSuffix}`,
           topic: `conflict-${key}`,
         });
         emails.push({
@@ -691,10 +706,10 @@ async function executeSyncMutations(
   }
   if (toUpdateStatus.length > 0) {
     promises.push(
-      supabaseAdmin.from("tracker").update({ status: "correction" }).in(
-        "id",
-        toUpdateStatus,
-      ),
+      supabaseAdmin
+        .from("tracker")
+        .update({ status: "correction" })
+        .in("id", toUpdateStatus),
     );
   }
   let notifIndex = -1;
@@ -713,7 +728,9 @@ async function executeSyncMutations(
         res.reason,
       );
     } else if (
-      res.value && typeof res.value === "object" && "error" in res.value &&
+      res.value &&
+      typeof res.value === "object" &&
+      "error" in res.value &&
       (res.value as Record<string, unknown>).error
     ) {
       logger.error(
@@ -753,7 +770,7 @@ async function executeSyncMutations(
               .eq("auth_id", user.auth_id);
           }
         })(),
-      )
+      ),
     );
   }
 
@@ -857,8 +874,10 @@ async function syncUser(
         const code = c.code?.trim().toUpperCase();
         const name = c.name ? toTitleCase(c.name.trim()) : undefined;
 
-        const existing = userCourseInfoMap.get(cid) ||
-          (code ? userCourseInfoMap.get(code) : undefined) || {};
+        const existing =
+          userCourseInfoMap.get(cid) ||
+          (code ? userCourseInfoMap.get(code) : undefined) ||
+          {};
         const meta: CourseMetadata = {
           name: name || existing.name,
           code: code || existing.code,
@@ -919,9 +938,10 @@ async function syncUser(
     return stats;
   } catch (err) {
     logger.error(
-      `Sync failed for ${redact("username", user.username)} (${
-        redact("id", user.auth_id)
-      })`,
+      `Sync failed for ${redact("username", user.username)} (${redact(
+        "id",
+        user.auth_id,
+      )})`,
       err,
     );
     stats.errors = 1;
@@ -933,9 +953,12 @@ async function syncUser(
     // retry queue — meaning they'd be skipped for the longest possible time
     // instead of being retried promptly.
     if (stats.processed > 0) {
-      await supabaseAdmin.from("users").update({
-        last_synced_at: new Date().toISOString(),
-      }).eq("auth_id", user.auth_id);
+      await supabaseAdmin
+        .from("users")
+        .update({
+          last_synced_at: new Date().toISOString(),
+        })
+        .eq("auth_id", user.auth_id);
     }
   }
 }
@@ -979,7 +1002,8 @@ async function fetchCronUsers(
   supabaseAdmin: ReturnType<typeof getAdminClient>,
   target: string | null,
 ): Promise<UserSyncData[]> {
-  let q = supabaseAdmin.from("users")
+  let q = supabaseAdmin
+    .from("users")
     .select(
       "username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name",
     )
@@ -1011,18 +1035,24 @@ async function fetchSessionUser(
     ? authHeader.substring(7)
     : null;
 
-  const { data: { user } } = supabaseToken
+  const {
+    data: { user },
+  } = supabaseToken
     ? await supabase.auth.getUser(supabaseToken)
     : await supabase.auth.getUser();
 
   if (!user) {
     return {
-      errorResponse: NextResponse.json({ error: "Unauthorized" }, {
-        status: 401,
-      }),
+      errorResponse: NextResponse.json(
+        { error: "Unauthorized" },
+        {
+          status: 401,
+        },
+      ),
     };
   }
-  const { data } = await supabaseAdmin.from("users")
+  const { data } = await supabaseAdmin
+    .from("users")
     .select(
       "username, email, ezygo_token, ezygo_iv, auth_id, fcm_token, first_name, last_name",
     )
@@ -1036,9 +1066,9 @@ async function loadCourseMaps(
   courseInfoMap: Map<string, CourseMetadata>;
   universityCodeToEzygoId: Map<string, string>;
 }> {
-  const { data: mappings } = await supabaseAdmin.from("course_mappings").select(
-    "ezygo_id, course_name, university_code",
-  );
+  const { data: mappings } = await supabaseAdmin
+    .from("course_mappings")
+    .select("ezygo_id, course_name, university_code");
   const courseInfoMap = new Map<string, CourseMetadata>();
   const universityCodeToEzygoId = new Map<string, string>();
   if (mappings) {
@@ -1091,9 +1121,8 @@ export const GET = withSecurity(async (req, { authType }) => {
       users = sessionResult.users || [];
     }
 
-    const { courseInfoMap, universityCodeToEzygoId } = await loadCourseMaps(
-      supabaseAdmin,
-    );
+    const { courseInfoMap, universityCodeToEzygoId } =
+      await loadCourseMaps(supabaseAdmin);
 
     const overallStats = createEmptyStats();
     // L-3: Process users concurrently instead of sequentially.
@@ -1108,7 +1137,7 @@ export const GET = withSecurity(async (req, { authType }) => {
           supabaseAdmin,
           courseInfoMap,
           universityCodeToEzygoId,
-        )
+        ),
       ),
     );
     for (const userStats of userResults) {
@@ -1123,11 +1152,14 @@ export const GET = withSecurity(async (req, { authType }) => {
     // In batch cron mode, consider the run successful if at least one user processed
     // or if there were no errors at all. Only fail the whole batch with 500 if every user errored.
     const successFlag = isBatchCron
-      ? (overallStats.processed > 0 || overallStats.errors === 0)
+      ? overallStats.processed > 0 || overallStats.errors === 0
       : overallStats.errors === 0;
-    return NextResponse.json({ success: successFlag, ...overallStats }, {
-      status: successFlag ? 200 : 500,
-    });
+    return NextResponse.json(
+      { success: successFlag, ...overallStats },
+      {
+        status: successFlag ? 200 : 500,
+      },
+    );
   } finally {
     if (lockAcquired) {
       try {

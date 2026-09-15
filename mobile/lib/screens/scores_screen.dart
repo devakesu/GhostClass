@@ -44,14 +44,18 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: ServiceErrorView(
           error: scoreState.error,
-          onRetry: () => ref.read(scoreProvider.notifier).refresh(),
+          onRetry: () async {
+            ref.read(apiServiceProvider).clearCaches();
+            await ref.read(scoreProvider.notifier).refresh();
+          },
         ),
       );
     }
 
-    if (isSyncing ||
-        academicAsync.isLoading ||
-        (scoreState.isLoading && (data == null || data.rawExams.isEmpty))) {
+    final hasData = data != null && data.rawExams.isNotEmpty;
+    if ((isSyncing && !hasData) ||
+        (academicAsync.isLoading && !hasData) ||
+        (scoreState.isLoading && !hasData)) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -233,7 +237,10 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                   error: (err, _) => SliverFillRemaining(
                     child: ServiceErrorView(
                       error: err,
-                      onRetry: () => ref.read(scoreProvider.notifier).refresh(),
+                      onRetry: () async {
+                        ref.read(apiServiceProvider).clearCaches();
+                        await ref.read(scoreProvider.notifier).refresh();
+                      },
                     ),
                   ),
                 ),

@@ -23,8 +23,7 @@ interface ProviderResult {
 
 const hasBrevo = !!process.env.BREVO_API_KEY;
 const hasSendPulse = !!(
-  process.env.SENDPULSE_CLIENT_ID &&
-  process.env.SENDPULSE_CLIENT_SECRET
+  process.env.SENDPULSE_CLIENT_ID && process.env.SENDPULSE_CLIENT_SECRET
 );
 
 const getSenderEmail = () => {
@@ -105,9 +104,8 @@ async function getSendPulseToken(): Promise<string> {
     }
 
     // SendPulse tokens typically have 3600s lifetime. Cache with 50-minute TTL or expires_in - 5min buffer.
-    const expiresInSec = typeof data.expires_in === "number"
-      ? data.expires_in
-      : 3600;
+    const expiresInSec =
+      typeof data.expires_in === "number" ? data.expires_in : 3600;
     const ttlMs = Math.min(
       Math.max((expiresInSec - 300) * 1000, 60_000),
       50 * 60 * 1000,
@@ -128,9 +126,15 @@ async function getSendPulseToken(): Promise<string> {
   }
 }
 
-async function sendViaSendPulse(
-  { to, subject, html, text, replyTo, fromName, toName }: SendEmailProps,
-): Promise<ProviderResult> {
+async function sendViaSendPulse({
+  to,
+  subject,
+  html,
+  text,
+  replyTo,
+  fromName,
+  toName,
+}: SendEmailProps): Promise<ProviderResult> {
   if (!hasSendPulse) throw new Error("SendPulse not configured");
 
   try {
@@ -138,7 +142,8 @@ async function sendViaSendPulse(
     const payload = {
       email: {
         html: Buffer.from(html).toString("base64"),
-        text: text ||
+        text:
+          text ||
           sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
         subject,
         from: {
@@ -159,10 +164,10 @@ async function sendViaSendPulse(
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({})) as { message?: string };
+      const err = (await res.json().catch(() => ({}))) as { message?: string };
       throw new Error(err.message || `SendPulse error: ${res.status}`);
     }
-    const data = await res.json() as { id?: string };
+    const data = (await res.json()) as { id?: string };
     return { success: true, provider: "SendPulse", id: data.id };
   } catch (error: unknown) {
     if (error instanceof Error) {
@@ -172,9 +177,15 @@ async function sendViaSendPulse(
   }
 }
 
-async function sendViaBrevo(
-  { to, subject, html, text, replyTo, fromName, toName }: SendEmailProps,
-): Promise<ProviderResult> {
+async function sendViaBrevo({
+  to,
+  subject,
+  html,
+  text,
+  replyTo,
+  fromName,
+  toName,
+}: SendEmailProps): Promise<ProviderResult> {
   if (!hasBrevo) throw new Error("Brevo not configured");
 
   try {
@@ -186,8 +197,8 @@ async function sendViaBrevo(
       to: [{ email: to, ...(toName ? { name: toName } : {}) }],
       subject,
       htmlContent: html,
-      textContent: text ||
-        sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
+      textContent:
+        text || sanitizeHtml(html, { allowedTags: [], allowedAttributes: {} }),
       ...(replyTo ? { replyTo: { email: replyTo } } : {}),
     };
 
@@ -201,10 +212,10 @@ async function sendViaBrevo(
       body: JSON.stringify(payload),
     });
     if (!res.ok) {
-      const err = await res.json().catch(() => ({})) as { message?: string };
+      const err = (await res.json().catch(() => ({}))) as { message?: string };
       throw new Error(err.message || `Brevo error: ${res.status}`);
     }
-    const data = await res.json() as { messageId?: string };
+    const data = (await res.json()) as { messageId?: string };
     return { success: true, provider: "Brevo", id: data.messageId };
   } catch (error: unknown) {
     if (error instanceof Error) {

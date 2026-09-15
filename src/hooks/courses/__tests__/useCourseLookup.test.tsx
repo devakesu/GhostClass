@@ -22,28 +22,28 @@ describe("useCourseLookup", () => {
 
   it("should get course code by ID from coursesData", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ coursesData: mockCoursesData })
+      useCourseLookup({ coursesData: mockCoursesData }),
     );
     expect(result.current.getCourseCodeById("1")).toBe("CS101");
   });
 
   it("should find course code by normalized code input", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ coursesData: mockCoursesData })
+      useCourseLookup({ coursesData: mockCoursesData }),
     );
     expect(result.current.getCourseCodeById(" cs 101 ")).toBe("CS101");
   });
 
   it("should get course code from classCourses", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ classCourses: mockClassCourses })
+      useCourseLookup({ classCourses: mockClassCourses }),
     );
     expect(result.current.getCourseCodeById("CUSTOM1")).toBe("CUSTOM1");
   });
 
   it("should fallback to attendanceData for course code", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ attendanceData: mockAttendanceData })
+      useCourseLookup({ attendanceData: mockAttendanceData }),
     );
     expect(result.current.getCourseCodeById("3")).toBe("PH101");
   });
@@ -55,42 +55,42 @@ describe("useCourseLookup", () => {
 
   it("should get course name by ID from coursesData", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ coursesData: mockCoursesData })
+      useCourseLookup({ coursesData: mockCoursesData }),
     );
     expect(result.current.getCourseNameById("1")).toBe("Intro to CS");
   });
 
   it("should find course name by normalized code input", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ coursesData: mockCoursesData })
+      useCourseLookup({ coursesData: mockCoursesData }),
     );
     expect(result.current.getCourseNameById(" cs 101 ")).toBe("Intro to CS");
   });
 
   it("should get course name from classCourses", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ classCourses: mockClassCourses })
+      useCourseLookup({ classCourses: mockClassCourses }),
     );
     expect(result.current.getCourseNameById("CUSTOM1")).toBe("Custom Course");
   });
 
   it("should handle classCourses with missing name", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ classCourses: [{ course_code: "NONAME" }] })
+      useCourseLookup({ classCourses: [{ course_code: "NONAME" }] }),
     );
     expect(result.current.getCourseNameById("NONAME")).toBe("NONAME");
   });
 
   it("should fallback to attendanceData for course name", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ attendanceData: mockAttendanceData })
+      useCourseLookup({ attendanceData: mockAttendanceData }),
     );
     expect(result.current.getCourseNameById("3")).toBe("Physics");
   });
 
   it("should fallback to attendanceData for course name by course code", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ attendanceData: mockAttendanceData })
+      useCourseLookup({ attendanceData: mockAttendanceData }),
     );
     expect(result.current.getCourseNameById("PH101")).toBe("Physics");
     expect(result.current.getCourseNameById(" ph 101 ")).toBe("Physics");
@@ -98,7 +98,7 @@ describe("useCourseLookup", () => {
 
   it("should fallback to attendanceData for course code by course code", () => {
     const { result } = renderHook(() =>
-      useCourseLookup({ attendanceData: mockAttendanceData })
+      useCourseLookup({ attendanceData: mockAttendanceData }),
     );
     expect(result.current.getCourseCodeById("PH101")).toBe("PH101");
     expect(result.current.getCourseCodeById(" ph 101 ")).toBe("PH101");

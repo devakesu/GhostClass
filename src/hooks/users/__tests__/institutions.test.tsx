@@ -200,10 +200,15 @@ describe("institutions hooks", () => {
     });
 
     it("should handle case where default institution user is null", async () => {
-      queryClient.setQueryData(["institutions"], [{
-        id: 10,
-        institution_role: { name: "student" },
-      }]);
+      queryClient.setQueryData(
+        ["institutions"],
+        [
+          {
+            id: 10,
+            institution_role: { name: "student" },
+          },
+        ],
+      );
       (axiosInstance.get as any).mockResolvedValueOnce({ data: null });
 
       const { result } = renderHook(() => useDefaultInstitutionUser(), {

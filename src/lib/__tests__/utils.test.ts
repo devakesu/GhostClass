@@ -163,8 +163,9 @@ describe("utils.ts", () => {
     });
 
     it("returns true even if it points to a different hostname (validation moved to next.config.ts)", () => {
-      expect(isValidAvatarUrl("https://other-project.supabase.co/test.png"))
-        .toBe(true);
+      expect(
+        isValidAvatarUrl("https://other-project.supabase.co/test.png"),
+      ).toBe(true);
       expect(isValidAvatarUrl("https://evil.com/test.png")).toBe(true);
     });
 
@@ -372,9 +373,9 @@ describe("utils.ts", () => {
         toBlob: vi.fn().mockImplementation((cb) => cb(mockBlob)),
       };
 
-      const spyCreate = vi.spyOn(document, "createElement").mockReturnValue(
-        mockCanvas as any,
-      );
+      const spyCreate = vi
+        .spyOn(document, "createElement")
+        .mockReturnValue(mockCanvas as any);
 
       // Mock FileReader
       const mockReader = {

@@ -12,51 +12,49 @@ const iconSrc = readPublicPngAsDataUri("icon-192.png");
 
 export default function Image() {
   return new ImageResponse(
-    (
+    <div
+      style={{
+        background: "#0b0b0f",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 32,
+      }}
+    >
+      {iconSrc && (
+        <img
+          src={iconSrc}
+          width={160}
+          height={160}
+          style={{ borderRadius: 24 }}
+        />
+      )}
       <div
         style={{
-          background: "#0b0b0f",
-          width: "100%",
-          height: "100%",
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          justifyContent: "center",
-          gap: 32,
+          gap: 12,
         }}
       >
-        {iconSrc && (
-          <img
-            src={iconSrc}
-            width={160}
-            height={160}
-            style={{ borderRadius: 24 }}
-          />
-        )}
-        <div
+        <span
           style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 12,
+            fontSize: 72,
+            fontWeight: 800,
+            color: "#ffffff",
+            letterSpacing: "-2px",
           }}
         >
-          <span
-            style={{
-              fontSize: 72,
-              fontWeight: 800,
-              color: "#ffffff",
-              letterSpacing: "-2px",
-            }}
-          >
-            GhostClass
-          </span>
-          <span style={{ fontSize: 32, color: "#a855f7", fontWeight: 500 }}>
-            Survive Attendance 👻
-          </span>
-        </div>
+          GhostClass
+        </span>
+        <span style={{ fontSize: 32, color: "#a855f7", fontWeight: 500 }}>
+          Survive Attendance 👻
+        </span>
       </div>
-    ),
+    </div>,
     { ...size },
   );
 }

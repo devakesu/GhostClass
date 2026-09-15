@@ -86,9 +86,8 @@ describe("PWAInstallBanner", () => {
 
   async function importAndRender() {
     vi.resetModules();
-    const { PWAInstallBanner } = await import(
-      "@/components/pwa-install-banner"
-    );
+    const { PWAInstallBanner } =
+      await import("@/components/pwa-install-banner");
     const { container } = render(React.createElement(PWAInstallBanner));
     return container;
   }
@@ -150,9 +149,8 @@ describe("PWAInstallBanner", () => {
     // Simulates: banner is showing, then the app transitions to standalone
     // (user adds via browser menu). The banner should hide immediately.
     vi.resetModules();
-    const { PWAInstallBanner } = await import(
-      "@/components/pwa-install-banner"
-    );
+    const { PWAInstallBanner } =
+      await import("@/components/pwa-install-banner");
     const { rerender } = render(React.createElement(PWAInstallBanner));
 
     // Banner shows after delay with canInstall=true, isInstalled=false
@@ -226,13 +224,14 @@ describe("PWAInstallBanner", () => {
     });
 
     // Toast is shown after the install prompt is accepted
-    expect((toast as unknown as { success: ReturnType<typeof vi.fn> }).success)
-      .toHaveBeenCalledWith(
-        "GhostClass is installing!",
-        expect.objectContaining({
-          description: "Next time, open it from your home screen.",
-        }),
-      );
+    expect(
+      (toast as unknown as { success: ReturnType<typeof vi.fn> }).success,
+    ).toHaveBeenCalledWith(
+      "GhostClass is installing!",
+      expect.objectContaining({
+        description: "Next time, open it from your home screen.",
+      }),
+    );
   });
 
   it("sets localStorage to a timestamp and hides banner when install is dismissed", async () => {

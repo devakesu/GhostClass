@@ -15,7 +15,7 @@ class AppConfig {
 
   // ─── Supabase Config ───────────────────────────────────────────────────────
 
-  /// The Supabase API endpoint (Proxied via ghostclass.devakesu.com for ISP bypass).
+  /// The Supabase API endpoint (Proxied for ISP bypass).
   static String get supabaseUrl => _d(
     AppSecrets.isDev
         ? AppSecrets.supabaseUrlDev
@@ -41,13 +41,12 @@ class AppConfig {
   /// The official GhostClass web application URL.
   static String get webUrl => 'https://$_appDomain';
 
-  /// The Supabase Origin used to bypass "Forbidden: missing Origin header" errors.
   /// Spoofed to match the official app domain.
   static String get supabaseOrigin => webUrl;
 
   // ─── Backend & Bridge Config ───────────────────────────────────────────────
 
-  /// The GhostClass web app's API origin (Auth Bridge).
+  /// The GhostClass web app's API origin
   static String get ghostclassApiUrl => _d(
     AppSecrets.isDev
         ? AppSecrets.ghostclassApiUrlDev
@@ -88,13 +87,16 @@ class AppConfig {
 
   // ─── App Metadata ──────────────────────────────────────────────────────────
 
-  /// Current application version (derived from Infisical compilation injection).
+  /// Current application version
   static String get appVersion =>
-      const String.fromEnvironment('APP_VERSION', defaultValue: '4.6.2');
+      const String.fromEnvironment('APP_VERSION', defaultValue: '4.6.5');
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>
       const String.fromEnvironment('APP_COMMIT_SHA', defaultValue: 'local');
+
+  /// Immutable image digest injected by CI.
+  static String get imageDigest => const String.fromEnvironment('IMAGE_DIGEST');
 
   /// Build timestamp injected by CI for release builds.
   static String get buildTimestamp =>

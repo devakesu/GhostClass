@@ -55,8 +55,8 @@ describe("contact actions", () => {
     global.fetch = vi.fn();
     vi.mocked(headers).mockResolvedValue(
       new Headers({
-        "host": "localhost:3000",
-        "origin": "http://localhost:3000",
+        host: "localhost:3000",
+        origin: "http://localhost:3000",
         "x-forwarded-for": "127.0.0.1",
       }) as never,
     );
@@ -80,9 +80,9 @@ describe("contact actions", () => {
     it("returns error if rate limited", async () => {
       const formData = new FormData();
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
-      vi.mocked(contactRateLimiter.limit).mockResolvedValue(
-        { success: false } as never,
-      );
+      vi.mocked(contactRateLimiter.limit).mockResolvedValue({
+        success: false,
+      } as never);
 
       const result = await submitContactForm(formData);
       expect(result.error).toContain("Too many requests");
@@ -101,9 +101,9 @@ describe("contact actions", () => {
       formData.append("csrf_token", "valid-csrf");
 
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
-      vi.mocked(contactRateLimiter.limit).mockResolvedValue(
-        { success: true } as never,
-      );
+      vi.mocked(contactRateLimiter.limit).mockResolvedValue({
+        success: true,
+      } as never);
       vi.mocked(fetch).mockResolvedValue({
         json: async () => ({ success: true }),
       } as never);
@@ -135,9 +135,9 @@ describe("contact actions", () => {
       formData.append("csrf_token", "valid-csrf");
 
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
-      vi.mocked(contactRateLimiter.limit).mockResolvedValue(
-        { success: true } as never,
-      );
+      vi.mocked(contactRateLimiter.limit).mockResolvedValue({
+        success: true,
+      } as never);
       vi.mocked(fetch).mockResolvedValue({
         json: async () => ({ success: false }),
       } as never);

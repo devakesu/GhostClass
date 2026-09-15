@@ -15,18 +15,21 @@ export type DashboardCourse = ExtendedCourse & {
   bunkable?: number;
   safeBunkable?: number;
   required?: number;
-  activeCourseDetails?:
-    | { present: number; absent: number; total: number }
-    | null;
+  activeCourseDetails?: {
+    present: number;
+    absent: number;
+    total: number;
+  } | null;
 };
 
 interface CourseGridProps {
   isLoadingCourses: boolean;
   isLoadingAllCourseSummaries: boolean;
   sortedCourses: DashboardCourse[];
-  customInstructors: Array<
-    { course_code: string; instructor_name?: string | null }
-  >;
+  customInstructors: Array<{
+    course_code: string;
+    instructor_name?: string | null;
+  }>;
   allCourseSummaries: Record<string, unknown> | null;
   profile: { auth_id?: string | null } | null;
   onEditInstructor: (
@@ -64,22 +67,22 @@ export function CourseGrid({
             const courseCodeNormalized = normalizeCourseCode(
               String(course.code || course.id),
             );
-            const customInstructor = customInstructors
-              ?.find(
-                (ci) => ci.course_code === courseCodeNormalized,
-              );
+            const customInstructor = customInstructors?.find(
+              (ci) => ci.course_code === courseCodeNormalized,
+            );
 
             const institutionUsers = course.institution_users as
               | Array<{
-                pivot: { courserole_id: number };
-                first_name: string;
-                last_name: string;
-              }>
+                  pivot: { courserole_id: number };
+                  first_name: string;
+                  last_name: string;
+                }>
               | undefined;
 
-            const ezygoInstructors = institutionUsers?.filter(
-              (user) => user.pivot.courserole_id === 1,
-            ) || [];
+            const ezygoInstructors =
+              institutionUsers?.filter(
+                (user) => user.pivot.courserole_id === 1,
+              ) || [];
 
             const hasCustomName = !!customInstructor?.instructor_name;
             let instructorName: string | undefined = undefined;
@@ -91,10 +94,9 @@ export function CourseGrid({
               }`;
             }
 
-            const initialCourseDetails = allCourseSummaries
-              ?.[String(course.code || "")] as DashboardCourse[
-                "activeCourseDetails"
-              ];
+            const initialCourseDetails = allCourseSummaries?.[
+              String(course.code || "")
+            ] as DashboardCourse["activeCourseDetails"];
 
             return (
               <div key={String(course.key)}>
@@ -111,7 +113,8 @@ export function CourseGrid({
                       instructorName || "",
                       hasCustomName,
                       customInstructor,
-                    )}
+                    )
+                  }
                 />
               </div>
             );

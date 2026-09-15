@@ -55,11 +55,11 @@ declare global {
   var __ghostclass_useSyncOnMount_state_v1: SyncMountState | undefined;
 }
 
-const _global = globalThis.__ghostclass_useSyncOnMount_state_v1 ??= {
+const _global = (globalThis.__ghostclass_useSyncOnMount_state_v1 ??= {
   lastSyncSuccessTime: 0,
   lastSyncUsername: null,
   activeSyncPromise: null,
-};
+});
 
 // Local aliases for clarity; always read/write to `_global` to persist across HMR
 const getLastSyncSuccessTime = () => _global.lastSyncSuccessTime;
@@ -90,9 +90,8 @@ function handleSyncError(
   userId: string | number | undefined,
   setIsSyncing: (val: boolean) => void,
 ) {
-  const errName = error instanceof Error
-    ? error.name
-    : (error as { name?: string })?.name;
+  const errName =
+    error instanceof Error ? error.name : (error as { name?: string })?.name;
   if (errName === "CanceledError" || errName === "AbortError") {
     logger.dev(`[${sentryLocation}] Sync request aborted`);
     return;
@@ -152,8 +151,9 @@ export function useSyncOnMount({
 
     // Check if successfully synced within cooldown period
     const now = Date.now();
-    const isAlreadySynced = getLastSyncUsername() === username &&
-      (now - getLastSyncSuccessTime()) < SYNC_COOLDOWN_MS;
+    const isAlreadySynced =
+      getLastSyncUsername() === username &&
+      now - getLastSyncSuccessTime() < SYNC_COOLDOWN_MS;
 
     if (isAlreadySynced || syncFinishedRef.current) {
       setSyncSettled(true);
@@ -194,7 +194,7 @@ export function useSyncOnMount({
       const innerNow = Date.now();
       if (
         getLastSyncUsername() === username &&
-        (innerNow - getLastSyncSuccessTime()) < SYNC_COOLDOWN_MS
+        innerNow - getLastSyncSuccessTime() < SYNC_COOLDOWN_MS
       ) {
         setSyncSettled(true);
         return;
@@ -280,9 +280,12 @@ export function useSyncOnMount({
           cancelIdleCallback?: (id: number) => void;
         };
         if (win.requestIdleCallback) {
-          idleHandle = win.requestIdleCallback(() => {
-            if (!isCleanedUp) runSync();
-          }, { timeout: 1000 });
+          idleHandle = win.requestIdleCallback(
+            () => {
+              if (!isCleanedUp) runSync();
+            },
+            { timeout: 1000 },
+          );
         } else {
           deferHandle = setTimeout(() => {
             if (!isCleanedUp) runSync();

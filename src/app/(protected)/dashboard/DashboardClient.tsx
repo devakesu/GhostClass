@@ -205,9 +205,8 @@ function planAcademicShift(
     ) {
       const maxAllowedIndex = currentIndex + 1;
       const maxAllowedStartYear = Math.floor(maxAllowedIndex / 2);
-      const maxAllowedSemester: AcademicSemester = maxAllowedIndex % 2 === 1
-        ? "even"
-        : "odd";
+      const maxAllowedSemester: AcademicSemester =
+        maxAllowedIndex % 2 === 1 ? "even" : "odd";
       clampedNext = {
         semester: maxAllowedSemester,
         year: formatAcademicYear(maxAllowedStartYear),
@@ -391,9 +390,7 @@ function computeInitialDataValidity(
     if (!initialProfile) return false;
 
     const userClass = initialProfile.class as
-      | { sem?: string; year?: string }
-      | null
-      | undefined;
+      { sem?: string; year?: string } | null | undefined;
     const initialSem = userClass?.sem;
     const initialYear = userClass?.year;
 
@@ -443,8 +440,8 @@ const isActiveTrackingRecord = (
   selectedSemester: string | null,
   selectedYear: string | null,
 ) => {
-  const isSameSemester = !selectedSemester ||
-    record.semester === selectedSemester;
+  const isSameSemester =
+    !selectedSemester || record.semester === selectedSemester;
   const isSameYear = !selectedYear || record.year === selectedYear;
   return (
     !!record.course && isSameSemester && isSameYear && record.attendance != null
@@ -477,7 +474,8 @@ const countNoDataCodes = (
   disabledCodes: Set<string>,
 ) =>
   Array.from(catalogCodes).reduce((count, code) => {
-    const hasNoData = !activeCodes.has(code) &&
+    const hasNoData =
+      !activeCodes.has(code) &&
       !disabledWithDataCodes.has(code) &&
       !disabledCodes.has(code);
     return hasNoData ? count + 1 : count;
@@ -579,11 +577,12 @@ export default function DashboardClient({
   } | null>(
     initialProfile
       ? {
-        semester: initialProfile.current_semester || initialClass?.sem || null,
-        year: initialProfile.current_year || initialClass?.year || null,
-        classId: initialClass?.id ?? null,
-        className: initialClass?.name ?? null,
-      }
+          semester:
+            initialProfile.current_semester || initialClass?.sem || null,
+          year: initialProfile.current_year || initialClass?.year || null,
+          classId: initialClass?.id ?? null,
+          className: initialClass?.name ?? null,
+        }
       : null,
   );
 
@@ -612,8 +611,7 @@ export default function DashboardClient({
 
         if (
           preferredSem &&
-          (!existingSem ||
-            semestersDiffer(existingSem as string, preferredSem))
+          (!existingSem || semestersDiffer(existingSem as string, preferredSem))
         ) {
           queryClient.setQueryData(["semester"], preferredSem);
         }
@@ -645,8 +643,8 @@ export default function DashboardClient({
         : false;
       const classChanged = prev
         ? (prev.classId != null &&
-          newClassId != null &&
-          prev.classId !== newClassId) ||
+            newClassId != null &&
+            prev.classId !== newClassId) ||
           (prev.className != null &&
             newClassName != null &&
             prev.className !== newClassName)
@@ -688,7 +686,13 @@ export default function DashboardClient({
       };
     }
     prevIsProfileFetchingRef.current = isFetchingProfile;
-  }, [isFetchingProfile, rawProfile, queryClient, setSelectedSemester, setSelectedYear]);
+  }, [
+    isFetchingProfile,
+    rawProfile,
+    queryClient,
+    setSelectedSemester,
+    setSelectedYear,
+  ]);
   const setSemesterMutation = useSetSemester({ skipInvalidations: true });
   const setAcademicYearMutation = useSetAcademicYear({
     skipInvalidations: true,
@@ -701,10 +705,10 @@ export default function DashboardClient({
   const ezygoYear = userSettings?.academicYear;
 
   const defaultAcademicInfo = useMemo(() => calculateCurrentAcademicInfo(), []);
-  const effectiveSemester = selectedSemester ?? ezygoSemester ??
-    defaultAcademicInfo.current_semester;
-  const effectiveYear = selectedYear ?? ezygoYear ??
-    defaultAcademicInfo.current_year;
+  const effectiveSemester =
+    selectedSemester ?? ezygoSemester ?? defaultAcademicInfo.current_semester;
+  const effectiveYear =
+    selectedYear ?? ezygoYear ?? defaultAcademicInfo.current_year;
 
   const currentSem = effectiveSemester || undefined;
   const currentYear = effectiveYear || undefined;
@@ -723,13 +727,11 @@ export default function DashboardClient({
     null,
   );
   const [isEditInstructorOpen, setIsEditInstructorOpen] = useState(false);
-  const [selectedInstructorCourse, setSelectedInstructorCourse] = useState<
-    {
-      code: string;
-      name: string;
-      initialName: string;
-    } | null
-  >(null);
+  const [selectedInstructorCourse, setSelectedInstructorCourse] = useState<{
+    code: string;
+    name: string;
+    initialName: string;
+  } | null>(null);
   const [isUpdating, setIsUpdating] = useState(false);
   const [isShifting, setIsShifting] = useState(false);
   const [hasRefetchedAllCourses, setHasRefetchedAllCourses] = useState(false);
@@ -805,9 +807,10 @@ export default function DashboardClient({
     refetch: refetchAttendance,
   } = useAttendanceReport(currentSem, currentYear, {
     enabled: isProfileReady && !!currentSem && !!currentYear,
-    initialData: isInitialDataValid && !isAttendanceStale
-      ? ((initialData?.attendance as AttendanceReport) ?? undefined)
-      : undefined,
+    initialData:
+      isInitialDataValid && !isAttendanceStale
+        ? ((initialData?.attendance as AttendanceReport) ?? undefined)
+        : undefined,
   });
   const attendanceData = rawAttendanceData as AttendanceReport | undefined;
 
@@ -845,8 +848,7 @@ export default function DashboardClient({
     initialData: isInitialDataValid ? formattedInitialCourses : undefined,
   });
   const coursesData = rawCoursesData as
-    | { courses: Record<string, Course> }
-    | undefined;
+    { courses: Record<string, Course> } | undefined;
 
   const { data: rawTrackingData, refetch: refetchTracking } = useTrackingData(
     profile,
@@ -867,8 +869,8 @@ export default function DashboardClient({
     useFetchClassCourses({
       semester: currentSem,
       year: currentYear,
-      enabled: isProfileReady && !!currentSem && !!currentYear &&
-        !!profile?.class?.id,
+      enabled:
+        isProfileReady && !!currentSem && !!currentYear && !!profile?.class?.id,
     });
   const classCourses = rawClassCourses as ClassCourse[] | undefined;
 
@@ -941,7 +943,8 @@ export default function DashboardClient({
     };
   }, [coursesData, classCourses]);
 
-  const isAllCourseDetailsEnabled = !isUpdating &&
+  const isAllCourseDetailsEnabled =
+    !isUpdating &&
     (!isShifting ||
       (!isFetchingCourses && !isFetchingAttendance && !isFetchingClassCourses));
 
@@ -1167,43 +1170,45 @@ export default function DashboardClient({
         const activeDetails = summariesMap.get(courseCode);
         const stat = statsMap.get(codeKey) ||
           statsMap.get(course.key) || {
-          present: 0,
-          total: 0,
-          officialPresent: 0,
-          officialTotal: 0,
-        };
+            present: 0,
+            total: 0,
+            officialPresent: 0,
+            officialTotal: 0,
+          };
 
         /* eslint-disable security/detect-object-injection */
         const courseTargetVal =
           (codeKey ? courseTargets?.[codeKey] : undefined) ??
-            (courseCode
-              ? courseTargets?.[normalizeCourseCode(courseCode)]
-              : undefined) ??
-            (course.key ? courseTargets?.[String(course.key)] : undefined);
+          (courseCode
+            ? courseTargets?.[normalizeCourseCode(courseCode)]
+            : undefined) ??
+          (course.key ? courseTargets?.[String(course.key)] : undefined);
         /* eslint-enable security/detect-object-injection */
-        const effectiveCourseTarget = typeof courseTargetVal === "number"
-          ? courseTargetVal
-          : targetPercentage;
+        const effectiveCourseTarget =
+          typeof courseTargetVal === "number"
+            ? courseTargetVal
+            : targetPercentage;
 
         const isNew = stat.total === 0;
         const res = isNew
           ? { canBunk: 0, requiredToAttend: 0 }
           : calculateAttendance(
-            stat.present,
-            stat.total,
-            effectiveCourseTarget,
-          );
-        const safeRes = isNew ? { canBunk: 0 } : calculateAttendance(
-          stat.officialPresent,
-          stat.officialTotal,
-          effectiveCourseTarget,
-        );
+              stat.present,
+              stat.total,
+              effectiveCourseTarget,
+            );
+        const safeRes = isNew
+          ? { canBunk: 0 }
+          : calculateAttendance(
+              stat.officialPresent,
+              stat.officialTotal,
+              effectiveCourseTarget,
+            );
 
         return {
           ...course,
-          currentPercentage: stat.total > 0
-            ? Math.round((stat.present / stat.total) * 100)
-            : 0,
+          currentPercentage:
+            stat.total > 0 ? Math.round((stat.present / stat.total) * 100) : 0,
           bunkable: res.canBunk,
           safeBunkable: safeRes.canBunk,
           required: res.requiredToAttend,
@@ -1261,13 +1266,15 @@ export default function DashboardClient({
     return <CompLoading />;
   }
 
-  const isDataLoading = !syncSettled ||
+  const isDataLoading =
+    !syncSettled ||
     !hasSyncedAndLoaded ||
     isSettingsLoading ||
     isLoadingAttendance ||
     (isAllCourseDetailsEnabled && isLoadingAllCourseSummaries);
 
-  const isGlobalLoading = (isLoadingProfile && !profile) ||
+  const isGlobalLoading =
+    (isLoadingProfile && !profile) ||
     isUpdating ||
     (isSettingsLoading && !userSettings && !initialProfile?.settings) ||
     setSemesterMutation.isPending ||
@@ -1365,12 +1372,13 @@ export default function DashboardClient({
                         {effectiveSemester?.toUpperCase()} {effectiveYear}
                       </div>
                       {(() => {
-                        const currentStart = parseAcademicYearStart(
-                          defaultAcademicInfo.current_year,
-                        ) ?? new Date().getFullYear();
+                        const currentStart =
+                          parseAcademicYearStart(
+                            defaultAcademicInfo.current_year,
+                          ) ?? new Date().getFullYear();
                         const viewedStart =
                           parseAcademicYearStart(String(effectiveYear)) ??
-                            currentStart;
+                          currentStart;
                         if (viewedStart > currentStart) {
                           return (
                             <span className="text-[10px] font-semibold uppercase tracking-wide text-amber-600 bg-amber-100/40 px-2 py-0.5 rounded-full border border-amber-200">
@@ -1403,83 +1411,74 @@ export default function DashboardClient({
             )}
           </div>
 
-          {isDataLoading
-            ? (
-              <div className="flex-1 flex flex-col items-center justify-center py-20 min-h-100">
-                <CompLoading
-                  minimal
-                  message="Loading dashboard statistics and course details..."
-                />
-              </div>
-            )
-            : (
-              <>
-                <DashboardCharts
-                  stats={stats}
-                  isLoadingAttendance={isLoadingAttendance}
-                  attendanceData={attendanceData}
-                  filteredChartData={filteredChartData}
-                  trackingData={trackingData}
-                  courseRegistry={courseRegistry}
-                  disabledCodes={disabledCodes}
-                  activeCourseCount={activeCourseCount}
-                  isLoadingCourses={isLoadingCourses}
-                />
-                <CourseGrid
-                  isLoadingCourses={isLoadingCourses}
-                  isLoadingAllCourseSummaries={isLoadingAllCourseSummaries ||
-                    !isAllCourseDetailsEnabled}
-                  sortedCourses={sortedCourses}
-                  customInstructors={customInstructors || []}
-                  allCourseSummaries={allCourseSummaries as Record<
-                    string,
-                    unknown
-                  >}
-                  profile={profile ?? null}
-                  onEditInstructor={(
-                    course: DashboardCourse,
-                    _name: string,
-                    hasCustomName: boolean,
-                    customInstructor?:
-                      | { instructor_name?: string | null }
-                      | undefined
-                      | null,
-                  ) => {
-                    const customInst = customInstructor as
-                      | CustomInstructor
-                      | undefined;
-                    setSelectedInstructorCourse({
-                      code: normalizeCourseCode(
-                        String(course.code || course.id),
-                      ),
-                      name: String(course.name || ""),
-                      initialName: hasCustomName
-                        ? (customInst?.instructor_name ?? "")
-                        : "",
-                    });
-                    setIsEditInstructorOpen(true);
-                  }}
-                  onAddCourse={() => {
-                    if (!profile?.class?.id) {
-                      toast.error("You have not assigned a class yet.");
-                    } else {
-                      setIsAddCourseOpen(true);
-                    }
-                  }}
-                />
+          {isDataLoading ? (
+            <div className="flex-1 flex flex-col items-center justify-center py-20 min-h-100">
+              <CompLoading
+                minimal
+                message="Loading dashboard statistics and course details..."
+              />
+            </div>
+          ) : (
+            <>
+              <DashboardCharts
+                stats={stats}
+                isLoadingAttendance={isLoadingAttendance}
+                attendanceData={attendanceData}
+                filteredChartData={filteredChartData}
+                trackingData={trackingData}
+                courseRegistry={courseRegistry}
+                disabledCodes={disabledCodes}
+                activeCourseCount={activeCourseCount}
+                isLoadingCourses={isLoadingCourses}
+              />
+              <CourseGrid
+                isLoadingCourses={isLoadingCourses}
+                isLoadingAllCourseSummaries={
+                  isLoadingAllCourseSummaries || !isAllCourseDetailsEnabled
+                }
+                sortedCourses={sortedCourses}
+                customInstructors={customInstructors || []}
+                allCourseSummaries={
+                  allCourseSummaries as Record<string, unknown>
+                }
+                profile={profile ?? null}
+                onEditInstructor={(
+                  course: DashboardCourse,
+                  _name: string,
+                  hasCustomName: boolean,
+                  customInstructor?:
+                    { instructor_name?: string | null } | undefined | null,
+                ) => {
+                  const customInst = customInstructor as
+                    CustomInstructor | undefined;
+                  setSelectedInstructorCourse({
+                    code: normalizeCourseCode(String(course.code || course.id)),
+                    name: String(course.name || ""),
+                    initialName: hasCustomName
+                      ? (customInst?.instructor_name ?? "")
+                      : "",
+                  });
+                  setIsEditInstructorOpen(true);
+                }}
+                onAddCourse={() => {
+                  if (!profile?.class?.id) {
+                    toast.error("You have not assigned a class yet.");
+                  } else {
+                    setIsAddCourseOpen(true);
+                  }
+                }}
+              />
 
-                <div className="mb-6">
-                  <Card className="custom-container">
-                    <CardHeader>
-                      <CardTitle>Attendance Calendar</CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                      {renderAttendanceCalendarContent()}
-                    </CardContent>
-                  </Card>
-                </div>
-              </>
-            )}
+              <div className="mb-6">
+                <Card className="custom-container">
+                  <CardHeader>
+                    <CardTitle>Attendance Calendar</CardTitle>
+                  </CardHeader>
+                  <CardContent>{renderAttendanceCalendarContent()}</CardContent>
+                </Card>
+              </div>
+            </>
+          )}
 
           <AlertDialog
             open={showConfirmDialog}
@@ -1497,8 +1496,7 @@ export default function DashboardClient({
                   Confirm academic period change
                 </AlertDialogTitle>
                 <AlertDialogDescription>
-                  Change from {effectiveSemester?.toUpperCase()} {effectiveYear}
-                  {" "}
+                  Change from {effectiveSemester?.toUpperCase()} {effectiveYear}{" "}
                   to {pendingPeriodLabel}?
                 </AlertDialogDescription>
               </AlertDialogHeader>
@@ -1533,7 +1531,8 @@ export default function DashboardClient({
             coursesData={coursesData || undefined}
             user={profile ? { id: String(profile.id) } : { id: "" }}
             onSuccess={() =>
-              Promise.all([refetchAttendance(), refetchTracking()])}
+              Promise.all([refetchAttendance(), refetchTracking()])
+            }
             selectedSemester={currentSem}
             selectedYear={currentYear}
           />

@@ -7,7 +7,7 @@ import { safeResponseJson } from "@/lib/json";
 
 export const isAuthSessionMissingError = (error: unknown): boolean => {
   if (!error || typeof error !== "object") return false;
-  const msg = (Object.prototype.hasOwnProperty.call(error, "message"))
+  const msg = Object.prototype.hasOwnProperty.call(error, "message")
     ? String((error as { message?: unknown }).message)
     : "";
   const lower = msg.toLowerCase();
@@ -16,7 +16,7 @@ export const isAuthSessionMissingError = (error: unknown): boolean => {
 
 export const isSupabaseLockTimeoutError = (error: unknown): boolean => {
   if (!error || typeof error !== "object") return false;
-  const msg = (Object.prototype.hasOwnProperty.call(error, "message"))
+  const msg = Object.prototype.hasOwnProperty.call(error, "message")
     ? String((error as { message?: unknown }).message)
     : "";
   const lower = msg.toLowerCase();
@@ -35,7 +35,7 @@ async function fetchFreshCsrfToken(): Promise<string | null> {
     });
     if (!res.ok) return null;
     const data = await safeResponseJson<{ token: string }>(res);
-    return (data && Object.prototype.hasOwnProperty.call(data, "token"))
+    return data && Object.prototype.hasOwnProperty.call(data, "token")
       ? String(data.token)
       : null;
   } catch (err) {

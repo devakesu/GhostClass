@@ -423,7 +423,7 @@ jobs:
           REPO_NAME=$(echo "${{ github.repository }}" | cut -d'/' -f2 | tr '[:upper:]' '[:lower:]')
           VERSION="${{ env.NEXT_PUBLIC_APP_VERSION || vars.NEXT_PUBLIC_APP_VERSION || 'latest' }}"
 
-          TARGET_TAG="${INPUT_TAG:-${{ github.sha }}}"
+          TARGET_TAG="${INPUT_DIGEST:-${INPUT_TAG:-${{ github.sha }}}}"
 
           REPO_OWNER_LOWER=$(echo "${REPO_OWNER}" | tr '[:upper:]' '[:lower:]')
           IMAGE_REPO="ghcr.io/${REPO_OWNER_LOWER}/${REPO_NAME}"

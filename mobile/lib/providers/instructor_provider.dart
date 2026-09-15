@@ -1,4 +1,5 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/models/course_instructor.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 
@@ -11,8 +12,9 @@ final instructorProvider = Provider.family<CourseInstructor?, String>((
   final dashboardAsync = ref.watch(dashboardProvider);
   return dashboardAsync.when(
     data: (data) {
+      final stdTarget = utils.standardizeCourseCode(courseId);
       for (final i in data.instructors) {
-        if (i.courseCode == courseId) return i;
+        if (utils.standardizeCourseCode(i.courseCode) == stdTarget) return i;
       }
       return null;
     },

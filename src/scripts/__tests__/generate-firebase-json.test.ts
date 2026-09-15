@@ -4,9 +4,10 @@ import path from "node:path";
 
 // Require commonjs script under test
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-const { generateFirebaseJson, generateFirebaseOptionsDart } = require(
-  "../../../scripts/generate-firebase-json.js",
-);
+const {
+  generateFirebaseJson,
+  generateFirebaseOptionsDart,
+} = require("../../../scripts/generate-firebase-json.js");
 
 describe("generate-firebase-json script", () => {
   const tempDir = path.join(__dirname, "__temp_firebase_test__");
@@ -55,8 +56,9 @@ describe("generate-firebase-json script", () => {
     expect(jsonContent.flutter.platforms.android.default.appId).toBe(
       "1:12345:android:abcdef",
     );
-    expect(jsonContent.flutter.platforms.dart["lib/firebase_options.dart"])
-      .toBeDefined();
+    expect(
+      jsonContent.flutter.platforms.dart["lib/firebase_options.dart"],
+    ).toBeDefined();
   });
 
   it("generates multi-flavor firebase.json from secrets array", () => {

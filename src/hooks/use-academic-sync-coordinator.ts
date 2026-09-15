@@ -100,9 +100,13 @@ async function executeRolloverTransition(
   }
 
   try {
-    await axios.get("/profile?sync=true", {
-      headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
-      params: { _t: Date.now() },
+    await axios.get("/api/profile", {
+      baseURL: "",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+      params: { sync: "true", force: "true", _t: Date.now() },
     });
   } catch (syncErr) {
     logger.warn(
@@ -144,95 +148,107 @@ export function useAcademicSyncCoordinator(): {
 
   const inFlightPromiseRef = useRef<Promise<AcademicCheckResult> | null>(null);
 
-  const checkAcademicRollover = useCallback(async (): Promise<
-    AcademicCheckResult
-  > => {
-    if (inFlightPromiseRef.current) {
-      return inFlightPromiseRef.current;
-    }
+  const checkAcademicRollover =
+    useCallback(async (): Promise<AcademicCheckResult> => {
+      if (inFlightPromiseRef.current) {
+        return inFlightPromiseRef.current;
+      }
 
-    const checkPromise = (async (): Promise<AcademicCheckResult> => {
-      try {
-        const { semester: freshSem, academicYear: freshYear } =
-          await fetchLiveAcademicPeriod();
+      const checkPromise = (async (): Promise<AcademicCheckResult> => {
+        try {
+          const { semester: freshSem, academicYear: freshYear } =
+            await fetchLiveAcademicPeriod();
 
-        if (!freshSem && !freshYear) {
-          return { hasChanged: false, semester: null, academicYear: null };
-        }
+          if (!freshSem && !freshYear) {
+            return { hasChanged: false, semester: null, academicYear: null };
+          }
 
-        const cachedSem = queryClient.getQueryData<string>(["semester"]) ??
-          null;
-        const cachedYear = queryClient.getQueryData<string>([
-          "academic-year",
-        ]) ?? null;
+          const cachedSem =
+            queryClient.getQueryData<string>(["semester"]) ?? null;
+          const cachedYear =
+            queryClient.getQueryData<string>(["academic-year"]) ?? null;
 
-        const baselineSem = appliedRef.current?.semester ?? cachedSem;
-        const baselineYear = appliedRef.current?.year ?? cachedYear;
+          const baselineSem = appliedRef.current?.semester ?? cachedSem;
+          const baselineYear = appliedRef.current?.year ?? cachedYear;
 
-        const semChanged = freshSem != null && (
-          (baselineSem != null && semestersDiffer(baselineSem, freshSem)) ||
-          (cachedSem != null && semestersDiffer(cachedSem, freshSem))
-        );
-        const yearChanged = freshYear != null && (
-          (baselineYear != null && yearsDiffer(baselineYear, freshYear)) ||
-          (cachedYear != null && yearsDiffer(cachedYear, freshYear))
-        );
+          const semChanged =
+            freshSem != null &&
+            ((baselineSem != null && semestersDiffer(baselineSem, freshSem)) ||
+              (cachedSem != null && semestersDiffer(cachedSem, freshSem)));
+          const yearChanged =
+            freshYear != null &&
+            ((baselineYear != null && yearsDiffer(baselineYear, freshYear)) ||
+              (cachedYear != null && yearsDiffer(cachedYear, freshYear)));
 
-        // Always seed query cache with fresh period if missing or divergent
-        if (freshSem && (!cachedSem || semestersDiffer(cachedSem, freshSem))) {
-          queryClient.setQueryData(["semester"], freshSem);
-        }
-        if (freshYear && (!cachedYear || yearsDiffer(cachedYear, freshYear))) {
-          queryClient.setQueryData(["academic-year"], freshYear);
-        }
+          // Always seed query cache with fresh period if missing or divergent
+          if (
+            freshSem &&
+            (!cachedSem || semestersDiffer(cachedSem, freshSem))
+          ) {
+            queryClient.setQueryData(["semester"], freshSem);
+          }
+          if (
+            freshYear &&
+            (!cachedYear || yearsDiffer(cachedYear, freshYear))
+          ) {
+            queryClient.setQueryData(["academic-year"], freshYear);
+          }
 
-        // Establish initial applied baseline if not present
-        if (!appliedRef.current) {
-          appliedRef.current = {
-            semester: freshSem,
-            year: freshYear,
-          };
-        }
+          // Establish initial applied baseline if not present
+          if (!appliedRef.current) {
+            appliedRef.current = {
+              semester: freshSem,
+              year: freshYear,
+            };
+          }
 
-        if (semChanged || yearChanged) {
-          logger.info(
-            `[AcademicCoordinator] Academic rollover detected (sem: ${baselineSem ?? cachedSem} -> ${freshSem}, year: ${baselineYear ?? cachedYear} -> ${freshYear}). Invalidating queries, purging server cache, and reloading.`,
-          );
+          if (semChanged || yearChanged) {
+            logger.info(
+              `[AcademicCoordinator] Academic rollover detected (sem: ${baselineSem ?? cachedSem} -> ${freshSem}, year: ${baselineYear ?? cachedYear} -> ${freshYear}). Invalidating queries, purging server cache, and reloading.`,
+            );
 
-          appliedRef.current = {
-            semester: freshSem ?? baselineSem,
-            year: freshYear ?? baselineYear,
-          };
+            appliedRef.current = {
+              semester: freshSem ?? baselineSem,
+              year: freshYear ?? baselineYear,
+            };
 
-          await executeRolloverTransition(queryClient, router, freshSem, freshYear);
+            await executeRolloverTransition(
+              queryClient,
+              router,
+              freshSem,
+              freshYear,
+            );
+
+            return {
+              hasChanged: true,
+              semester: freshSem,
+              academicYear: freshYear,
+            };
+          }
 
           return {
-            hasChanged: true,
-            semester: freshSem,
-            academicYear: freshYear,
+            hasChanged: false,
+            semester: freshSem ?? (baselineSem as SemesterType),
+            academicYear: freshYear ?? baselineYear,
           };
+        } catch (err) {
+          logger.warn(
+            "[AcademicCoordinator] Academic check encountered error",
+            err,
+          );
+          return {
+            hasChanged: false,
+            semester: null,
+            academicYear: null,
+          };
+        } finally {
+          inFlightPromiseRef.current = null;
         }
+      })();
 
-        return {
-          hasChanged: false,
-          semester: freshSem ?? (baselineSem as SemesterType),
-          academicYear: freshYear ?? baselineYear,
-        };
-      } catch (err) {
-        logger.warn("[AcademicCoordinator] Academic check encountered error", err);
-        return {
-          hasChanged: false,
-          semester: null,
-          academicYear: null,
-        };
-      } finally {
-        inFlightPromiseRef.current = null;
-      }
-    })();
-
-    inFlightPromiseRef.current = checkPromise;
-    return checkPromise;
-  }, [queryClient, router]);
+      inFlightPromiseRef.current = checkPromise;
+      return checkPromise;
+    }, [queryClient, router]);
 
   // Check on mount of any protected page and when navigating between protected pages
   useEffect(() => {

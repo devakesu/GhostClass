@@ -54,7 +54,8 @@ self.addEventListener("fetch", (event) => {
   try {
     const url = new URL(event.request.url);
     if (
-      url.pathname.startsWith("/monitoring") || url.pathname.startsWith("/api/")
+      url.pathname.startsWith("/monitoring") ||
+      url.pathname.startsWith("/api/")
     ) {
       event.stopImmediatePropagation();
       return;

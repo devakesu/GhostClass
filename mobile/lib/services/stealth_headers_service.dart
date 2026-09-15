@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/models/user.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 class StealthHeadersService {
@@ -62,8 +63,20 @@ class StealthHeadersService {
     }();
   }
 
+  StealthInfo? _cachedStealthInfo;
+  bool _hasCachedStealthInfo = false;
+
+  void invalidateCache() {
+    _cachedStealthInfo = null;
+    _hasCachedStealthInfo = false;
+  }
+
   Future<Map<String, String>> getHeaders({required String url}) async {
-    final info = await storage.getStealthInfo();
+    if (!_hasCachedStealthInfo) {
+      _cachedStealthInfo = await storage.getStealthInfo();
+      _hasCachedStealthInfo = true;
+    }
+    final info = _cachedStealthInfo;
     await _initDeviceInfo();
 
     final headers = <String, String>{

@@ -157,9 +157,10 @@ class LeavesScreen extends ConsumerWidget {
     final academicAsync = ref.watch(academicProvider);
 
     final data = leaveState.value;
-    if (isSyncing ||
-        academicAsync.isLoading ||
-        (leaveState.isLoading && data == null)) {
+    final hasData = data != null;
+    if ((isSyncing && !hasData) ||
+        (academicAsync.isLoading && !hasData) ||
+        (leaveState.isLoading && !hasData)) {
       return Scaffold(
         backgroundColor: Theme.of(context).scaffoldBackgroundColor,
         body: const LoadingOverlay(isFullScreen: false, showLogo: false),
@@ -264,34 +265,39 @@ class LeavesScreen extends ConsumerWidget {
                   error: (err, stack) => SliverFillRemaining(
                     child: ServiceErrorView(
                       error: err,
-                      onRetry: () => runUnifiedPullToRefresh(
-                        invalidateNotifications: () =>
-                            ref.invalidate(notificationsProvider),
-                        logLabel: 'LeavesScreen',
-                        refreshProfile: () => ref
-                            .read(authProvider.notifier)
-                            .refreshProfile(force: true),
-                        syncCron: () async {
-                          final supabaseToken = ref
-                              .read(supabaseClientProvider)
-                              .auth
-                              .currentSession
-                              ?.accessToken;
-                          if (supabaseToken == null) return null;
-                          return ref
-                              .read(apiServiceProvider)
-                              .runCronSync(supabaseToken, force: true);
-                        },
-                        onSyncResult: (result) {
-                          if (result is CronSyncResult && result.hasChanges) {
-                            ref
-                                .read(profileHydrationServiceProvider.notifier)
-                                .handleCronSyncResult(result);
-                          }
-                        },
-                        refreshData: () =>
-                            ref.read(leaveProvider.notifier).refresh(),
-                      ),
+                      onRetry: () async {
+                        ref.read(apiServiceProvider).clearCaches();
+                        await runUnifiedPullToRefresh(
+                          invalidateNotifications: () =>
+                              ref.invalidate(notificationsProvider),
+                          logLabel: 'LeavesScreen',
+                          refreshProfile: () => ref
+                              .read(authProvider.notifier)
+                              .refreshProfile(force: true),
+                          syncCron: () async {
+                            final supabaseToken = ref
+                                .read(supabaseClientProvider)
+                                .auth
+                                .currentSession
+                                ?.accessToken;
+                            if (supabaseToken == null) return null;
+                            return ref
+                                .read(apiServiceProvider)
+                                .runCronSync(supabaseToken, force: true);
+                          },
+                          onSyncResult: (result) {
+                            if (result is CronSyncResult && result.hasChanges) {
+                              ref
+                                  .read(
+                                    profileHydrationServiceProvider.notifier,
+                                  )
+                                  .handleCronSyncResult(result);
+                            }
+                          },
+                          refreshData: () =>
+                              ref.read(leaveProvider.notifier).refresh(),
+                        );
+                      },
                     ),
                   ),
                 ),

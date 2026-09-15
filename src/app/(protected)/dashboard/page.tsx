@@ -21,7 +21,10 @@ export const metadata: Metadata = {
 export default async function DashboardPage() {
   // 1. Check authentication (fast – reads existing session cookie, no external I/O)
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
 
   if (authError || !user) {
     logger.dev("[Dashboard] User not authenticated, redirecting", {

@@ -30,20 +30,19 @@ vi.mock("framer-motion", async () => {
     variants?: unknown;
     transition?: unknown;
   }
-  const MotionDiv = actualReact.forwardRef<HTMLDivElement, MotionProps>((
-    { children, animate, ...props },
-    ref,
-  ) => (
-    <div
-      ref={ref}
-      data-testid="motion-div"
-      data-animate={animate}
-      data-is-inert={props.inert ? "true" : "false"}
-      {...props}
-    >
-      {children}
-    </div>
-  ));
+  const MotionDiv = actualReact.forwardRef<HTMLDivElement, MotionProps>(
+    ({ children, animate, ...props }, ref) => (
+      <div
+        ref={ref}
+        data-testid="motion-div"
+        data-animate={animate}
+        data-is-inert={props.inert ? "true" : "false"}
+        {...props}
+      >
+        {children}
+      </div>
+    ),
+  );
   MotionDiv.displayName = "MotionDiv";
   return {
     motion: {
@@ -65,9 +64,8 @@ describe("PublicLayout", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     vi.useFakeTimers();
-    vi.stubGlobal(
-      "requestAnimationFrame",
-      (cb: FrameRequestCallback) => setTimeout(() => cb(Date.now()), 1),
+    vi.stubGlobal("requestAnimationFrame", (cb: FrameRequestCallback) =>
+      setTimeout(() => cb(Date.now()), 1),
     );
     vi.mocked(useScroll).mockReturnValue({
       scrollY: { on: mockOn },

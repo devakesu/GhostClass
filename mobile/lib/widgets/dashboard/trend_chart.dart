@@ -23,13 +23,37 @@ class TrendChartSection extends StatefulWidget {
   State<TrendChartSection> createState() => _TrendChartSectionState();
 }
 
+final List<double> _kHatchStops = () {
+  const n = 16;
+  final stops = <double>[];
+  for (var j = 0; j < n; j++) {
+    final s0 = j / n;
+    final mid = (j + 0.25) / n;
+    final s1 = (j + 1) / n;
+    stops.addAll([s0, mid, mid, s1]);
+  }
+  return List<double>.unmodifiable(stops);
+}();
+
+List<Color> _buildHatchColors(Color brightLine, Color faintGap) {
+  const n = 16;
+  final colors = <Color>[];
+  for (var j = 0; j < n; j++) {
+    colors.addAll([brightLine, brightLine, faintGap, faintGap]);
+  }
+  return colors;
+}
+
 class _TrendChartSectionState extends State<TrendChartSection> {
   final GlobalKey _chartKey = GlobalKey();
   List<CourseStat> _courses = [];
   int _touchedIndex = -1;
   Offset? _touchedOffset;
+  double _cachedYMin = 0;
 
-  double _calculateYMin() {
+  double _calculateYMin() => _cachedYMin;
+
+  double _computeYMin() {
     final nonZero = _courses
         .expand((s) => [s.percentage, s.officialPercentage])
         .where((p) => p > 0)
@@ -79,7 +103,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
     if (box == null) return;
 
     // Calculate fixed vertical position at the top of the bar
-    final yMinVal = _calculateYMin();
+    final yMinVal = _cachedYMin;
     const maxYVal = 100;
     final chartSize = box.size;
     const bottomReserved = 80;
@@ -108,7 +132,8 @@ class _TrendChartSectionState extends State<TrendChartSection> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.stats != widget.stats ||
         oldWidget.disabledCodes != widget.disabledCodes ||
-        oldWidget.courseTargets != widget.courseTargets) {
+        oldWidget.courseTargets != widget.courseTargets ||
+        oldWidget.targetPercentage != widget.targetPercentage) {
       _updateCourses();
     }
   }
@@ -119,6 +144,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
       final isDisabled = widget.disabledCodes.contains(s.code);
       return isTracked && !isDisabled;
     }).toList()..sort((a, b) => a.percentage.compareTo(b.percentage));
+    _cachedYMin = _computeYMin();
   }
 
   @override
@@ -350,22 +376,10 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                                 alpha: 0.15,
                               );
 
-                              // Pre-calculate stops to avoid recreating them in the loop
-                              final hatchColors = <Color>[];
-                              final hatchStops = <double>[];
-                              const n = 16; // Optimized frequency
-                              for (var j = 0; j < n; j++) {
-                                final s0 = j / n;
-                                final mid = (j + 0.25) / n;
-                                final s1 = (j + 1) / n;
-                                hatchColors.addAll([
-                                  brightLine,
-                                  brightLine,
-                                  faintGap,
-                                  faintGap,
-                                ]);
-                                hatchStops.addAll([s0, mid, mid, s1]);
-                              }
+                              final hatchColors = _buildHatchColors(
+                                brightLine,
+                                faintGap,
+                              );
 
                               // Whether this bar has a custom target distinct from the global one
                               final hasCustomTarget =
@@ -418,7 +432,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                                         begin: Alignment.bottomLeft,
                                         end: Alignment.topRight,
                                         colors: hatchColors,
-                                        stops: hatchStops,
+                                        stops: _kHatchStops,
                                       ),
                                     ),
                                   ),

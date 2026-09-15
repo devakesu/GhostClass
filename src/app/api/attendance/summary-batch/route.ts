@@ -27,11 +27,13 @@ interface BatchRequest {
 }
 
 const BatchRequestSchema = z.object({
-  courses: z.array(z.object({
-    code: z.string(),
-    id: z.number(),
-    name: z.string(),
-  })),
+  courses: z.array(
+    z.object({
+      code: z.string(),
+      id: z.number(),
+      name: z.string(),
+    }),
+  ),
 });
 
 // Module-level cache for the working endpoint variant (summery vs summary)
@@ -45,9 +47,12 @@ const handler = async (
   // 1. Rate limiting — keyed per IP to prevent abuse
   const ip = getClientIp(req.headers);
   if (!ip) {
-    return NextResponse.json({ error: "Unable to determine client IP" }, {
-      status: 400,
-    });
+    return NextResponse.json(
+      { error: "Unable to determine client IP" },
+      {
+        status: 400,
+      },
+    );
   }
   const { success } = await proxyRateLimiter.limit(`attendance_batch_${ip}`);
   if (!success) {
@@ -56,7 +61,10 @@ const handler = async (
 
   // 2. Auth check
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -73,18 +81,24 @@ const handler = async (
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid JSON payload" }, {
-        status: 400,
-      });
+      return NextResponse.json(
+        { error: "Invalid JSON payload" },
+        {
+          status: 400,
+        },
+      );
     }
   }
 
   const validation = BatchRequestSchema.safeParse(body);
   if (!validation.success) {
-    return NextResponse.json({
-      error: "Invalid request format",
-      details: validation.error.format(),
-    }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: "Invalid request format",
+        details: validation.error.format(),
+      },
+      { status: 400 },
+    );
   }
 
   const { courses } = validation.data;
@@ -100,7 +114,8 @@ const handler = async (
     percentage: z.number().optional(),
     persantage: z.number().optional(),
     persentage: z.number().optional(),
-    course: z.object({ id: z.number(), name: z.string(), code: z.string() })
+    course: z
+      .object({ id: z.number(), name: z.string(), code: z.string() })
       .optional(),
     error: z.string().optional(),
   });
@@ -176,9 +191,8 @@ const handler = async (
           total: 0,
           percentage: 0,
           course: { id: course.id, name: course.name, code: course.code },
-          error: _err instanceof Error
-            ? _err.message
-            : "Failed to fetch from EzyGo",
+          error:
+            _err instanceof Error ? _err.message : "Failed to fetch from EzyGo",
         };
       }
     },

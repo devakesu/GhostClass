@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -214,7 +215,18 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
             const LoadingOverlay(isFullScreen: false, showLogo: false),
         error: (err, _) => ServiceErrorView(
           error: err,
-          onRetry: () => ref.invalidate(authProvider),
+          onRetry: () async {
+            ref.read(apiServiceProvider).clearCaches();
+            ref.invalidate(authProvider);
+            try {
+              await ref
+                  .read(authProvider.future)
+                  .timeout(AppConfig.defaultTimeout);
+            } on Object catch (e, st) {
+              AppLogger.e('ProfileScreen: Retry failed', e, st);
+              rethrow;
+            }
+          },
         ),
       ),
     );

@@ -84,7 +84,9 @@ export async function submitContactForm(formData: FormData) {
   // 7. Execute Unified Service
   const supabase = await createClient();
   const supabaseAdmin = getAdminClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   const flowResult = await processContactSubmission(
     supabase as unknown as import("@supabase/supabase-js").SupabaseClient,

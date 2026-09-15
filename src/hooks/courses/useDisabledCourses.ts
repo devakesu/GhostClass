@@ -84,7 +84,8 @@ export function useDisabledCourses({
     if (
       !semKey ||
       !Object.prototype.hasOwnProperty.call(disabledCoursesMap, semKey)
-    ) return EMPTY_DISABLED_SET;
+    )
+      return EMPTY_DISABLED_SET;
     const semMap = Reflect.get(disabledCoursesMap, semKey) ?? {};
     const keys = Object.keys(semMap);
     if (keys.length === 0) return EMPTY_DISABLED_SET;

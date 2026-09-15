@@ -67,9 +67,7 @@ type AttendanceDataPayload = AttendanceReport | null | undefined;
 type AttendanceSessionItem =
   AttendanceReport["studentAttendanceData"][string][string];
 type CoursesDataPayload =
-  | { courses: Record<string, Course> }
-  | null
-  | undefined;
+  { courses: Record<string, Course> } | null | undefined;
 
 const STATUS_ORDER = ["Present", "Duty Leave", "Absent"] as const;
 type StatusKey = (typeof STATUS_ORDER)[number];
@@ -192,8 +190,7 @@ function TrackingRecordCard({
   setDeleteConfirmOpen: (id: string | null) => void;
   getResolvedSessionName: (sessionValue: string, dateStr?: string) => string;
 }) {
-  const trackingId =
-    `${trackingItem.auth_user_id}-${trackingItem.session}-${trackingItem.course}-${trackingItem.date}`;
+  const trackingId = `${trackingItem.auth_user_id}-${trackingItem.session}-${trackingItem.course}-${trackingItem.date}`;
 
   // Status Logic
   const isCorrection = trackingItem.status === "correction";
@@ -235,9 +232,10 @@ function TrackingRecordCard({
     cardBgClass = "bg-red-500/5 border-red-500/35 dark:border-red-500/20";
   }
 
-  const remarkColorClass = attCode === 225
-    ? "text-orange-600/80 dark:text-orange-400/80"
-    : "text-muted-foreground/80";
+  const remarkColorClass =
+    attCode === 225
+      ? "text-orange-600/80 dark:text-orange-400/80"
+      : "text-muted-foreground/80";
 
   return (
     <m.div
@@ -258,9 +256,7 @@ function TrackingRecordCard({
           >
             {typeLabel}
           </Badge>
-          <Badge className={statusBadgeClass}>
-            {statusText}
-          </Badge>
+          <Badge className={statusBadgeClass}>{statusText}</Badge>
         </div>
       </div>
       <div className="text-xs text-muted-foreground flex items-center justify-between mt-2">
@@ -272,23 +268,19 @@ function TrackingRecordCard({
           whileTap={{ scale: 0.95 }}
           disabled={deleteId === trackingId}
           onClick={() => setDeleteConfirmOpen(trackingId)}
-          aria-label={`Remove tracking entry for ${
-            getResolvedSessionName(
-              trackingItem.session,
-            )
-          } session on ${formatDisplayDate(trackingItem.date)}`}
+          aria-label={`Remove tracking entry for ${getResolvedSessionName(
+            trackingItem.session,
+          )} session on ${formatDisplayDate(trackingItem.date)}`}
           className="flex cursor-pointer items-center gap-2 px-2.5 py-1.5 bg-yellow-400/6 border border-yellow-500/40 dark:border-yellow-500/20 rounded-lg font-medium text-yellow-600 dark:text-yellow-500 disabled:opacity-50"
         >
-          {deleteId === trackingId
-            ? (
-              "Deleting..."
-            )
-            : (
-              <>
-                <span className="max-md:hidden">Remove</span>
-                <Trash2 size={15} aria-hidden="true" />
-              </>
-            )}
+          {deleteId === trackingId ? (
+            "Deleting..."
+          ) : (
+            <>
+              <span className="max-md:hidden">Remove</span>
+              <Trash2 size={15} aria-hidden="true" />
+            </>
+          )}
         </m.button>
       </div>
       {trackingItem.remarks && !isLegacyRemark(trackingItem.remarks) && (
@@ -355,8 +347,8 @@ function CourseSectionCard({
   visibleItems.forEach((item) => {
     statusGroups.get(getStatusKey(item.attendance))!.push(item);
   });
-  const activeStatusLabels = STATUS_ORDER.filter((s) =>
-    statusGroups.get(s)!.length > 0
+  const activeStatusLabels = STATUS_ORDER.filter(
+    (s) => statusGroups.get(s)!.length > 0,
   );
 
   const recordLabel = moreCount === 1 ? "Record" : "Records";
@@ -365,10 +357,7 @@ function CourseSectionCard({
     : `Show ${moreCount} More ${recordLabel}`;
 
   return (
-    <div
-      key={courseName}
-      className="scroll-mt-24 flex flex-col gap-3"
-    >
+    <div key={courseName} className="scroll-mt-24 flex flex-col gap-3">
       <div
         ref={(el) => {
           courseHeaderRefs.current.set(courseName, el);
@@ -386,10 +375,7 @@ function CourseSectionCard({
             Disabled
           </Badge>
         )}
-        <Badge
-          variant="outline"
-          className="ml-auto text-xs"
-        >
+        <Badge variant="outline" className="ml-auto text-xs">
           {items.length}
         </Badge>
       </div>
@@ -399,17 +385,12 @@ function CourseSectionCard({
           const groupItems = statusGroups.get(statusLabel)!;
           const { dot, text, border } = STATUS_STYLES.get(statusLabel)!;
           return (
-            <div
-              key={statusLabel}
-              className="flex flex-col gap-2"
-            >
+            <div key={statusLabel} className="flex flex-col gap-2">
               {/* Status sub-header */}
               <div
                 className={`flex items-center gap-2 px-2 py-1 rounded-md border ${border} bg-background/40`}
               >
-                <span
-                  className={`w-2 h-2 rounded-full shrink-0 ${dot}`}
-                />
+                <span className={`w-2 h-2 rounded-full shrink-0 ${dot}`} />
                 <span
                   className={`text-xs font-semibold uppercase tracking-wide ${text}`}
                 >
@@ -577,8 +558,7 @@ function buildOfficialSessionsMap(
 
 function findSessionIndex(
   studentAttendanceData:
-    | Record<string, Record<string, AttendanceSessionItem>>
-    | undefined,
+    Record<string, Record<string, AttendanceSessionItem>> | undefined,
   dateStr: string | undefined,
   sessionValue: string,
 ): string | null {
@@ -766,8 +746,8 @@ function renderBadgeContent(
   const subjectCount = groupedAllData.get(selectedCourseFilter)?.length || 0;
   return (
     <>
-      <strong>{subjectCount}</strong>{" "}
-      {onlyDutyLeave ? "duty leave " : ""}recorded for this subject.
+      <strong>{subjectCount}</strong> {onlyDutyLeave ? "duty leave " : ""}
+      recorded for this subject.
     </>
   );
 }
@@ -893,9 +873,7 @@ function CourseFilterControls({
             </SelectTrigger>
             <SelectContent className="max-h-75 w-full min-w-(--radix-select-trigger-width) max-w-[calc(100vw-40px)]">
               <SelectItem value="all">
-                <span className="font-medium text-primary">
-                  All Subjects
-                </span>
+                <span className="font-medium text-primary">All Subjects</span>
               </SelectItem>
               {allCourseKeys.map((courseKey) => (
                 <CourseFilterSelectItem
@@ -1005,9 +983,10 @@ function TrackingModals({
             <AlertDialogAction
               onClick={async () => {
                 if (deleteConfirmOpen) {
-                  const trackingItem = trackingData?.find((item) =>
-                    `${item.auth_user_id}-${item.session}-${item.course}-${item.date}` ===
-                      deleteConfirmOpen
+                  const trackingItem = trackingData?.find(
+                    (item) =>
+                      `${item.auth_user_id}-${item.session}-${item.course}-${item.date}` ===
+                      deleteConfirmOpen,
                   );
                   if (trackingItem) {
                     await handleDeleteTrackData(
@@ -1044,8 +1023,9 @@ function TrackingModals({
               {selectedCourseFilter === "all"
                 ? `This will permanently delete all ${count} tracking record${recordSuffix} for the ${semesterData?.toUpperCase()} ${academicYearData} academic term.`
                 : `This will permanently delete all tracking records for ${
-                  activeCourseMeta?.displayCourseName || selectedCourseFilter
-                }.`} This action cannot be undone.
+                    activeCourseMeta?.displayCourseName || selectedCourseFilter
+                  }.`}{" "}
+              This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -1113,44 +1093,39 @@ function CourseListContainer({
 }) {
   return (
     <div className="relative mx-auto flex w-full max-w-175 flex-col gap-4 overflow-visible">
-      <div
-        key={currentPage}
-        className="flex flex-col gap-6 overflow-visible"
-      >
-        {currentCourseKeys.length === 0
-          ? (
-            <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-xl border border-dashed border-border/60 bg-background/20">
-              <Filter className="h-10 w-10 text-muted-foreground/50 mb-3" />
-              <h3 className="font-semibold text-foreground/80">
-                No matching records found
-              </h3>
-              <p className="text-xs text-muted-foreground mt-1 max-w-xs">
-                No tracking records match your active filters. Try adjusting
-                your subject or Duty Leave filter.
-              </p>
-            </div>
-          )
-          : (
-            currentCourseKeys.map((courseName) => (
-              <CourseSectionCard
-                key={courseName}
-                courseName={courseName}
-                groupedAllData={groupedAllData}
-                getCourseNameById={getCourseNameById}
-                getCourseCodeById={getCourseCodeById}
-                isCourseDisabled={isCourseDisabled}
-                expandedCourses={expandedCourses}
-                recordsPerCourseInitial={recordsPerCourseInitial}
-                getStatusKey={getStatusKey}
-                officialSessionsMap={officialSessionsMap}
-                deleteId={deleteId}
-                setDeleteConfirmOpen={setDeleteConfirmOpen}
-                getResolvedSessionName={getResolvedSessionName}
-                toggleCourseExpansion={toggleCourseExpansion}
-                courseHeaderRefs={courseHeaderRefs}
-              />
-            ))
-          )}
+      <div key={currentPage} className="flex flex-col gap-6 overflow-visible">
+        {currentCourseKeys.length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-12 px-4 text-center rounded-xl border border-dashed border-border/60 bg-background/20">
+            <Filter className="h-10 w-10 text-muted-foreground/50 mb-3" />
+            <h3 className="font-semibold text-foreground/80">
+              No matching records found
+            </h3>
+            <p className="text-xs text-muted-foreground mt-1 max-w-xs">
+              No tracking records match your active filters. Try adjusting your
+              subject or Duty Leave filter.
+            </p>
+          </div>
+        ) : (
+          currentCourseKeys.map((courseName) => (
+            <CourseSectionCard
+              key={courseName}
+              courseName={courseName}
+              groupedAllData={groupedAllData}
+              getCourseNameById={getCourseNameById}
+              getCourseCodeById={getCourseCodeById}
+              isCourseDisabled={isCourseDisabled}
+              expandedCourses={expandedCourses}
+              recordsPerCourseInitial={recordsPerCourseInitial}
+              getStatusKey={getStatusKey}
+              officialSessionsMap={officialSessionsMap}
+              deleteId={deleteId}
+              setDeleteConfirmOpen={setDeleteConfirmOpen}
+              getResolvedSessionName={getResolvedSessionName}
+              toggleCourseExpansion={toggleCourseExpansion}
+              courseHeaderRefs={courseHeaderRefs}
+            />
+          ))
+        )}
       </div>
 
       {totalPages > 1 && (
@@ -1220,7 +1195,9 @@ async function executeDeleteSingleRecord({
   if (!profile) return;
   setDeleteId(uniqueId);
   const supabase = createClient();
-  const { data: { user: authUser } } = await supabase.auth.getUser();
+  const {
+    data: { user: authUser },
+  } = await supabase.auth.getUser();
 
   try {
     const { error } = await supabase
@@ -1242,7 +1219,8 @@ async function executeDeleteSingleRecord({
 
     const remainingInCourse = groupedAllData.get(course)?.length || 0;
     if (
-      remainingInCourse <= 1 && currentCourseKeys.length === 1 &&
+      remainingInCourse <= 1 &&
+      currentCourseKeys.length === 1 &&
       currentPage > 0
     ) {
       setCurrentPage((prev) => prev - 1);
@@ -1291,7 +1269,9 @@ async function executeDeleteAllRecords({
   try {
     setIsProcessing(true);
     const supabase = createClient();
-    const { data: { user: authUser } } = await supabase.auth.getUser();
+    const {
+      data: { user: authUser },
+    } = await supabase.auth.getUser();
 
     let query = supabase
       .from("tracker")
@@ -1358,9 +1338,8 @@ export default function TrackingClient() {
     new Set(),
   );
   const recordsPerCourseInitial = 10;
-  const [selectedCourseFilter, setSelectedCourseFilter] = useState<string>(
-    "all",
-  );
+  const [selectedCourseFilter, setSelectedCourseFilter] =
+    useState<string>("all");
   const [onlyDutyLeave, setOnlyDutyLeave] = useState<boolean>(false);
 
   // Reset to first page when filter changes is handled by the Select onValueChange.
@@ -1369,14 +1348,9 @@ export default function TrackingClient() {
 
   const coursesPerPage = 3;
 
-  const {
-    data: semesterData,
-    isError: isSemesterError,
-  } = useFetchSemester();
-  const {
-    data: academicYearData,
-    isError: isAcademicYearError,
-  } = useFetchAcademicYear();
+  const { data: semesterData, isError: isSemesterError } = useFetchSemester();
+  const { data: academicYearData, isError: isAcademicYearError } =
+    useFetchAcademicYear();
 
   const {
     data: coursesData,
@@ -1410,9 +1384,7 @@ export default function TrackingClient() {
     academicYearData || undefined,
     { enabled: !!semesterData && !!academicYearData },
   );
-  const {
-    data: classCourses,
-  } = useFetchClassCourses({
+  const { data: classCourses } = useFetchClassCourses({
     semester: semesterData as string | undefined,
     year: academicYearData as string | undefined,
     enabled: !!semesterData && !!academicYearData,
@@ -1518,29 +1490,27 @@ export default function TrackingClient() {
     ],
   );
 
-  const effectiveCourseFilter = selectedCourseFilter !== "all" &&
-      (!unfilteredGroupedData.get(selectedCourseFilter)?.length)
-    ? "all"
-    : selectedCourseFilter;
+  const effectiveCourseFilter =
+    selectedCourseFilter !== "all" &&
+    !unfilteredGroupedData.get(selectedCourseFilter)?.length
+      ? "all"
+      : selectedCourseFilter;
 
-  const filteredCourseKeys = useMemo(
-    () => {
-      const keys = filterCourseKeys(
-        allCourseKeys,
-        effectiveCourseFilter,
-        getCourseCodeById,
-        isCourseDisabled,
-      );
-      return keys.filter((k) => (groupedAllData.get(k)?.length ?? 0) > 0);
-    },
-    [
+  const filteredCourseKeys = useMemo(() => {
+    const keys = filterCourseKeys(
       allCourseKeys,
       effectiveCourseFilter,
-      groupedAllData,
-      isCourseDisabled,
       getCourseCodeById,
-    ],
-  );
+      isCourseDisabled,
+    );
+    return keys.filter((k) => (groupedAllData.get(k)?.length ?? 0) > 0);
+  }, [
+    allCourseKeys,
+    effectiveCourseFilter,
+    groupedAllData,
+    isCourseDisabled,
+    getCourseCodeById,
+  ]);
 
   const totalPages = Math.ceil(filteredCourseKeys.length / coursesPerPage);
 
@@ -1631,8 +1601,13 @@ export default function TrackingClient() {
   // Block rendering only on base data readiness; sync runs in the background.
   const isInitialLoading = !enabled || isDataLoading;
 
-  const hasBaseErrors = isTrackingError || isCountError || isCoursesError ||
-    isAttendanceError || isSemesterError || isAcademicYearError;
+  const hasBaseErrors =
+    isTrackingError ||
+    isCountError ||
+    isCoursesError ||
+    isAttendanceError ||
+    isSemesterError ||
+    isAcademicYearError;
 
   if (isInitialLoading && !hasBaseErrors) {
     return <Loading />;
@@ -1791,10 +1766,9 @@ export default function TrackingClient() {
             expandedCourses={expandedCourses}
             recordsPerCourseInitial={recordsPerCourseInitial}
             getStatusKey={getStatusKey}
-            officialSessionsMap={officialSessionsMap as Map<
-              string,
-              AttendanceSessionItem
-            >}
+            officialSessionsMap={
+              officialSessionsMap as Map<string, AttendanceSessionItem>
+            }
             deleteId={deleteId}
             setDeleteConfirmOpen={setDeleteConfirmOpen}
             getResolvedSessionName={getResolvedSessionName}

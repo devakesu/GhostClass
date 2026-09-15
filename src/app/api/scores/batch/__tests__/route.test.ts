@@ -6,7 +6,8 @@ import { NextRequest } from "next/server";
 vi.mock("@/lib/security/app-check", () => ({
   withSecurity:
     (handler: (req: NextRequest, ctx: unknown) => unknown) =>
-    (req: NextRequest, context: unknown = {}) => handler(req, context),
+    (req: NextRequest, context: unknown = {}) =>
+      handler(req, context),
 }));
 
 vi.mock("@/lib/supabase/server", () => ({
@@ -137,9 +138,8 @@ describe("POST /api/scores/batch", () => {
   });
 
   it("returns 401 if token is missing", async () => {
-    const { getAuthTokenWithFallback } = await import(
-      "@/lib/security/auth-cookie"
-    );
+    const { getAuthTokenWithFallback } =
+      await import("@/lib/security/auth-cookie");
     vi.mocked(getAuthTokenWithFallback).mockResolvedValueOnce(undefined);
 
     const req = new NextRequest("http://localhost/api/scores/batch", {

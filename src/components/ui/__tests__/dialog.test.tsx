@@ -47,7 +47,8 @@ describe("Dialog UI Components", () => {
         </DialogContent>
       </Dialog>,
     );
-    expect(screen.queryByRole("button", { name: /close/i })).not
-      .toBeInTheDocument();
+    expect(
+      screen.queryByRole("button", { name: /close/i }),
+    ).not.toBeInTheDocument();
   });
 });

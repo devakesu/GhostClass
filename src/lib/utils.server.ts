@@ -210,10 +210,10 @@ async function attemptEgressTier(
 ): Promise<
   | { success: true; res: Response }
   | {
-    success: false;
-    shouldThrow: boolean;
-    error?: unknown;
-  }
+      success: false;
+      shouldThrow: boolean;
+      error?: unknown;
+    }
 > {
   const url = `${target.baseUrl}/${cleanEndpoint}`;
   const headers = new Headers(init?.headers);
@@ -224,13 +224,14 @@ async function attemptEgressTier(
     () => tierController.abort(),
     PER_TIER_TIMEOUT_MS,
   );
-  const tierSignal: AbortSignal = callerSignal !== null
-    ? (
-      AbortSignal as unknown as {
-        any: (signals: AbortSignal[]) => AbortSignal;
-      }
-    ).any([callerSignal, tierController.signal])
-    : tierController.signal;
+  const tierSignal: AbortSignal =
+    callerSignal !== null
+      ? (
+          AbortSignal as unknown as {
+            any: (signals: AbortSignal[]) => AbortSignal;
+          }
+        ).any([callerSignal, tierController.signal])
+      : tierController.signal;
 
   try {
     const res = await fetch(url, { ...init, headers, signal: tierSignal });
@@ -318,13 +319,12 @@ export function isUpstreamAuthNetworkError(error: unknown): boolean {
     if (errObj.status === 0) return true;
     if (errObj.name === "AuthRetryableFetchError") return true;
     if (
-      typeof errObj.message === "string" && (
-        errObj.message.includes("fetch failed") ||
+      typeof errObj.message === "string" &&
+      (errObj.message.includes("fetch failed") ||
         errObj.message.includes("network") ||
         errObj.message.includes("timeout") ||
         errObj.message.includes("ECONNRESET") ||
-        errObj.message.includes("ENOTFOUND")
-      )
+        errObj.message.includes("ENOTFOUND"))
     ) {
       return true;
     }

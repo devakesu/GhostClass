@@ -39,8 +39,8 @@ if (_rawBaseApiUrl) {
 }
 const EGRESS_TARGETS = buildEgressTargets();
 const IS_PRODUCTION = process.env.NODE_ENV === "production";
-const SHOULD_EXPOSE_EGRESS_HEADERS = !IS_PRODUCTION ||
-  process.env.DEBUG_EGRESS === "true";
+const SHOULD_EXPOSE_EGRESS_HEADERS =
+  !IS_PRODUCTION || process.env.DEBUG_EGRESS === "true";
 
 function getEgressHeaders(
   headersObj: Record<string, string>,
@@ -90,7 +90,9 @@ function validateOrigin(
     const isRead = req.method === "GET" || req.method === "HEAD";
     const secFetchSite = req.headers.get("sec-fetch-site")?.toLowerCase();
     if (
-      isRead && secFetchSite === "same-origin" && !!requestHostname &&
+      isRead &&
+      secFetchSite === "same-origin" &&
+      !!requestHostname &&
       (allowedHosts?.has(requestHostname) || isLoopbackHost(requestHostname))
     ) {
       return null;
@@ -104,7 +106,8 @@ function validateOrigin(
 
   try {
     const originHostname = new URL(origin).hostname.toLowerCase();
-    const isAllowed = allowedHosts?.has(originHostname) ||
+    const isAllowed =
+      allowedHosts?.has(originHostname) ||
       (isLoopbackHost(originHostname) && isLoopbackHost(requestHostname));
     if (!isAllowed) {
       logger.warn("Origin validation failed", {
@@ -145,7 +148,8 @@ async function prepareRequestBody(
   }
 
   const buf = Buffer.from(await req.arrayBuffer());
-  const resolvedType = contentType.split(";")[0].trim().toLowerCase() ||
+  const resolvedType =
+    contentType.split(";")[0].trim().toLowerCase() ||
     "application/octet-stream";
   return { body: buf, contentType: resolvedType };
 }
@@ -157,48 +161,68 @@ interface EgressResult {
   egressName: string;
 }
 
-function validateProxyRequestPath(
-  path?: string[],
-): { fullPath: string; errorResponse: NextResponse | null } {
+function validateProxyRequestPath(path?: string[]): {
+  fullPath: string;
+  errorResponse: NextResponse | null;
+} {
   if (!BASE_API_URL) {
     return {
       fullPath: "",
-      errorResponse: NextResponse.json({
-        message: "Backend URL not configured",
-      }, { status: 500 }),
+      errorResponse: NextResponse.json(
+        {
+          message: "Backend URL not configured",
+        },
+        { status: 500 },
+      ),
     };
   }
   if (!path || path.length === 0) {
     return {
       fullPath: "",
-      errorResponse: NextResponse.json({ message: "Missing path" }, {
-        status: 400,
-      }),
+      errorResponse: NextResponse.json(
+        { message: "Missing path" },
+        {
+          status: 400,
+        },
+      ),
     };
   }
-  if (path.some((s) => s === ".." || s === "." || s.includes("/") || s.includes("\\"))) {
+  if (
+    path.some(
+      (s) => s === ".." || s === "." || s.includes("/") || s.includes("\\"),
+    )
+  ) {
     return {
       fullPath: "",
-      errorResponse: NextResponse.json({ message: "Invalid path segment" }, {
-        status: 400,
-      }),
+      errorResponse: NextResponse.json(
+        { message: "Invalid path segment" },
+        {
+          status: 400,
+        },
+      ),
     };
   }
   const fullPath = path.join("/");
   if (fullPath.includes("#") || fullPath.includes("?")) {
     return {
       fullPath,
-      errorResponse: NextResponse.json({ message: "Invalid path format" }, {
-        status: 400,
-      }),
+      errorResponse: NextResponse.json(
+        { message: "Invalid path format" },
+        {
+          status: 400,
+        },
+      ),
     };
   }
   if (MISCONFIGURED_EGRESS_TARGET) {
     return {
       fullPath,
-      errorResponse: NextResponse.json({ message: "Proxy config error" }, {
-        status: 500,
-      }),
+      errorResponse: NextResponse.json(
+        { message: "Proxy config error" },
+        {
+          status: 500,
+        },
+      ),
     };
   }
   return { fullPath, errorResponse: null };
@@ -220,22 +244,28 @@ async function validateProxyAuthAndOrigin(
   );
   if (originError) {
     return {
-      errorResponse: NextResponse.json({ message: originError.message }, {
-        status: originError.status,
-      }),
+      errorResponse: NextResponse.json(
+        { message: originError.message },
+        {
+          status: originError.status,
+        },
+      ),
     };
   }
 
   const pathLower = fullPath.toLowerCase().replace(/\/$/, "");
-  const isAuthPublic = isPublic || pathLower === "login" ||
-    pathLower === "auth/login";
+  const isAuthPublic =
+    isPublic || pathLower === "login" || pathLower === "auth/login";
   const token = isAuthPublic ? undefined : await getAuthTokenWithFallback();
 
   if (!isAuthPublic && !token) {
     return {
-      errorResponse: NextResponse.json({ message: "Unauthorized" }, {
-        status: 401,
-      }),
+      errorResponse: NextResponse.json(
+        { message: "Unauthorized" },
+        {
+          status: 401,
+        },
+      ),
     };
   }
 
@@ -255,13 +285,17 @@ function handleProxyUpstreamError(
   };
 
   if (errObj?.name === "CircuitBreakerOpenError") {
-    return NextResponse.json({ message: "EzyGo issues." }, {
-      status: 503,
-      headers: egressHeader,
-    });
+    return NextResponse.json(
+      { message: "EzyGo issues." },
+      {
+        status: 503,
+        headers: egressHeader,
+      },
+    );
   }
 
-  const isUpstreamErr = err instanceof UpstreamServerError ||
+  const isUpstreamErr =
+    err instanceof UpstreamServerError ||
     errObj?.name === "UpstreamServerError";
   if (isUpstreamErr) {
     const uStatus = errObj?.status ?? 502;
@@ -274,26 +308,36 @@ function handleProxyUpstreamError(
         ? rawHeaders
         : new Headers((rawHeaders as Record<string, string>) || {}),
     );
-    const msg = (IS_PRODUCTION && uStatus >= 500)
-      ? "Error processing request"
-      : resolveSafeUpstreamErrorMessage(errObj?.body ?? "", uStatus);
-    return NextResponse.json({ message: msg, status: uStatus }, {
-      status: uStatus,
-      headers: { ...headers, ...egressHeader },
-    });
+    const msg =
+      IS_PRODUCTION && uStatus >= 500
+        ? "Error processing request"
+        : resolveSafeUpstreamErrorMessage(errObj?.body ?? "", uStatus);
+    return NextResponse.json(
+      { message: msg, status: uStatus },
+      {
+        status: uStatus,
+        headers: { ...headers, ...egressHeader },
+      },
+    );
   }
 
   if (errObj?.name === "AbortError") {
-    return NextResponse.json({ message: "Upstream timed out" }, {
-      status: 502,
-      headers: egressHeader,
-    });
+    return NextResponse.json(
+      { message: "Upstream timed out" },
+      {
+        status: 502,
+        headers: egressHeader,
+      },
+    );
   }
 
-  return NextResponse.json({
-    message:
-      "EzyGo servers are having technical issues. Exception: EzyGo servers",
-  }, { status: 502, headers: egressHeader });
+  return NextResponse.json(
+    {
+      message:
+        "EzyGo servers are having technical issues. Exception: EzyGo servers",
+    },
+    { status: 502, headers: egressHeader },
+  );
 }
 
 async function handleBatchedEgress(
@@ -325,10 +369,11 @@ async function handleBatchedEgress(
       fullPath.includes("user/setting");
     const settingHeaders: Record<string, string> = isSettingPath
       ? {
-        "cache-control": "no-store, no-cache, must-revalidate, proxy-revalidate",
-        "pragma": "no-cache",
-        "expires": "0",
-      }
+          "cache-control":
+            "no-store, no-cache, must-revalidate, proxy-revalidate",
+          pragma: "no-cache",
+          expires: "0",
+        }
       : {};
     return NextResponse.json(data, {
       status: 200,
@@ -484,13 +529,17 @@ function handleProxyResultResponse(
     } else {
       logger.error(`Proxy error ${result.res.status}`, { path: fullPath });
     }
-    const msg = (IS_PRODUCTION && result.res.status >= 500)
-      ? "Service experiencing issues."
-      : resolveSafeUpstreamErrorMessage(result.text ?? "", result.res.status);
-    return NextResponse.json({ message: msg, status: result.res.status }, {
-      status: result.res.status,
-      headers: getEgressHeaders(sanitizedHeaders, result.egressName),
-    });
+    const msg =
+      IS_PRODUCTION && result.res.status >= 500
+        ? "Service experiencing issues."
+        : resolveSafeUpstreamErrorMessage(result.text ?? "", result.res.status);
+    return NextResponse.json(
+      { message: msg, status: result.res.status },
+      {
+        status: result.res.status,
+        headers: getEgressHeaders(sanitizedHeaders, result.egressName),
+      },
+    );
   }
 
   if (result.bodyStream) {
@@ -533,8 +582,11 @@ async function forward(
 
   try {
     const isBatchablePost = method === "POST" && (!body || body === "{}");
-    const canBatch = (method === "GET" || isBatchablePost) && !isPublic &&
-      token && process.env.VITEST !== "true";
+    const canBatch =
+      (method === "GET" || isBatchablePost) &&
+      !isPublic &&
+      token &&
+      process.env.VITEST !== "true";
 
     if (canBatch) {
       const batchedRes = await handleBatchedEgress(
@@ -551,11 +603,11 @@ async function forward(
 
     const result = await ezygoCircuitBreaker.execute(async () => {
       const baseHeaders: Record<string, string> = {
-        ...(token ? { "authorization": `Bearer ${token}` } : {}),
+        ...(token ? { authorization: `Bearer ${token}` } : {}),
         "content-type": resolvedContentType,
-        "accept": "application/json, text/plain, */*",
-        "referer": "https://edu.ezygo.app/",
-        "origin": "https://edu.ezygo.app",
+        accept: "application/json, text/plain, */*",
+        referer: "https://edu.ezygo.app/",
+        origin: "https://edu.ezygo.app",
         ...(clientIp
           ? { "x-forwarded-for": clientIp, "x-real-ip": clientIp }
           : {}),
@@ -608,10 +660,13 @@ export const POST = withSecurity(
   { consume: true },
 );
 
-export const PUT = withSecurity((req, { params, decryptedBody, authType }) => {
-  const { path } = params as { path: string[] };
-  return forward(req as NextRequest, "PUT", path, decryptedBody, authType);
-}, { consume: true });
+export const PUT = withSecurity(
+  (req, { params, decryptedBody, authType }) => {
+    const { path } = params as { path: string[] };
+    return forward(req as NextRequest, "PUT", path, decryptedBody, authType);
+  },
+  { consume: true },
+);
 
 export const PATCH = withSecurity(
   (req, { params, decryptedBody, authType }) => {
@@ -621,10 +676,13 @@ export const PATCH = withSecurity(
   { consume: true },
 );
 
-export const DELETE = withSecurity((req, { params, authType }) => {
-  const { path } = params as { path: string[] };
-  return forward(req as NextRequest, "DELETE", path, undefined, authType);
-}, { consume: true });
+export const DELETE = withSecurity(
+  (req, { params, authType }) => {
+    const { path } = params as { path: string[] };
+    return forward(req as NextRequest, "DELETE", path, undefined, authType);
+  },
+  { consume: true },
+);
 
 export const HEAD = withSecurity((req, { params, authType }) => {
   const { path } = params as { path: string[] };

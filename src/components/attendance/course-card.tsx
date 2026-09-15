@@ -107,14 +107,17 @@ interface BunkPanelProps {
   noOfficialData: boolean;
 }
 
-function StatusMessage(
-  { canBunk, requiredToAttend }: { canBunk: number; requiredToAttend: number },
-) {
+function StatusMessage({
+  canBunk,
+  requiredToAttend,
+}: {
+  canBunk: number;
+  requiredToAttend: number;
+}) {
   if (canBunk > 0) {
     return (
       <>
-        You can bunk <span className="font-bold text-green-500">{canBunk}</span>
-        {" "}
+        You can bunk <span className="font-bold text-green-500">{canBunk}</span>{" "}
         {canBunk === 1 ? "class" : "classes"} 🥳
       </>
     );
@@ -122,15 +125,15 @@ function StatusMessage(
   if (requiredToAttend > 0) {
     return (
       <span className="text-red-500 dark:text-red-400">
-        {!isFinite(requiredToAttend) || requiredToAttend >= 0x7FFFFFFF
-          ? <span className="font-bold">Impossible 💀</span>
-          : (
-            <>
-              You need to attend{" "}
-              <span className="font-bold">{requiredToAttend}</span> more{" "}
-              {requiredToAttend === 1 ? "class" : "classes"} 💀
-            </>
-          )}
+        {!isFinite(requiredToAttend) || requiredToAttend >= 0x7fffffff ? (
+          <span className="font-bold">Impossible 💀</span>
+        ) : (
+          <>
+            You need to attend{" "}
+            <span className="font-bold">{requiredToAttend}</span> more{" "}
+            {requiredToAttend === 1 ? "class" : "classes"} 💀
+          </>
+        )}
       </span>
     );
   }
@@ -155,7 +158,10 @@ function renderPanelMetrics(
     );
   }
   if (metrics.requiredToAttend > 0) {
-    if (!isFinite(metrics.requiredToAttend) || metrics.requiredToAttend >= 0x7FFFFFFF) {
+    if (
+      !isFinite(metrics.requiredToAttend) ||
+      metrics.requiredToAttend >= 0x7fffffff
+    ) {
       return (
         <span className="font-bold text-red-500 dark:text-red-400">
           Impossible 💀
@@ -177,9 +183,11 @@ function renderPanelMetrics(
   );
 }
 
-function BunkCalculatorPanel(
-  { stats, trackingIsStrictlyBetter, noOfficialData }: BunkPanelProps,
-) {
+function BunkCalculatorPanel({
+  stats,
+  trackingIsStrictlyBetter,
+  noOfficialData,
+}: BunkPanelProps) {
   const hasModifications = stats.correctionPresent > 0 || stats.extras > 0;
 
   if (!hasModifications) {
@@ -290,8 +298,8 @@ function CourseStatusBadge({
   onEnable,
   onDisable,
 }: StatusBadgeProps) {
-  const isActionDisabled = isDisabledCoursesLoading || !courseCode ||
-    !hasSemesterContext;
+  const isActionDisabled =
+    isDisabledCoursesLoading || !courseCode || !hasSemesterContext;
   const commonClasses = cn(
     "flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-wide rounded-full px-2 py-0.5 border transition-colors cursor-pointer select-none",
     isActionDisabled && "opacity-50 cursor-not-allowed",
@@ -395,11 +403,12 @@ function calculateCourseStats(
 ): CourseCardStats {
   const { targetId, targetName, targetCode } = courseIdentifiers;
 
-  const courseTracks = trackingData?.filter((t) => {
-    if (String(t.course) === targetId) return true;
-    const tName = normalize(String(t.course));
-    return tName === targetName || (targetCode && tName === targetCode);
-  }) || [];
+  const courseTracks =
+    trackingData?.filter((t) => {
+      if (String(t.course) === targetId) return true;
+      const tName = normalize(String(t.course));
+      return tName === targetName || (targetCode && tName === targetCode);
+    }) || [];
 
   if (course.present !== undefined && course.total !== undefined) {
     const officialPresent = course.officialPresent ?? 0;
@@ -473,13 +482,14 @@ function calculateCourseStats(
     String(course.id),
     {
       present: activeCourseDetails?.present ?? course.officialPresent ?? 0,
-      absent: activeCourseDetails?.absent ??
+      absent:
+        activeCourseDetails?.absent ??
         Math.max(
           (course.officialTotal ?? 0) - (course.officialPresent ?? 0),
           0,
         ),
       total: activeCourseDetails
-        ? (activeCourseDetails.present + activeCourseDetails.absent)
+        ? activeCourseDetails.present + activeCourseDetails.absent
         : (course.officialTotal ?? 0),
     },
     undefined,
@@ -666,8 +676,7 @@ function CardBodyContent({
   if (isSummaryLoading) {
     return (
       <div className="flex flex-col items-center justify-center p-4">
-        <div className="animate-pulse h-4 w-24 bg-secondary rounded mb-2">
-        </div>
+        <div className="animate-pulse h-4 w-24 bg-secondary rounded mb-2"></div>
         <div className="animate-pulse h-2 w-16 bg-secondary rounded"></div>
       </div>
     );
@@ -735,9 +744,7 @@ function CardBodyContent({
         <div className="text-center p-1 bg-primary/10 border border-primary/25 dark:bg-primary/10 dark:border-primary/20 rounded-md py-2.5 flex gap-1 flex-col">
           <span className="text-xs text-muted-foreground block">Total</span>
           <div className="flex items-center justify-center gap-0.5">
-            <span className="text-sm font-medium">
-              {stats.realTotal}
-            </span>
+            <span className="text-sm font-medium">{stats.realTotal}</span>
             {stats.extras > 0 && (
               <span className="text-xs font-medium text-blue-400">
                 +{stats.extras}
@@ -761,10 +768,10 @@ function CardBodyContent({
           <div className="flex items-center gap-2">
             {(stats.correctionPresent > 0 || stats.extras > 0) &&
               stats.officialPercentage !== stats.displayPercentage && (
-              <span className="text-xs">
-                {stats.officialPercentage}% <span className="mx-0.5">→</span>
-              </span>
-            )}
+                <span className="text-xs">
+                  {stats.officialPercentage}% <span className="mx-0.5">→</span>
+                </span>
+              )}
             <span className={percentageTextClass}>
               {stats.displayPercentage}%
             </span>
@@ -776,12 +783,13 @@ function CardBodyContent({
         <div className="mt-4">
           <BunkCalculatorPanel
             stats={stats}
-            trackingIsStrictlyBetter={stats.extraMetrics.canBunk >
-                stats.safeMetrics.canBunk ||
+            trackingIsStrictlyBetter={
+              stats.extraMetrics.canBunk > stats.safeMetrics.canBunk ||
               (stats.extraMetrics.canBunk === 0 &&
                 stats.safeMetrics.canBunk === 0 &&
                 stats.extraMetrics.requiredToAttend <
-                  stats.safeMetrics.requiredToAttend)}
+                  stats.safeMetrics.requiredToAttend)
+            }
             noOfficialData={stats.realTotal === 0}
           />
         </div>
@@ -817,11 +825,9 @@ function countOfficialDL(
   if (!attendanceData?.studentAttendanceData) return 0;
   let count = 0;
 
-  for (
-    const [dateStr, dateData] of Object.entries(
-      attendanceData.studentAttendanceData,
-    )
-  ) {
+  for (const [dateStr, dateData] of Object.entries(
+    attendanceData.studentAttendanceData,
+  )) {
     if (!dateData) continue;
     for (const [sessionKey, session] of Object.entries(dateData)) {
       const s = session as {
@@ -866,7 +872,8 @@ function countTrackedDL(
     const tNorm = resolveCodeNorm(t.course);
     const tNameNorm = normalize(tStr);
 
-    const isMatch = (targetIdStr && tStr === targetIdStr) ||
+    const isMatch =
+      (targetIdStr && tStr === targetIdStr) ||
       (targetCodeNorm && tNorm === targetCodeNorm) ||
       (targetNameNorm && tNameNorm === targetNameNorm);
 
@@ -934,7 +941,9 @@ function useCourseCardStats(
     Number(course.id),
     course.name,
     {
-      enabled: !initialCourseDetails && !isBatchLoading &&
+      enabled:
+        !initialCourseDetails &&
+        !isBatchLoading &&
         !!(course.code || course.id),
       staleTime: initialCourseDetails ? Infinity : 10 * 60 * 1000,
     },
@@ -954,23 +963,27 @@ function useCourseCardStats(
     (courseCodeNormalized
       ? courseTargets?.[courseCodeNormalized]
       : undefined) ??
-      (course.code ? courseTargets?.[course.code] : undefined) ??
-      (course.id ? courseTargets?.[String(course.id)] : undefined);
+    (course.code ? courseTargets?.[course.code] : undefined) ??
+    (course.id ? courseTargets?.[String(course.id)] : undefined);
   /* eslint-enable security/detect-object-injection */
-  const effectiveCourseTarget = typeof courseTargetOverride === "number"
-    ? courseTargetOverride
-    : targetPercentage;
+  const effectiveCourseTarget =
+    typeof courseTargetOverride === "number"
+      ? courseTargetOverride
+      : targetPercentage;
 
   const normalize = useCallback(
     (s: string | undefined) => s?.toLowerCase().replace(/[^a-z0-9]/g, "") || "",
     [],
   );
 
-  const courseIdentifiers = useMemo(() => ({
-    targetId: String(course.id),
-    targetName: normalize(course.name),
-    targetCode: normalize(course.code),
-  }), [course.id, course.name, course.code, normalize]);
+  const courseIdentifiers = useMemo(
+    () => ({
+      targetId: String(course.id),
+      targetName: normalize(course.name),
+      targetCode: normalize(course.code),
+    }),
+    [course.id, course.name, course.code, normalize],
+  );
 
   const { data: userSettings } = useFetchUserSettings();
   const semesterData = userSettings?.semester;
@@ -988,12 +1001,7 @@ function useCourseCardStats(
       trackingData,
       normalize,
     );
-  }, [
-    attendanceData,
-    course,
-    trackingData,
-    normalize,
-  ]);
+  }, [attendanceData, course, trackingData, normalize]);
 
   const stats = useMemo(() => {
     const computed = calculateCourseStats(
@@ -1019,8 +1027,8 @@ function useCourseCardStats(
   ]);
 
   const hasAttendanceData = !isSummaryLoading && stats.displayTotal > 0;
-  const isTrackingOnly = !isSummaryLoading && stats.realTotal === 0 &&
-    stats.displayTotal > 0;
+  const isTrackingOnly =
+    !isSummaryLoading && stats.realTotal === 0 && stats.displayTotal > 0;
   const isGain = stats.displayPercentage >= stats.officialPercentage;
 
   const statusColorClasses = useMemo(() => {
@@ -1113,9 +1121,8 @@ export function CourseCard({
   // Dialog state for disable/enable workflow
   const [showDisableDialog, setShowDisableDialog] = useState(false);
   const [showEnableDialog, setShowEnableDialog] = useState(false);
-  const [disableReason, setDisableReason] = useState<string>(
-    "Challenge passed",
-  );
+  const [disableReason, setDisableReason] =
+    useState<string>("Challenge passed");
   const [customReason, setCustomReason] = useState("");
   const [isDisabling, setIsDisabling] = useState(false);
   const [isEnabling, setIsEnabling] = useState(false);
@@ -1130,13 +1137,13 @@ export function CourseCard({
       .join(" ");
   }, []);
 
-  const courseName = useMemo(() => capitalize(course.name.toLowerCase()), [
-    course.name,
-    capitalize,
-  ]);
+  const courseName = useMemo(
+    () => capitalize(course.name.toLowerCase()),
+    [course.name, capitalize],
+  );
 
-  const isInactive = disabled ||
-    (!isSummaryLoading && stats.displayTotal === 0);
+  const isInactive =
+    disabled || (!isSummaryLoading && stats.displayTotal === 0);
 
   return (
     <Card
@@ -1146,9 +1153,9 @@ export function CourseCard({
         isInactive && "opacity-70",
         disabled && "opacity-50",
       )}
-      style={isInactive
-        ? { filter: "grayscale(100%) brightness(0.9)" }
-        : undefined}
+      style={
+        isInactive ? { filter: "grayscale(100%) brightness(0.9)" } : undefined
+      }
     >
       <CardHeader
         className={cn(
@@ -1277,8 +1284,9 @@ export function CourseCard({
         courseCode={course.code}
         hasSemesterContext={hasSemesterContext}
         enableCourse={enableCourse}
-        disableReasonText={(courseCode ? getDisableReason(courseCode) : null) ??
-          "N/A"}
+        disableReasonText={
+          (courseCode ? getDisableReason(courseCode) : null) ?? "N/A"
+        }
         isEnabling={isEnabling}
         setIsEnabling={setIsEnabling}
         enableInFlightRef={enableInFlightRef}
@@ -1377,7 +1385,9 @@ function DisableCourseDialog({
             </SelectTrigger>
             <SelectContent className="custom-dropdown">
               {DISABLE_REASONS.map((r) => (
-                <SelectItem key={r} value={r}>{r}</SelectItem>
+                <SelectItem key={r} value={r}>
+                  {r}
+                </SelectItem>
               ))}
             </SelectContent>
           </Select>
@@ -1397,24 +1407,25 @@ function DisableCourseDialog({
           </AlertDialogCancel>
           <AlertDialogAction
             className="custom-button bg-red-600! hover:bg-red-700! text-white! border-none!"
-            disabled={isDisabling || !hasSemesterContext ||
-              (isOtherReason && !customReason.trim())}
+            disabled={
+              isDisabling ||
+              !hasSemesterContext ||
+              (isOtherReason && !customReason.trim())
+            }
             aria-busy={isDisabling}
             onClick={handleConfirm}
           >
-            {isDisabling
-              ? (
-                <>
-                  <Loader2
-                    className="mr-2 h-4 w-4 animate-spin"
-                    aria-hidden="true"
-                  />
-                  Disabling...
-                </>
-              )
-              : (
-                "Disable"
-              )}
+            {isDisabling ? (
+              <>
+                <Loader2
+                  className="mr-2 h-4 w-4 animate-spin"
+                  aria-hidden="true"
+                />
+                Disabling...
+              </>
+            ) : (
+              "Disable"
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
@@ -1475,7 +1486,8 @@ function EnableCourseDialog({
             This course was disabled with reason:{" "}
             <span className="font-semibold text-foreground">
               &ldquo;{disableReasonText}&rdquo;
-            </span>. Enabling it will include it back in your total attendance
+            </span>
+            . Enabling it will include it back in your total attendance
             calculations.
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -1489,19 +1501,17 @@ function EnableCourseDialog({
             aria-busy={isEnabling}
             onClick={handleConfirm}
           >
-            {isEnabling
-              ? (
-                <>
-                  <Loader2
-                    className="mr-2 h-4 w-4 animate-spin"
-                    aria-hidden="true"
-                  />
-                  Enabling...
-                </>
-              )
-              : (
-                "Enable"
-              )}
+            {isEnabling ? (
+              <>
+                <Loader2
+                  className="mr-2 h-4 w-4 animate-spin"
+                  aria-hidden="true"
+                />
+                Enabling...
+              </>
+            ) : (
+              "Enable"
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

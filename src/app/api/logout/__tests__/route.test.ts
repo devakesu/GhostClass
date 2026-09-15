@@ -31,7 +31,7 @@ vi.mock("@/lib/security/csrf", () => ({
   removeCsrfToken: mockRemoveCsrfToken,
   getSessionIdFromCookie: vi.fn(() => Promise.resolve(null)),
   verifyCsrfTokenWithSessionBinding: vi.fn(() =>
-    Promise.resolve({ isValid: true })
+    Promise.resolve({ isValid: true }),
   ),
 }));
 
@@ -115,7 +115,7 @@ describe("POST /api/logout", () => {
       expect(res.headers.get("Retry-After")).toBeDefined();
       expect(res.headers.get("X-RateLimit-Limit")).toBeNull();
       expect(res.headers.get("X-RateLimit-Remaining")).toBeNull();
-      const body = await res.json() as { message: string };
+      const body = (await res.json()) as { message: string };
       expect(body.message).toMatch(/too many requests/i);
     });
 
@@ -147,7 +147,7 @@ describe("POST /api/logout", () => {
       const { POST } = await import("../route");
       const res = await POST(makePostReq(), { params: {} });
       expect(res.status).toBe(200);
-      const body = await res.json() as { ok: boolean };
+      const body = (await res.json()) as { ok: boolean };
       expect(body.ok).toBe(true);
     });
 

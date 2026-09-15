@@ -68,8 +68,9 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 vi.mock("@/lib/security/app-check", () => ({
   withSecurity: vi.fn(
-    (handler) => (req: any, context: any = { authType: "cron" }) =>
-      handler(req, context),
+    (handler) =>
+      (req: any, context: any = { authType: "cron" }) =>
+        handler(req, context),
   ),
 }));
 
@@ -109,14 +110,13 @@ vi.mock("@/lib/notifications/push", () => ({
   sendPushNotification: (...args: any[]) => mockSendPushNotification(...args),
 }));
 
-vi.mock(
-  "@/lib/email",
-  () => ({ sendEmail: vi.fn().mockResolvedValue(undefined) }),
-);
+vi.mock("@/lib/email", () => ({
+  sendEmail: vi.fn().mockResolvedValue(undefined),
+}));
 vi.mock("@/lib/email-templates", () => ({
-  renderAttendanceConflictEmail: vi.fn().mockResolvedValue(
-    "<html>conflict</html>",
-  ),
+  renderAttendanceConflictEmail: vi
+    .fn()
+    .mockResolvedValue("<html>conflict</html>"),
   renderCourseMismatchEmail: vi.fn().mockResolvedValue("<html>mismatch</html>"),
   renderRevisionClassEmail: vi.fn().mockResolvedValue("<html>revision</html>"),
 }));
@@ -126,7 +126,7 @@ vi.mock("@/lib/email-templates", () => ({
 // ---------------------------------------------------------------------------
 vi.mock("next/headers", () => ({
   headers: vi.fn(() =>
-    Promise.resolve(new Map([["x-forwarded-for", "127.0.0.1"]]))
+    Promise.resolve(new Map([["x-forwarded-for", "127.0.0.1"]])),
   ),
 }));
 
@@ -250,23 +250,25 @@ function ezygoSession(
 // Returns spies for the database operations so each test can assert on them.
 // The factory mimics the Supabase query builder's fluent interface.
 // ---------------------------------------------------------------------------
-function buildAdminMock(opts: {
-  trackerData?: Array<{
-    id: number;
-    course: string;
-    date: string;
-    session: string;
-    attendance: string;
-    status: string;
-    remarks?: string | null;
-  }>;
-  usersData?: any[];
-  courseMappings?: Array<{
-    ezygo_id: number;
-    course_name: string;
-    university_code: string;
-  }>;
-} = {}) {
+function buildAdminMock(
+  opts: {
+    trackerData?: Array<{
+      id: number;
+      course: string;
+      date: string;
+      session: string;
+      attendance: string;
+      status: string;
+      remarks?: string | null;
+    }>;
+    usersData?: any[];
+    courseMappings?: Array<{
+      ezygo_id: number;
+      course_name: string;
+      university_code: string;
+    }>;
+  } = {},
+) {
   const trackerData = opts.trackerData || [];
   const users = opts.usersData || [MOCK_USER_ROW];
   const mappingsData = opts.courseMappings ?? [];
@@ -498,6 +500,54 @@ describe("Cron sync — official absent, tracker correction → entry stays (no 
 
 // ---------------------------------------------------------------------------
 
+describe("Cron sync — official record matches manual entry → delete + alert", () => {
+  it("deletes the entry and sends a 'matches manual entry: absent' notification when both are absent", async () => {
+    const { deleteInSpy, notificationInsertSpy } = buildAdminMock({
+      trackerData: [
+        {
+          id: 108,
+          course: "1005",
+          date: "2025-10-24",
+          session: "III",
+          attendance: "111",
+          status: "extra",
+        },
+      ],
+      courseMappings: [
+        {
+          ezygo_id: 1005,
+          course_name: "INTRODUCTION TO CLOUD COMPUTING",
+          university_code: "1005",
+        },
+      ],
+    });
+
+    mockCoursesResponse();
+    mockRolesResponse();
+    mockAttendanceResponse({
+      "2025-10-24": { "3": ezygoSession(3, 111, 1005) },
+    });
+
+    const res = await GET(makeCronRequest("testuser"));
+    const body = await res.json();
+
+    expect(res.status).toBe(200);
+    expect(body.deletions).toBe(1);
+    expect(deleteInSpy).toHaveBeenCalledWith("id", [108]);
+
+    expect(notificationInsertSpy).toHaveBeenCalledOnce();
+    const [notifications] = notificationInsertSpy.mock.calls[0];
+    expect(notifications).toHaveLength(1);
+    expect(notifications[0].title).toBe("Attendance Updated 🥳");
+    expect(notifications[0].description).toBe(
+      "Official record for Introduction To Cloud Computing (1005) on 2025-10-24 (Session III) matches manual entry: absent.",
+    );
+    expect(notifications[0].topic).toContain("sync-surprise-20251024|III");
+  });
+});
+
+// ---------------------------------------------------------------------------
+
 describe("Cron sync — official absent, tracker extra (self-mark present) → conflict", () => {
   it("updates status to correction and inserts a conflict notification", async () => {
     const { deleteInSpy, updateTrackerSpy, notificationInsertSpy } =
@@ -544,10 +594,12 @@ describe("Cron sync — official absent, tracker extra (self-mark present) → c
     );
 
     // Verify email was sent
-    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      to: MOCK_USER_ROW.email,
-      subject: "Attendance Conflict 💀",
-    }));
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: MOCK_USER_ROW.email,
+        subject: "Attendance Conflict 💀",
+      }),
+    );
   });
 
   it("appends manual record remarks to notification description and forwards to email on conflict", async () => {
@@ -672,11 +724,13 @@ describe("Cron sync — course mismatch on an extra entry → delete + Course Mi
     expect(notifications[0].topic).toContain("conflict-course");
 
     // Verify email was sent with full name
-    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      to: MOCK_USER_ROW.email,
-      toName: "John Doe",
-      subject: "Course Mismatch 💀",
-    }));
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: MOCK_USER_ROW.email,
+        toName: "John Doe",
+        subject: "Course Mismatch 💀",
+      }),
+    );
 
     const { renderCourseMismatchEmail } = await import("@/lib/email-templates");
     expect(renderCourseMismatchEmail).toHaveBeenCalledWith(
@@ -693,28 +747,44 @@ describe("getUserDisplayName", () => {
   it("formats first and last name when both are present", async () => {
     const { getUserDisplayName } = await import("@/lib/utils");
     expect(
-      getUserDisplayName({ first_name: "John", last_name: "Doe", username: "johnd" }),
+      getUserDisplayName({
+        first_name: "John",
+        last_name: "Doe",
+        username: "johnd",
+      }),
     ).toBe("John Doe");
   });
 
   it("handles only first_name", async () => {
     const { getUserDisplayName } = await import("@/lib/utils");
     expect(
-      getUserDisplayName({ first_name: "John", last_name: null, username: "johnd" }),
+      getUserDisplayName({
+        first_name: "John",
+        last_name: null,
+        username: "johnd",
+      }),
     ).toBe("John");
   });
 
   it("falls back to username when names are missing", async () => {
     const { getUserDisplayName } = await import("@/lib/utils");
     expect(
-      getUserDisplayName({ first_name: null, last_name: null, username: "johnd" }),
+      getUserDisplayName({
+        first_name: null,
+        last_name: null,
+        username: "johnd",
+      }),
     ).toBe("johnd");
   });
 
   it("falls back to 'User' when names are missing and username is 'User'", async () => {
     const { getUserDisplayName } = await import("@/lib/utils");
     expect(
-      getUserDisplayName({ first_name: null, last_name: null, username: "User" }),
+      getUserDisplayName({
+        first_name: null,
+        last_name: null,
+        username: "User",
+      }),
     ).toBe("User");
   });
 });
@@ -797,7 +867,7 @@ describe("Cron sync — course mismatch on a correction entry → delete + alert
         "3": ezygoSession(
           3,
           110,
-          99999, /* different course, ignored for corrections */
+          99999 /* different course, ignored for corrections */,
         ),
       },
     });
@@ -912,10 +982,12 @@ describe("Cron sync — EzyGo Revision class, correction entry → deleted silen
     });
 
     await GET(makeCronRequest("testuser"));
-    expect(sendEmail).toHaveBeenCalledWith(expect.objectContaining({
-      to: MOCK_USER_ROW.email,
-      subject: "Revision Class Detected 📚",
-    }));
+    expect(sendEmail).toHaveBeenCalledWith(
+      expect.objectContaining({
+        to: MOCK_USER_ROW.email,
+        subject: "Revision Class Detected 📚",
+      }),
+    );
   });
 
   it("handles email failure gracefully", async () => {
@@ -1311,8 +1383,8 @@ describe("Cron sync — EzyGo courses API fails → user counted as error", () =
     buildAdminMock({ trackerData: [] });
 
     // Courses API returns 500 for the first call
-    mockFetch.mockImplementationOnce(async () =>
-      new Response("Server Error", { status: 500 })
+    mockFetch.mockImplementationOnce(
+      async () => new Response("Server Error", { status: 500 }),
     );
 
     const res = await GET(makeCronRequest("testuser"));

@@ -200,11 +200,13 @@ class CircuitBreaker {
       this.localHalfOpenInFlight = res;
       return res;
     } catch (e) {
-      logger.dev("Redis error in circuit breaker incr for half_open_in_flight", e);
+      logger.dev(
+        "Redis error in circuit breaker incr for half_open_in_flight",
+        e,
+      );
       return this.localHalfOpenInFlight;
     }
   }
-
 
   private async decrHalfOpenInFlight(): Promise<number> {
     this.localHalfOpenInFlight = Math.max(0, this.localHalfOpenInFlight - 1);
@@ -487,12 +489,13 @@ class CircuitBreaker {
       ),
     ]);
 
-    const timeUntilReset = state === "OPEN"
-      ? Math.max(
-        0,
-        Math.ceil((this.resetTimeout - (Date.now() - lastFailTime)) / 1000),
-      )
-      : 0;
+    const timeUntilReset =
+      state === "OPEN"
+        ? Math.max(
+            0,
+            Math.ceil((this.resetTimeout - (Date.now() - lastFailTime)) / 1000),
+          )
+        : 0;
     return {
       state,
       failures,

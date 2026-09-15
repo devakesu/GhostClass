@@ -2,12 +2,17 @@ import crypto from "node:crypto";
 import { headers as nextHeaders } from "next/headers";
 import { getAppCheck } from "@/lib/firebase/admin";
 import { logger } from "@/lib/logger";
-import { getSessionIdFromCookie, validateCsrfToken } from "@/lib/security/csrf";
+import {
+  extractStableSessionId,
+  getSessionIdFromCookie,
+  validateCsrfToken,
+} from "@/lib/security/csrf";
 import { NextRequest, NextResponse } from "next/server";
 import { getClientIp } from "@/lib/utils.server";
 import { redis } from "@/lib/redis";
 import * as Sentry from "@sentry/nextjs";
 import { Ratelimit } from "@upstash/ratelimit";
+import { createResilientLimiter } from "@/lib/ratelimit";
 
 // C-2: Module-level lazy singletons — avoids creating a new Ratelimit instance
 // (and its internal HTTP connection pool) on every inbound request.
@@ -18,11 +23,11 @@ function getWebProxyLimiter(): Ratelimit {
   if (!_webProxyLimiter) {
     const limit = parseInt(process.env.PROXY_RATE_LIMIT_REQUESTS || "300", 10);
     const window = parseInt(process.env.PROXY_RATE_LIMIT_WINDOW || "60", 10);
-    _webProxyLimiter = new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(limit, `${window} s`),
-      prefix: "@ghostclass/web-proxy",
-    });
+    _webProxyLimiter = createResilientLimiter(
+      "@ghostclass/web-proxy",
+      limit,
+      window,
+    );
   }
   return _webProxyLimiter;
 }
@@ -31,11 +36,11 @@ function getWebApiLimiter(): Ratelimit {
   if (!_webApiLimiter) {
     const limit = parseInt(process.env.WEB_RATE_LIMIT_REQUESTS || "60", 10);
     const window = parseInt(process.env.WEB_RATE_LIMIT_WINDOW || "60", 10);
-    _webApiLimiter = new Ratelimit({
-      redis,
-      limiter: Ratelimit.slidingWindow(limit, `${window} s`),
-      prefix: "@ghostclass/web-api",
-    });
+    _webApiLimiter = createResilientLimiter(
+      "@ghostclass/web-api",
+      limit,
+      window,
+    );
   }
   return _webApiLimiter;
 }
@@ -92,6 +97,21 @@ export interface AuthResult {
   isMobileRequest?: boolean;
 }
 
+function isSessionMatched(
+  boundSession: string,
+  currentSession: string,
+): boolean {
+  const normalizedBound =
+    typeof extractStableSessionId === "function"
+      ? extractStableSessionId(boundSession)
+      : boundSession;
+  const normalizedCurrent =
+    typeof extractStableSessionId === "function"
+      ? extractStableSessionId(currentSession)
+      : currentSession;
+  return normalizedBound === normalizedCurrent;
+}
+
 async function verifyCsrfTokenWithSessionBinding(
   headerList: Headers,
   sessionId?: string | null,
@@ -106,14 +126,42 @@ async function verifyCsrfTokenWithSessionBinding(
 
   if (sessionId) {
     try {
-      const boundSession = await redis.get(`csrf:token:${csrfToken}:session`);
-      if (!boundSession || boundSession !== sessionId) {
+      let timeoutId: NodeJS.Timeout | undefined;
+      const timeoutPromise = new Promise<null>((_, reject) => {
+        timeoutId = setTimeout(
+          () => reject(new Error("Redis session binding lookup timed out")),
+          1500,
+        );
+      });
+
+      const redisPromise = (async () => {
+        try {
+          return await redis.get<string>(`csrf:token:${csrfToken}:session`);
+        } finally {
+          clearTimeout(timeoutId);
+        }
+      })();
+
+      const boundSession = await Promise.race([redisPromise, timeoutPromise]);
+      if (!boundSession) {
+        // Token was created pre-authentication or key expired in Redis.
+        // The cryptographic synchronizer token has already been validated against the httpOnly cookie.
+        // Lazily bind the valid token to the current session in Redis.
+        await redis
+          .set(`csrf:token:${csrfToken}:session`, sessionId, { ex: 86400 })
+          .catch(() => {});
+      } else if (!isSessionMatched(boundSession, sessionId)) {
         logger.warn("CSRF token session binding mismatch");
         return { isValid: false, error: "CSRF token session mismatch" };
       }
     } catch (error) {
-      logger.warn("CSRF session binding check unavailable", error);
-      return { isValid: false, error: "CSRF session binding unavailable" };
+      logger.warn(
+        "CSRF session binding check unavailable; falling back to valid cookie token",
+        error,
+      );
+      // Cryptographic synchronizer token has already been validated against the httpOnly
+      // cookie above. Allow request through to prevent Redis outages from halting web clients.
+      return { isValid: true };
     }
   }
   return { isValid: true };
@@ -213,9 +261,7 @@ async function verifyAppCheckAuth(
   };
 }
 
-async function verifyCsrfAuth(
-  headerList: Headers,
-): Promise<AuthResult> {
+async function verifyCsrfAuth(headerList: Headers): Promise<AuthResult> {
   const sessionId = await getSessionIdFromCookie();
   const res = await verifyCsrfTokenWithSessionBinding(headerList, sessionId);
   if (!res.isValid) {
@@ -257,8 +303,10 @@ async function verifyAuthentication(
   }
 
   if (
-    process.env.NODE_ENV !== "production" && process.env.VITEST === "true" &&
-    !hasAppCheckToken && !csrfToken
+    process.env.NODE_ENV !== "production" &&
+    process.env.VITEST === "true" &&
+    !hasAppCheckToken &&
+    !csrfToken
   ) {
     return { isValid: true, authType: "none" };
   }
@@ -275,8 +323,8 @@ async function verifyAuthentication(
   const method = req.method.toUpperCase();
   const isStateChanging = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
   if (isStateChanging && !hasAppCheckToken) {
-    const isVitestBypass = process.env.NODE_ENV !== "production" &&
-      process.env.VITEST === "true";
+    const isVitestBypass =
+      process.env.NODE_ENV !== "production" && process.env.VITEST === "true";
     if (!isVitestBypass) {
       return {
         isValid: false,
@@ -356,9 +404,8 @@ export function withSecurity<T = unknown>(
     },
   ) => {
     const rawParams = context?.params;
-    const resolvedParams = rawParams instanceof Promise
-      ? await rawParams
-      : (rawParams ?? {});
+    const resolvedParams =
+      rawParams instanceof Promise ? await rawParams : (rawParams ?? {});
 
     let clientIp: string | null = null;
     try {
@@ -368,22 +415,28 @@ export function withSecurity<T = unknown>(
     }
 
     if (!(await handleRateLimit(req, clientIp))) {
-      return NextResponse.json({ error: "Rate limit exceeded" }, {
-        status: 429,
-        headers: { "Retry-After": "60" },
-      });
+      return NextResponse.json(
+        { error: "Rate limit exceeded" },
+        {
+          status: 429,
+          headers: { "Retry-After": "60" },
+        },
+      );
     }
 
     const authRes = await verifyAuthentication(req, options);
     if (!authRes.isValid) {
-      return NextResponse.json({
-        error: authRes.error || "Unauthenticated",
-        message: authRes.error || "Unauthenticated",
-        reason: authRes.reason || SECURITY_ERRORS.DEFAULT.reason,
-        action: authRes.action || SECURITY_ERRORS.DEFAULT.action,
-        criticalRisk: authRes.criticalRisk ?? false,
-        type: "security",
-      }, { status: authRes.authType === "csrf" ? 403 : 401 });
+      return NextResponse.json(
+        {
+          error: authRes.error || "Unauthenticated",
+          message: authRes.error || "Unauthenticated",
+          reason: authRes.reason || SECURITY_ERRORS.DEFAULT.reason,
+          action: authRes.action || SECURITY_ERRORS.DEFAULT.action,
+          criticalRisk: authRes.criticalRisk ?? false,
+          type: "security",
+        },
+        { status: authRes.authType === "csrf" ? 403 : 401 },
+      );
     }
 
     const response = await handler(req, {
@@ -395,9 +448,12 @@ export function withSecurity<T = unknown>(
     });
     if (!response) {
       Sentry.captureException(new Error("Handler no response"));
-      return NextResponse.json({ error: "Internal security error" }, {
-        status: 500,
-      });
+      return NextResponse.json(
+        { error: "Internal security error" },
+        {
+          status: 500,
+        },
+      );
     }
 
     return response;

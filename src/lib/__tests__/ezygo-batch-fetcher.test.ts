@@ -78,10 +78,11 @@ describe("ezygo-batch-fetcher", () => {
 
   it("respects MAX_CONCURRENT limit and queues requests", async () => {
     const resolvers: any[] = [];
-    (egressFetch as any).mockImplementation(() =>
-      new Promise((resolve) => {
-        resolvers.push(resolve);
-      })
+    (egressFetch as any).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
     );
 
     // Start 3 requests (MAX_CONCURRENT)
@@ -220,8 +221,14 @@ describe("ezygo-batch-fetcher", () => {
       });
     });
 
-    const sem1 = await fetchEzygoData("/user/setting/default_semester", "token");
-    const sem2 = await fetchEzygoData("/user/setting/default_semester", "token");
+    const sem1 = await fetchEzygoData(
+      "/user/setting/default_semester",
+      "token",
+    );
+    const sem2 = await fetchEzygoData(
+      "/user/setting/default_semester",
+      "token",
+    );
 
     expect(sem1).toBe("even");
     expect(sem2).toBe("even");
@@ -368,10 +375,11 @@ describe("ezygo-batch-fetcher", () => {
     // This is hard to test directly because releaseSlot is internal
     // but we can trigger it via resetRateLimiterState
     const resolvers: any[] = [];
-    (egressFetch as any).mockImplementation(() =>
-      new Promise((resolve) => {
-        resolvers.push(resolve);
-      })
+    (egressFetch as any).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          resolvers.push(resolve);
+        }),
     );
 
     const p1 = fetchEzygoData("/1", "token");

@@ -23,9 +23,10 @@ import { egressFetch } from "./utils.server";
  * Falls back to AbortController + setTimeout for environments where AbortSignal.timeout() is unavailable.
  * Returns an object with the signal and a cleanup function.
  */
-function createTimeoutSignal(
-  timeoutMs: number,
-): { signal: AbortSignal; cleanup: () => void } {
+function createTimeoutSignal(timeoutMs: number): {
+  signal: AbortSignal;
+  cleanup: () => void;
+} {
   // Use native AbortSignal.timeout() if available
   if (
     typeof AbortSignal !== "undefined" &&
@@ -322,7 +323,8 @@ export function fetchEzygoData<T>(
       // Queue errors (full/timeout) are transient - evict from cache to allow immediate retry
       // when queue has capacity again
       if (
-        error instanceof QueueFullError || error instanceof QueueTimeoutError
+        error instanceof QueueFullError ||
+        error instanceof QueueTimeoutError
       ) {
         requestCache.delete(cacheKey);
       }
@@ -345,7 +347,7 @@ export function fetchEzygoData<T>(
 
       const result = await ezygoCircuitBreaker.execute(async () => {
         const fetchHeaders: Record<string, string> = {
-          "Authorization": `Bearer ${token}`,
+          Authorization: `Bearer ${token}`,
           ...(extraHeaders ?? {}),
         };
 
@@ -372,13 +374,13 @@ export function fetchEzygoData<T>(
           const response = await egressFetch(endpoint, fetchOptions);
 
           if (!response.ok) {
-            const errorMsg =
-              `EzyGo API error: ${response.status} ${response.statusText}`;
+            const errorMsg = `EzyGo API error: ${response.status} ${response.statusText}`;
             // All 4xx errors (client errors) except 429 shouldn't trip the circuit breaker
             // They indicate invalid request/token/permissions/resource, not API failure
             // Note: 429 (rate limit) is intentionally excluded as it indicates service degradation
             if (
-              response.status >= 400 && response.status < 500 &&
+              response.status >= 400 &&
+              response.status < 500 &&
               response.status !== 429
             ) {
               throw new NonBreakerError(errorMsg);
@@ -441,14 +443,18 @@ export async function fetchDashboardData(token: string) {
         return null;
       },
     ),
-    fetchEzygoData("/attendancereports/student/detailed", token, "POST", {})
-      .catch((error) => {
-        logger.error("[EzyGo] Failed to fetch attendance", {
-          context: "ezygo-batch-fetcher",
-          error: error instanceof Error ? error.message : String(error),
-        });
-        return null;
-      }),
+    fetchEzygoData(
+      "/attendancereports/student/detailed",
+      token,
+      "POST",
+      {},
+    ).catch((error) => {
+      logger.error("[EzyGo] Failed to fetch attendance", {
+        context: "ezygo-batch-fetcher",
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
+    }),
   ]);
 
   return { courses, attendance };

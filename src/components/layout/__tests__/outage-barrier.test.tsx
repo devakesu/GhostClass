@@ -29,26 +29,29 @@ describe("OutageBarrier", () => {
   });
 
   it("renders nothing when there is no outage", () => {
-    vi.mocked(useOutage).mockReturnValue(
-      { hasOutage: false, resetOutage: vi.fn() } as any,
-    );
+    vi.mocked(useOutage).mockReturnValue({
+      hasOutage: false,
+      resetOutage: vi.fn(),
+    } as any);
     render(<OutageBarrier />);
     expect(screen.queryByTestId("service-error-view")).toBeNull();
   });
 
   it("renders ServiceErrorView when an outage is detected", () => {
-    vi.mocked(useOutage).mockReturnValue(
-      { hasOutage: true, resetOutage: vi.fn() } as any,
-    );
+    vi.mocked(useOutage).mockReturnValue({
+      hasOutage: true,
+      resetOutage: vi.fn(),
+    } as any);
     render(<OutageBarrier />);
     expect(screen.getByTestId("service-error-view")).toBeDefined();
   });
 
   it("calls resetOutage when retry is clicked", () => {
     const resetOutage = vi.fn();
-    vi.mocked(useOutage).mockReturnValue(
-      { hasOutage: true, resetOutage } as any,
-    );
+    vi.mocked(useOutage).mockReturnValue({
+      hasOutage: true,
+      resetOutage,
+    } as any);
     render(<OutageBarrier />);
 
     fireEvent.click(screen.getByText("Retry"));

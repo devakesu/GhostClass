@@ -7,6 +7,12 @@ import { redact } from "@/lib/utils.server";
  * Distributed lock for institutional login synchronization.
  * Prevents race conditions when multiple devices attempt to log in with the
  * same institutional ID simultaneously.
+ *
+ * NOTE ON PRODUCTION SAFETY:
+ * Lock acquisition deliberately fails closed (throws on Redis failure) so the
+ * caller (/api/auth/save-token) returns 503 Service Unavailable. This guarantees
+ * that two concurrent requests for the same institutional user across instances
+ * cannot race on credential provisioning or Supabase user upserts.
  */
 
 /**

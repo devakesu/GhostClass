@@ -89,8 +89,7 @@ export function CourseTargetDialog({
     delete newTargets[courseCode];
     updateCourseTargets(newTargets);
     toast.info("Course Target Reset", {
-      description:
-        `${courseCode} will now use default target (${targetPercentage}%).`,
+      description: `${courseCode} will now use default target (${targetPercentage}%).`,
     });
   };
 
@@ -153,100 +152,95 @@ export function CourseTargetDialog({
               </span>
             </div>
 
-            {uniqueCourses.length === 0
-              ? (
-                <div className="text-center py-6 text-xs text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border/60">
-                  No courses available yet.
-                </div>
-              )
-              : (
-                <div className="space-y-2.5">
-                  {uniqueCourses.map((c) => {
-                    const customTarget = courseTargets?.[c.code];
-                    const hasCustom = typeof customTarget === "number";
-                    const effectiveTarget = hasCustom
-                      ? customTarget
-                      : targetPercentage;
+            {uniqueCourses.length === 0 ? (
+              <div className="text-center py-6 text-xs text-muted-foreground bg-muted/20 rounded-xl border border-dashed border-border/60">
+                No courses available yet.
+              </div>
+            ) : (
+              <div className="space-y-2.5">
+                {uniqueCourses.map((c) => {
+                  const customTarget = courseTargets?.[c.code];
+                  const hasCustom = typeof customTarget === "number";
+                  const effectiveTarget = hasCustom
+                    ? customTarget
+                    : targetPercentage;
 
-                    return (
-                      <div
-                        key={c.code}
-                        className="flex items-center justify-between p-3 rounded-xl border border-border/40 bg-card/30 hover:bg-card/60 transition-colors gap-3"
-                      >
-                        <div className="flex items-center gap-2.5 min-w-0 flex-1">
-                          <div className="p-1.5 rounded-lg bg-muted/60 text-muted-foreground shrink-0">
-                            <BookOpen className="h-4 w-4" />
-                          </div>
-                          <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-1.5">
-                              <span className="text-xs font-bold truncate">
-                                {c.code}
-                              </span>
-                              {hasCustom
-                                ? (
-                                  <Badge
-                                    variant="secondary"
-                                    className="text-[9px] px-1.5 py-0 bg-primary/10 text-primary border-primary/20"
-                                  >
-                                    Custom
-                                  </Badge>
-                                )
-                                : (
-                                  <Badge
-                                    variant="outline"
-                                    className="text-[9px] px-1.5 py-0 text-muted-foreground opacity-70"
-                                  >
-                                    Default
-                                  </Badge>
-                                )}
-                            </div>
-                            {c.name && c.name !== c.code && (
-                              <p className="text-[10px] text-muted-foreground truncate">
-                                {c.name}
-                              </p>
+                  return (
+                    <div
+                      key={c.code}
+                      className="flex items-center justify-between p-3 rounded-xl border border-border/40 bg-card/30 hover:bg-card/60 transition-colors gap-3"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                        <div className="p-1.5 rounded-lg bg-muted/60 text-muted-foreground shrink-0">
+                          <BookOpen className="h-4 w-4" />
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-xs font-bold truncate">
+                              {c.code}
+                            </span>
+                            {hasCustom ? (
+                              <Badge
+                                variant="secondary"
+                                className="text-[9px] px-1.5 py-0 bg-primary/10 text-primary border-primary/20"
+                              >
+                                Custom
+                              </Badge>
+                            ) : (
+                              <Badge
+                                variant="outline"
+                                className="text-[9px] px-1.5 py-0 text-muted-foreground opacity-70"
+                              >
+                                Default
+                              </Badge>
                             )}
                           </div>
-                        </div>
-
-                        <div className="flex items-center gap-1.5 shrink-0">
-                          {hasCustom && (
-                            <Button
-                              variant="ghost"
-                              size="icon"
-                              className="h-7 w-7 text-muted-foreground hover:text-foreground"
-                              onClick={() => handleResetCourseTarget(c.code)}
-                              title="Reset to default target"
-                            >
-                              <RotateCcw className="h-3.5 w-3.5" />
-                            </Button>
+                          {c.name && c.name !== c.code && (
+                            <p className="text-[10px] text-muted-foreground truncate">
+                              {c.name}
+                            </p>
                           )}
-                          <Select
-                            value={String(effectiveTarget)}
-                            onValueChange={(val) =>
-                              handleCourseTargetChange(c.code, val)}
-                          >
-                            <SelectTrigger
-                              id={`course-target-select-${c.code}`}
-                              className="w-20 h-8 text-xs font-semibold bg-background border-border/50"
-                            >
-                              <SelectValue
-                                placeholder={`${effectiveTarget}%`}
-                              />
-                            </SelectTrigger>
-                            <SelectContent className="z-70">
-                              {TARGET_OPTIONS.map((val) => (
-                                <SelectItem key={val} value={String(val)}>
-                                  {val}%
-                                </SelectItem>
-                              ))}
-                            </SelectContent>
-                          </Select>
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              )}
+
+                      <div className="flex items-center gap-1.5 shrink-0">
+                        {hasCustom && (
+                          <Button
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground hover:text-foreground"
+                            onClick={() => handleResetCourseTarget(c.code)}
+                            title="Reset to default target"
+                          >
+                            <RotateCcw className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
+                        <Select
+                          value={String(effectiveTarget)}
+                          onValueChange={(val) =>
+                            handleCourseTargetChange(c.code, val)
+                          }
+                        >
+                          <SelectTrigger
+                            id={`course-target-select-${c.code}`}
+                            className="w-20 h-8 text-xs font-semibold bg-background border-border/50"
+                          >
+                            <SelectValue placeholder={`${effectiveTarget}%`} />
+                          </SelectTrigger>
+                          <SelectContent className="z-70">
+                            {TARGET_OPTIONS.map((val) => (
+                              <SelectItem key={val} value={String(val)}>
+                                {val}%
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
           </div>
         </div>
       </DialogContent>
