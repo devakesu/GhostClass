@@ -18,7 +18,7 @@ import { getClientIp, isUpstreamAuthNetworkError } from "@/lib/utils.server";
 import { profileRateLimiter } from "@/lib/ratelimit";
 import { z } from "zod";
 import { withSecurity } from "@/lib/security/app-check";
-import { performProfileSync } from "@/lib/user/sync";
+import { performProfileSync, type SyncResult } from "@/lib/user/sync";
 import { getProfileBundle } from "@/lib/user/profile-bundle";
 import { invalidateEzygoCacheForUser } from "@/lib/ezygo-batch-fetcher";
 import {
@@ -140,7 +140,10 @@ async function authenticateUser(
   return { user: authUser, isUpstreamError: false };
 }
 
-async function ingestNewProfile(user: { id: string }): Promise<NextResponse> {
+async function ingestNewProfile(
+  user: { id: string },
+  preFetchedSettings?: unknown,
+): Promise<NextResponse> {
   const token = await getAuthTokenWithFallback(user.id);
   if (!token) {
     return NextResponse.json(
@@ -154,7 +157,12 @@ async function ingestNewProfile(user: { id: string }): Promise<NextResponse> {
 
   try {
     const syncResult = await performProfileSync(token, "", user.id, true);
-    const bundle = await getProfileBundle(user.id, syncResult?.academic);
+    const bundle = await getProfileBundle(
+      user.id,
+      syncResult?.academic,
+      undefined,
+      preFetchedSettings,
+    );
     if (!bundle) {
       return NextResponse.json(
         { error: "Profile not found after ingestion" },
@@ -225,12 +233,7 @@ async function performSyncAndFetchUser(
   supabaseAdmin: ReturnType<typeof getAdminClient>,
 ): Promise<{
   updatedUser: ExistingUserRawType;
-  syncResult: {
-    academic?: {
-      current_semester?: string | null;
-      current_year?: string | null;
-    };
-  } | null;
+  syncResult: SyncResult | null;
 }> {
   try {
     const fullSync = !isDebounced;
@@ -254,6 +257,7 @@ async function performSyncAndFetchUser(
       .select("*, class:classes(id, name, sem, year)")
       .eq("auth_id", userId)
       .single();
+
     return {
       updatedUser: updatedUser ?? existingUser,
       syncResult,
@@ -270,15 +274,11 @@ async function loadExistingUserBundle(
   shouldSync: boolean,
   isDebounced: boolean,
   supabaseAdmin: ReturnType<typeof getAdminClient>,
+  preFetchedSettings?: unknown,
 ): Promise<NextResponse> {
   let existingUser = existingUserRaw;
   let resolvedToken: string | null = null;
-  let syncResult: {
-    academic?: {
-      current_semester?: string | null;
-      current_year?: string | null;
-    };
-  } | null = null;
+  let syncResult: SyncResult | null = null;
   if (shouldSync) {
     resolvedToken = await resolveAuthToken(existingUserRaw);
     if (resolvedToken) {
@@ -331,6 +331,7 @@ async function loadExistingUserBundle(
     userId,
     syncResult?.academic,
     existingUser,
+    preFetchedSettings,
   );
   if (!bundle) {
     return NextResponse.json({ error: "Profile not found" }, { status: 404 });
@@ -340,6 +341,13 @@ async function loadExistingUserBundle(
 }
 
 const getHandler = async (req: NextRequest) => {
+  // Enforce same-origin checks for browser/cookie flows; skip for bearer flows.
+  const authHeader = req.headers.get("authorization");
+  if (!authHeader?.startsWith("Bearer ")) {
+    const originErr = validateRequestOrigin(req);
+    if (originErr) return originErr;
+  }
+
   const ip = getClientIp(req.headers);
   if (!ip) {
     return NextResponse.json(
@@ -368,13 +376,6 @@ const getHandler = async (req: NextRequest) => {
     );
   }
 
-  // Enforce same-origin checks for browser/cookie flows; skip for bearer flows.
-  const authHeader = req.headers.get("authorization");
-  if (!authHeader?.startsWith("Bearer ")) {
-    const originErr = validateRequestOrigin(req);
-    if (originErr) return originErr;
-  }
-
   const supabaseAdmin = getAdminClient();
   const { user, isUpstreamError } = await authenticateUser(req, supabaseAdmin);
   if (!user) {
@@ -396,11 +397,22 @@ const getHandler = async (req: NextRequest) => {
     );
   }
 
-  const { data: existingUserRaw } = await supabaseAdmin
-    .from("users")
-    .select("*, class:classes(id, name, sem, year)")
-    .eq("auth_id", user.id)
-    .maybeSingle();
+  const [userRes, settingsRes] = await Promise.all([
+    supabaseAdmin
+      .from("users")
+      .select("*, class:classes(id, name, sem, year)")
+      .eq("auth_id", user.id)
+      .maybeSingle(),
+    supabaseAdmin
+      .from("user_settings")
+      .select("*")
+      .eq("user_id", user.id)
+      .maybeSingle(),
+  ]);
+
+  const existingUserRaw = userRes.data;
+  const preFetchedSettings = settingsRes.data;
+
   const searchParams = req.nextUrl.searchParams;
   const shouldSync = searchParams.get("sync") === "true";
   const force = searchParams.get("force") === "true";
@@ -419,10 +431,11 @@ const getHandler = async (req: NextRequest) => {
       shouldSync,
       isDebounced,
       supabaseAdmin,
+      preFetchedSettings,
     );
   }
 
-  return ingestNewProfile(user);
+  return ingestNewProfile(user, preFetchedSettings);
 };
 
 const patchSchema = z.object({

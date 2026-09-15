@@ -651,14 +651,14 @@ async function populateCourseCatalogAndMigrateTrackers(
     }));
 
   if (mappings.length > 0) {
-    await supabaseAdmin
-      .from("course_mappings")
-      .upsert(mappings, { onConflict: "ezygo_id" });
+    const [, trackersRes] = await Promise.all([
+      supabaseAdmin
+        .from("course_mappings")
+        .upsert(mappings, { onConflict: "ezygo_id" }),
+      supabaseAdmin.from("tracker").select("course").eq("auth_user_id", authId),
+    ]);
 
-    const { data: currentTrackers } = await supabaseAdmin
-      .from("tracker")
-      .select("course")
-      .eq("auth_user_id", authId);
+    const currentTrackers = trackersRes.data;
 
     const coursesWithTrackers = new Set(
       currentTrackers?.map((t) => String(t.course)) || [],
@@ -687,15 +687,16 @@ async function detectClassAndPopulateCatalog(
   currentAcademic: { current_semester: string; current_year: string },
   existingUserClassId: string | null | undefined,
 ) {
-  const { classId, classInfo, detectedSem, detectedYear } =
-    await detectAndSyncClass(
+  const [detection] = await Promise.all([
+    detectAndSyncClass(
       coursesList,
       rolesData,
       currentAcademic,
       existingUserClassId,
-    );
-  await populateCourseCatalogAndMigrateTrackers(coursesList, authId);
-  return { classId, classInfo, detectedSem, detectedYear };
+    ),
+    populateCourseCatalogAndMigrateTrackers(coursesList, authId),
+  ]);
+  return detection;
 }
 
 interface ExistingUserData {
