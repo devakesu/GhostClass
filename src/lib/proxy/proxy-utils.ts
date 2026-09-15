@@ -139,15 +139,15 @@ export function resolveSafeUpstreamErrorMessage(
   body: string,
   status: number,
 ): string {
-  const fallback = status >= 500
-    ? "Upstream service error"
-    : "Unable to process request";
+  const fallback =
+    status >= 500 ? "Upstream service error" : "Unable to process request";
 
   if (!body) return fallback;
 
   const trimmed = body.trim();
   if (
-    trimmed.startsWith("<") || trimmed.toLowerCase().includes("<!doctype") ||
+    trimmed.startsWith("<") ||
+    trimmed.toLowerCase().includes("<!doctype") ||
     trimmed.toLowerCase().includes("<html")
   ) {
     return fallback;
@@ -158,13 +158,18 @@ export function resolveSafeUpstreamErrorMessage(
       message?: string;
       error?: string;
     };
-    const rawMsg = (parsed.message?.trim() || parsed.error?.trim() || "")
-      .trim();
+    const rawMsg = (
+      parsed.message?.trim() ||
+      parsed.error?.trim() ||
+      ""
+    ).trim();
     if (rawMsg) {
       const lower = rawMsg.toLowerCase();
       if (
-        lower.includes("/home/") || lower.includes("postgres") ||
-        lower.includes("pgsql") || lower.includes("at ") ||
+        lower.includes("/home/") ||
+        lower.includes("postgres") ||
+        lower.includes("pgsql") ||
+        lower.includes("at ") ||
         lower.includes("node_modules")
       ) {
         return fallback;
@@ -178,9 +183,12 @@ export function resolveSafeUpstreamErrorMessage(
   const sanitized = body.replace(/[\r\n\t]+/g, " ").trim();
   const lowerSanitized = sanitized.toLowerCase();
   if (
-    !sanitized || lowerSanitized.includes("/home/") ||
-    lowerSanitized.includes("postgres") || lowerSanitized.includes("pgsql") ||
-    lowerSanitized.includes("at ") || lowerSanitized.includes("node_modules")
+    !sanitized ||
+    lowerSanitized.includes("/home/") ||
+    lowerSanitized.includes("postgres") ||
+    lowerSanitized.includes("pgsql") ||
+    lowerSanitized.includes("at ") ||
+    lowerSanitized.includes("node_modules")
   ) {
     return fallback;
   }

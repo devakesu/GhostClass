@@ -112,9 +112,13 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
   DropdownMenuContent: ({ children }: { children?: React.ReactNode }) => (
     <div data-testid="menu-content">{children}</div>
   ),
-  DropdownMenuItem: (
-    { children, onClick }: { children?: React.ReactNode; onClick?: () => void },
-  ) => <button onClick={onClick}>{children}</button>,
+  DropdownMenuItem: ({
+    children,
+    onClick,
+  }: {
+    children?: React.ReactNode;
+    onClick?: () => void;
+  }) => <button onClick={onClick}>{children}</button>,
   DropdownMenuLabel: ({ children }: { children?: React.ReactNode }) => (
     <div>{children}</div>
   ),
@@ -122,12 +126,13 @@ vi.mock("@/components/ui/dropdown-menu", () => ({
 }));
 
 vi.mock("@/components/ui/select", () => ({
-  Select: (
-    { children, onValueChange }: {
-      children?: React.ReactNode;
-      onValueChange?: (v: string) => void;
-    },
-  ) => (
+  Select: ({
+    children,
+    onValueChange,
+  }: {
+    children?: React.ReactNode;
+    onValueChange?: (v: string) => void;
+  }) => (
     <div
       data-testid="select-root"
       onClick={() => onValueChange && onValueChange("80")}
@@ -150,12 +155,13 @@ vi.mock("@/components/ui/select", () => ({
 }));
 
 vi.mock("@/components/ui/switch", () => ({
-  Switch: (
-    { checked, onCheckedChange }: {
-      checked?: boolean;
-      onCheckedChange: (v: boolean) => void;
-    },
-  ) => (
+  Switch: ({
+    checked,
+    onCheckedChange,
+  }: {
+    checked?: boolean;
+    onCheckedChange: (v: boolean) => void;
+  }) => (
     <input
       type="checkbox"
       checked={checked}

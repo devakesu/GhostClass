@@ -18,9 +18,11 @@ interface UseFetchCourseInstructorsOptions {
   enabled?: boolean;
 }
 
-export function useFetchCourseInstructors(
-  { semester, year, enabled = true }: UseFetchCourseInstructorsOptions = {},
-) {
+export function useFetchCourseInstructors({
+  semester,
+  year,
+  enabled = true,
+}: UseFetchCourseInstructorsOptions = {}) {
   const { data: profile } = useProfile();
   const classId = profile?.class?.id;
 

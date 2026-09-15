@@ -25,10 +25,12 @@ describe("instrumentation-client coverage", () => {
     vi.stubEnv("NODE_ENV", "development");
     await import("../instrumentation-client");
 
-    expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
-      tracesSampleRate: 1,
-      replaysSessionSampleRate: 0.1,
-    }));
+    expect(mockInit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tracesSampleRate: 1,
+        replaysSessionSampleRate: 0.1,
+      }),
+    );
   });
 
   it("initializes Sentry in production with env replay rate", async () => {
@@ -36,11 +38,13 @@ describe("instrumentation-client coverage", () => {
     vi.stubEnv("NEXT_PUBLIC_SENTRY_REPLAY_RATE", "0.5");
     await import("../instrumentation-client");
 
-    expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
-      tracesSampleRate: 0.1,
-      replaysSessionSampleRate: 0.5,
-      integrations: expect.arrayContaining([{ name: "replay" }]),
-    }));
+    expect(mockInit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        tracesSampleRate: 0.1,
+        replaysSessionSampleRate: 0.5,
+        integrations: expect.arrayContaining([{ name: "replay" }]),
+      }),
+    );
   });
 
   it("initializes Sentry in production with zero replay rate", async () => {
@@ -48,10 +52,12 @@ describe("instrumentation-client coverage", () => {
     vi.stubEnv("NEXT_PUBLIC_SENTRY_REPLAY_RATE", "0");
     await import("../instrumentation-client");
 
-    expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
-      replaysSessionSampleRate: 0,
-      integrations: [],
-    }));
+    expect(mockInit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        replaysSessionSampleRate: 0,
+        integrations: [],
+      }),
+    );
   });
 
   it("initializes Sentry in production with missing replay rate (defaults to 0)", async () => {
@@ -59,15 +65,16 @@ describe("instrumentation-client coverage", () => {
     vi.stubEnv("NEXT_PUBLIC_SENTRY_REPLAY_RATE", undefined as any);
     await import("../instrumentation-client");
 
-    expect(mockInit).toHaveBeenCalledWith(expect.objectContaining({
-      replaysSessionSampleRate: 0,
-    }));
+    expect(mockInit).toHaveBeenCalledWith(
+      expect.objectContaining({
+        replaysSessionSampleRate: 0,
+      }),
+    );
   });
 
   it("covers onRouterTransitionStart", async () => {
-    const { onRouterTransitionStart } = await import(
-      "../instrumentation-client"
-    );
+    const { onRouterTransitionStart } =
+      await import("../instrumentation-client");
     onRouterTransitionStart("/test", "push");
     expect(mockCaptureRouterTransitionStart).toHaveBeenCalledWith(
       "/test",

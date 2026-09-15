@@ -9,9 +9,13 @@ import { getProfileBundle } from "@/lib/user/profile-bundle";
  * once fetchDashboardData resolves. This converts a blocking ~770 ms TTFB into
  * perceived-instant page load with a streaming fallback spinner.
  */
-export async function DashboardDataLoader(
-  { token, userId }: { token: string; userId: string },
-) {
+export async function DashboardDataLoader({
+  token,
+  userId,
+}: {
+  token: string;
+  userId: string;
+}) {
   let initialData = null;
   let initialProfile = null;
   try {

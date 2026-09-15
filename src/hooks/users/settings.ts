@@ -53,14 +53,16 @@ async function fetchSettingWithFallback<T extends string>(
     if (result != null) return result;
   } catch (error: unknown) {
     if (isAxiosError(error) && error.response?.status === 404) {
-      const cachedProfile = queryClient.getQueryData<UserProfile>(["profile"]) ||
+      const cachedProfile =
+        queryClient.getQueryData<UserProfile>(["profile"]) ||
         queryClient.getQueryData<UserProfile>(["profile", "synced"]);
       return extractAcademicField<T>(cachedProfile, field);
     }
     throw error;
   }
 
-  const cachedProfile = queryClient.getQueryData<UserProfile>(["profile"]) ||
+  const cachedProfile =
+    queryClient.getQueryData<UserProfile>(["profile"]) ||
     queryClient.getQueryData<UserProfile>(["profile", "synced"]);
   return extractAcademicField<T>(cachedProfile, field);
 }
@@ -70,7 +72,12 @@ export function extractSemesterValue(raw: unknown): "even" | "odd" | null {
   let val: unknown = raw;
   if (typeof val === "object" && val !== null) {
     const obj = val as Record<string, unknown>;
-    val = obj.default_semester ?? obj.current_semester ?? obj.semester ?? obj.data ?? obj.value;
+    val =
+      obj.default_semester ??
+      obj.current_semester ??
+      obj.semester ??
+      obj.data ??
+      obj.value;
     if (typeof val === "object" && val !== null) {
       const inner = val as Record<string, unknown>;
       val = inner.default_semester ?? inner.current_semester ?? inner.semester;
@@ -88,10 +95,20 @@ export function extractAcademicYearValue(raw: unknown): string | null {
   let val: unknown = raw;
   if (typeof val === "object" && val !== null) {
     const obj = val as Record<string, unknown>;
-    val = obj.default_academic_year ?? obj.current_year ?? obj.academic_year ?? obj.year ?? obj.data ?? obj.value;
+    val =
+      obj.default_academic_year ??
+      obj.current_year ??
+      obj.academic_year ??
+      obj.year ??
+      obj.data ??
+      obj.value;
     if (typeof val === "object" && val !== null) {
       const inner = val as Record<string, unknown>;
-      val = inner.default_academic_year ?? inner.current_year ?? inner.academic_year ?? inner.year;
+      val =
+        inner.default_academic_year ??
+        inner.current_year ??
+        inner.academic_year ??
+        inner.year;
     }
   }
   if (!val) return null;
@@ -191,9 +208,9 @@ export const useSetSemester = (options?: { skipInvalidations?: boolean }) => {
   });
 };
 
-export const useSetAcademicYear = (
-  options?: { skipInvalidations?: boolean },
-) => {
+export const useSetAcademicYear = (options?: {
+  skipInvalidations?: boolean;
+}) => {
   const queryClient = useQueryClient();
 
   return useMutation({

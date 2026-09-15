@@ -86,10 +86,13 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     return () => mq.removeEventListener("change", handler);
   }, []);
 
-  const setTheme = useCallback((t: Theme) => {
-    setThemeState(t);
-    saveTheme(t);
-  }, [saveTheme]);
+  const setTheme = useCallback(
+    (t: Theme) => {
+      setThemeState(t);
+      saveTheme(t);
+    },
+    [saveTheme],
+  );
   const toggleTheme = useCallback(
     () =>
       setThemeState((prev) => {
@@ -105,8 +108,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     [theme, toggleTheme, setTheme],
   );
 
-  return <ThemeContext.Provider value={value}>{children}
-  </ThemeContext.Provider>;
+  return (
+    <ThemeContext.Provider value={value}>{children}</ThemeContext.Provider>
+  );
 }
 
 export function useTheme() {

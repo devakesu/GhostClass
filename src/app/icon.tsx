@@ -11,20 +11,18 @@ const iconSrc = readPublicPngAsDataUri("icon-192.png");
 
 export default function Icon() {
   return new ImageResponse(
-    (
-      <div
-        style={{
-          background: "#0b0b0f",
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {iconSrc && <img src={iconSrc} width={28} height={28} />}
-      </div>
-    ),
+    <div
+      style={{
+        background: "#0b0b0f",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {iconSrc && <img src={iconSrc} width={28} height={28} />}
+    </div>,
     { ...size },
   );
 }

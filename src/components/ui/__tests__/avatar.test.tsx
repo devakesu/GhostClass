@@ -12,8 +12,9 @@ describe("Avatar UI Component", () => {
     );
 
     expect(container.querySelector('[data-slot="avatar"]')).toBeInTheDocument();
-    expect(container.querySelector('[data-slot="avatar-fallback"]'))
-      .toBeInTheDocument();
+    expect(
+      container.querySelector('[data-slot="avatar-fallback"]'),
+    ).toBeInTheDocument();
   });
 
   it("renders fallback when image is missing", () => {

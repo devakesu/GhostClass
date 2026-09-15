@@ -45,8 +45,8 @@ describe("sitemap.xml", () => {
     process.env.NEXT_PUBLIC_APP_URL = "https://example.com";
 
     const urls = sitemap();
-    const contactPage = urls.find((u) =>
-      u.url === "https://example.com/contact"
+    const contactPage = urls.find(
+      (u) => u.url === "https://example.com/contact",
     );
 
     expect(contactPage).toBeDefined();

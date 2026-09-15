@@ -50,9 +50,9 @@ describe("useFetchClassCourses", () => {
       from: vi.fn().mockReturnThis(),
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
-      then: vi.fn().mockImplementation((cb) =>
-        cb({ data: mockData, error: null })
-      ),
+      then: vi
+        .fn()
+        .mockImplementation((cb) => cb({ data: mockData, error: null })),
     };
     (createClient as any).mockReturnValue(mockSupabase);
 
@@ -77,9 +77,9 @@ describe("useFetchClassCourses", () => {
       from: vi.fn().mockReturnThis(),
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
-      then: vi.fn().mockImplementation((cb) =>
-        cb({ data: null, error: mockError })
-      ),
+      then: vi
+        .fn()
+        .mockImplementation((cb) => cb({ data: null, error: mockError })),
     };
     (createClient as any).mockReturnValue(mockSupabase);
 

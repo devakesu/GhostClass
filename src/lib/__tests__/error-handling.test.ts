@@ -82,8 +82,9 @@ describe("error-handling.ts", () => {
       expect(getHumanReadableError({ message: "technical issues" })).toBe(
         "Ezygo is down, connection failed",
       );
-      expect(getHumanReadableError({ response: { status: 503 }, message: "" }))
-        .toBe("Ezygo is down, connection failed");
+      expect(
+        getHumanReadableError({ response: { status: 503 }, message: "" }),
+      ).toBe("Ezygo is down, connection failed");
     });
 
     it("handles rate limiting", () => {

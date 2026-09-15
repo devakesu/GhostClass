@@ -29,7 +29,7 @@ const ChartBar = ({
   const aboveTarget = course.official >= target;
   const baseColor = aboveTarget ? "bg-green-600" : "bg-red-600";
   const hasTracking = course.adjusted !== null;
-  const isGain = hasTracking && (course.adjusted!) >= course.official;
+  const isGain = hasTracking && course.adjusted! >= course.official;
 
   const baseHeight = (course.official / 100) * chartHeight;
   const adjustedHeight = hasTracking
@@ -43,7 +43,7 @@ const ChartBar = ({
     solidBarHeight = adjustedHeight;
   }
 
-  const roundedClass = (!hasTracking || !isGain) ? "rounded-t" : "";
+  const roundedClass = !hasTracking || !isGain ? "rounded-t" : "";
 
   return (
     <div className="flex flex-col items-center gap-1 w-14">
@@ -83,11 +83,14 @@ const ChartBar = ({
         {course.official}%
         {hasTracking && (
           <span
-            className={isGain
-              ? "text-green-600 dark:text-green-400"
-              : "text-red-600 dark:text-red-400"}
+            className={
+              isGain
+                ? "text-green-600 dark:text-green-400"
+                : "text-red-600 dark:text-red-400"
+            }
           >
-            {" "} → {course.adjusted}%
+            {" "}
+            → {course.adjusted}%
           </span>
         )}
       </span>
@@ -126,9 +129,13 @@ function makePanelId(question: string): string {
   return `faq-panel-${slug || "item"}`;
 }
 
-function FaqItem(
-  { question, answer }: { question: string; answer: React.ReactNode },
-) {
+function FaqItem({
+  question,
+  answer,
+}: {
+  question: string;
+  answer: React.ReactNode;
+}) {
   const [open, setOpen] = useState(false);
   const panelId = makePanelId(question);
   const btnId = `${panelId}-btn`;
@@ -142,19 +149,17 @@ function FaqItem(
         aria-controls={panelId}
       >
         <span>{question}</span>
-        {open
-          ? (
-            <ChevronUp
-              className="shrink-0 size-4 text-primary"
-              aria-hidden="true"
-            />
-          )
-          : (
-            <ChevronDown
-              className="shrink-0 size-4 text-muted-foreground"
-              aria-hidden="true"
-            />
-          )}
+        {open ? (
+          <ChevronUp
+            className="shrink-0 size-4 text-primary"
+            aria-hidden="true"
+          />
+        ) : (
+          <ChevronDown
+            className="shrink-0 size-4 text-muted-foreground"
+            aria-hidden="true"
+          />
+        )}
       </button>
       <div
         id={panelId}
@@ -170,12 +175,13 @@ function FaqItem(
 }
 
 // ─── Mock course card ──────────────────────────────────────────────────────────
-function MockCourseCard(
-  { officialPct = 80, adjustedPct = 82.5 }: {
-    officialPct?: number;
-    adjustedPct?: number;
-  } = {},
-) {
+function MockCourseCard({
+  officialPct = 80,
+  adjustedPct = 82.5,
+}: {
+  officialPct?: number;
+  adjustedPct?: number;
+} = {}) {
   const isGain = adjustedPct >= officialPct;
 
   return (
@@ -526,8 +532,7 @@ export default function HelpClient() {
           <p className="text-muted-foreground text-sm">
             Below is a sample course card with all features shown. Hover over
             the small{" "}
-            <span className="text-orange-500 font-semibold">orange</span> and
-            {" "}
+            <span className="text-orange-500 font-semibold">orange</span> and{" "}
             <span className="text-blue-500 dark:text-blue-400 font-semibold">
               blue
             </span>{" "}
@@ -537,9 +542,8 @@ export default function HelpClient() {
           <MockCourseCard />
           <p className="text-muted-foreground text-sm mt-4">
             If your tracking data shows a{" "}
-            <span className="text-red-600 font-semibold">loss</span>{" "}
-            (e.g. you corrected a present class to absent), the card reflects
-            it:
+            <span className="text-red-600 font-semibold">loss</span> (e.g. you
+            corrected a present class to absent), the card reflects it:
           </p>
           <MockCourseCard officialPct={80} adjustedPct={75} />
 
@@ -564,8 +568,8 @@ export default function HelpClient() {
                   </span>{" "}
                   next to Present = Correction entries that convert absences to
                   present/DL (does{" "}
-                  <strong className="text-foreground/80">NOT</strong>{" "}
-                  add to total)
+                  <strong className="text-foreground/80">NOT</strong> add to
+                  total)
                 </span>
               </li>
               <li className="flex items-center gap-2">
@@ -581,8 +585,7 @@ export default function HelpClient() {
               <li className="flex items-center gap-2">
                 <span className="inline-block size-3 rounded-sm bg-red-500 shrink-0" />
                 <span>
-                  <span className="text-red-500 font-semibold">Red number</span>
-                  {" "}
+                  <span className="text-red-500 font-semibold">Red number</span>{" "}
                   (e.g. 8) = Official absent count from EzyGo
                 </span>
               </li>
@@ -605,8 +608,7 @@ export default function HelpClient() {
                 </span>
               </li>
               <li>
-                <span className="text-foreground/80 font-semibold">Total</span>
-                {" "}
+                <span className="text-foreground/80 font-semibold">Total</span>{" "}
                 +{" "}
                 <span className="text-blue-500 dark:text-blue-400 font-semibold">
                   Blue <code>+N</code>
@@ -626,14 +628,14 @@ export default function HelpClient() {
               <li>
                 <span className="inline-block size-3 rounded-sm bg-green-500 mr-1.5 align-middle" />
                 Green overlay (going further right) = Tracking data{" "}
-                <strong className="text-foreground/80">GAIN</strong>{" "}
-                (adjusted % is higher than official)
+                <strong className="text-foreground/80">GAIN</strong> (adjusted %
+                is higher than official)
               </li>
               <li>
                 <span className="inline-block size-3 rounded-sm bg-red-600 mr-1.5 align-middle" />
                 Deep red overlay (going further left/right) = Tracking data{" "}
-                <strong className="text-foreground/80">LOSS</strong>{" "}
-                (adjusted % is lower than official)
+                <strong className="text-foreground/80">LOSS</strong> (adjusted %
+                is lower than official)
               </li>
             </ul>
 
@@ -663,10 +665,12 @@ export default function HelpClient() {
                 Shows how many classes you can safely bunk (
                 <span className="text-green-600 dark:text-green-400">
                   green
-                </span>) or must attend (
+                </span>
+                ) or must attend (
                 <span className="text-amber-600 dark:text-amber-400">
                   amber
-                </span>) to stay at your target %
+                </span>
+                ) to stay at your target %
               </li>
             </ul>
           </div>
@@ -688,8 +692,8 @@ export default function HelpClient() {
                   present
                 </li>
                 <li>
-                  Does <strong className="text-foreground/80">NOT</strong>{" "}
-                  add to the total class count — it only adjusts present/absent
+                  Does <strong className="text-foreground/80">NOT</strong> add
+                  to the total class count — it only adjusts present/absent
                   counts
                 </li>
                 <li>
@@ -718,8 +722,8 @@ export default function HelpClient() {
                   held class not synced)
                 </li>
                 <li>
-                  <strong className="text-foreground/80">ADDS</strong>{" "}
-                  to the total class count AND to present/absent
+                  <strong className="text-foreground/80">ADDS</strong> to the
+                  total class count AND to present/absent
                 </li>
                 <li>
                   Shown in{" "}

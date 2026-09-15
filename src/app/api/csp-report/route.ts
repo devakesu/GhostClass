@@ -52,7 +52,8 @@ function extractLogFields(text: string): Record<string, unknown> {
     if (typeof parsed !== "object" || parsed === null) return {};
 
     // Legacy report-uri format: { "csp-report": { ... } }
-    const report = (parsed as Record<string, unknown>)["csp-report"] ??
+    const report =
+      (parsed as Record<string, unknown>)["csp-report"] ??
       // Reporting API v1 wraps reports in an array: [{ body: { ... } }]
       (Array.isArray(parsed)
         ? (parsed[0] as Record<string, unknown>)?.["body"]
@@ -66,9 +67,10 @@ function extractLogFields(text: string): Record<string, unknown> {
       "document-uri": sanitizeUrl(r["document-uri"] ?? r["documentURL"]),
       "blocked-uri": sanitizeUrl(r["blocked-uri"] ?? r["blockedURL"]),
       "violated-directive": r["violated-directive"] ?? r["effectiveDirective"],
-      "original-policy": typeof r["original-policy"] === "string"
-        ? r["original-policy"].slice(0, 512)
-        : undefined,
+      "original-policy":
+        typeof r["original-policy"] === "string"
+          ? r["original-policy"].slice(0, 512)
+          : undefined,
       disposition: r["disposition"],
       "status-code": r["status-code"],
     };
@@ -86,8 +88,7 @@ export function GET() {
     {
       status: "operational",
       message: "This endpoint is for CSP violation reports via POST only.",
-      docs:
-        "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/report-uri",
+      docs: "https://developer.mozilla.org/en-US/docs/Web/HTTP/Headers/Content-Security-Policy/report-uri",
     },
     { status: 200 },
   );
@@ -104,7 +105,7 @@ export async function POST(req: NextRequest) {
 
   const contentType = req.headers.get("content-type") ?? "";
   const isAccepted = ACCEPTED_CONTENT_TYPES.some((t) =>
-    contentType.includes(t)
+    contentType.includes(t),
   );
 
   if (!isAccepted) {

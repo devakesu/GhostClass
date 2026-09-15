@@ -17,8 +17,8 @@ vi.mock("next/dynamic", () => ({
     if (typeof loader === "function") {
       loader();
     }
-    const LoadingFallback = options?.loading ??
-      (() => React.createElement("div", null, "loading"));
+    const LoadingFallback =
+      options?.loading ?? (() => React.createElement("div", null, "loading"));
     return LoadingFallback;
   },
 }));

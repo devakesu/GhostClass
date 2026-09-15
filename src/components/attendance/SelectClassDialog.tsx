@@ -85,9 +85,8 @@ export function SelectClassDialog({
       queryClient.invalidateQueries({ queryKey: ["profile"] });
       onOpenChange(false);
     } catch (err) {
-      const errorMessage = err instanceof Error
-        ? err.message
-        : "Failed to save class selection";
+      const errorMessage =
+        err instanceof Error ? err.message : "Failed to save class selection";
       toast.error(errorMessage);
     } finally {
       setIsSubmitting(false);
@@ -163,9 +162,11 @@ export function SelectClassDialog({
             Select Your Class
           </DialogTitle>
           <DialogDescription className="text-center">
-            You must select a class for the current term (<strong>
+            You must select a class for the current term (
+            <strong>
               {semester.toUpperCase()} {academicYear}
-            </strong>) to access course and attendance features.
+            </strong>
+            ) to access course and attendance features.
           </DialogDescription>
         </DialogHeader>
 
@@ -187,19 +188,18 @@ export function SelectClassDialog({
             <Button
               type="submit"
               className="w-full h-12 text-lg font-bold transition-all hover:scale-[1.02]"
-              disabled={isSubmitting || !selectedClassId ||
-                classes.length === 0}
+              disabled={
+                isSubmitting || !selectedClassId || classes.length === 0
+              }
             >
-              {isSubmitting
-                ? (
-                  <>
-                    <Loader2 className="mr-2 h-5 w-5 animate-spin" />
-                    Saving Selection...
-                  </>
-                )
-                : (
-                  "Confirm Class"
-                )}
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                  Saving Selection...
+                </>
+              ) : (
+                "Confirm Class"
+              )}
             </Button>
             <Button
               type="button"

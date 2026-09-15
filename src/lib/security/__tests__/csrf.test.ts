@@ -81,13 +81,15 @@ describe("CSRF Security", () => {
   describe("setCsrfCookie", () => {
     it("sets the cookie with correct parameters", async () => {
       await setCsrfCookie("new-token");
-      expect(mockCookieStore.set).toHaveBeenCalledWith(expect.objectContaining({
-        name: "csrf_token",
-        value: "new-token",
-        httpOnly: true,
-        sameSite: "strict",
-        path: "/",
-      }));
+      expect(mockCookieStore.set).toHaveBeenCalledWith(
+        expect.objectContaining({
+          name: "csrf_token",
+          value: "new-token",
+          httpOnly: true,
+          sameSite: "strict",
+          path: "/",
+        }),
+      );
     });
   });
 

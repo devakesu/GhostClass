@@ -19,9 +19,8 @@ const isValidUrl = (urlString: string | undefined): boolean => {
 
 export const Footer = ({ className }: { className?: string }) => {
   const commitSha = process.env.NEXT_PUBLIC_GIT_COMMIT_SHA ?? "unknown";
-  const shortSha = commitSha === "unknown"
-    ? "dev-build"
-    : commitSha.substring(0, 7);
+  const shortSha =
+    commitSha === "unknown" ? "dev-build" : commitSha.substring(0, 7);
   const appVersion = process.env.NEXT_PUBLIC_APP_VERSION ?? "dev";
 
   // Validate all external URLs from environment variables
@@ -120,18 +119,18 @@ export const Footer = ({ className }: { className?: string }) => {
             title={`Commit: ${commitSha}`}
           >
             <div className="relative flex h-1.5 w-1.5">
-              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75">
-              </span>
-              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500">
-              </span>
+              <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+              <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
             </div>
 
             <div className="flex items-center gap-1.5">
               <span>v{appVersion}</span>
               <a
-                href={githubUrl && commitSha !== "unknown"
-                  ? `${githubUrl}/commit/${commitSha}`
-                  : "#"}
+                href={
+                  githubUrl && commitSha !== "unknown"
+                    ? `${githubUrl}/commit/${commitSha}`
+                    : "#"
+                }
                 {...(githubUrl && commitSha !== "unknown"
                   ? { target: "_blank", rel: "noopener noreferrer" }
                   : {})}

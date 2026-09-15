@@ -138,9 +138,10 @@ function computeAcademicRange(
     }
     const startYear = parseInt(parts[0], 10);
     const endYearShort = parseInt(parts[1], 10);
-    const endYear = startYear >= 2000
-      ? Math.floor(startYear / 100) * 100 + endYearShort
-      : 2000 + endYearShort;
+    const endYear =
+      startYear >= 2000
+        ? Math.floor(startYear / 100) * 100 + endYearShort
+        : 2000 + endYearShort;
 
     if (semester === "odd") {
       return {
@@ -259,7 +260,8 @@ function resolveSessionName(
   index: number,
   attendanceData: AttendanceReport,
 ): string {
-  const isNumericId = (s: string) => !isNaN(parseInt(s, 10)) && parseInt(s, 10) > 20;
+  const isNumericId = (s: string) =>
+    !isNaN(parseInt(s, 10)) && parseInt(s, 10) > 20;
 
   if (
     !sessionNameStr ||
@@ -569,7 +571,7 @@ function mergeSelectedDateEvents(
 
   const dbDateStr = formatDateForDB(selectedDate);
   const dayOfficialsRaw = rawEvents.filter((event) =>
-    isSameDayLocal(event.date, selectedDate)
+    isSameDayLocal(event.date, selectedDate),
   );
 
   const processedEvents = mapOfficialEventsWithOverrides(
@@ -594,7 +596,7 @@ function mergeSelectedDateEvents(
     merged = merged.filter(
       (e) =>
         e.status.toLowerCase().replace(" ", "") ===
-          filter.toLowerCase().replace(" ", ""),
+        filter.toLowerCase().replace(" ", ""),
     );
   }
 
@@ -764,12 +766,15 @@ function RenderTrackedActions({
         className="h-8 w-8 text-red-400 hover:text-red-500 hover:bg-red-500/10"
         disabled={isDeleting}
         onClick={() =>
-          onDeleteConfirm(`${event.courseId}|${dbDate}|${sessionForDB}`)}
+          onDeleteConfirm(`${event.courseId}|${dbDate}|${sessionForDB}`)
+        }
         aria-label="Delete record"
       >
-        {isDeleting
-          ? <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
-          : <Trash2 className="h-3 w-3" aria-hidden="true" />}
+        {isDeleting ? (
+          <Loader2 className="h-3 w-3 animate-spin" aria-hidden="true" />
+        ) : (
+          <Trash2 className="h-3 w-3" aria-hidden="true" />
+        )}
       </Button>
     </div>
   );
@@ -803,17 +808,18 @@ function RenderSelfMarkedActions({
         className="h-6 w-6 text-red-400 hover:text-red-500 hover:bg-red-500/10"
         disabled={isDeleting}
         onClick={() =>
-          onDeleteConfirm(`${event.courseId}|${dbDate}|${sessionForDB}`)}
+          onDeleteConfirm(`${event.courseId}|${dbDate}|${sessionForDB}`)
+        }
         aria-label={`Delete self-marked ${event.status} record for ${event.title} ${event.sessionName}`}
       >
-        {isDeleting
-          ? (
-            <Loader2
-              className="h-3 w-3 text-primary animate-spin"
-              aria-hidden="true"
-            />
-          )
-          : <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />}
+        {isDeleting ? (
+          <Loader2
+            className="h-3 w-3 text-primary animate-spin"
+            aria-hidden="true"
+          />
+        ) : (
+          <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+        )}
       </Button>
     </div>
   );
@@ -844,7 +850,8 @@ function RenderAbsentActions({
               "Duty Leave Reason",
               "Programme/Activity Name",
               "Duty Leave",
-            )}
+            )
+          }
           className={cn(
             "flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all",
             isLoading
@@ -852,16 +859,14 @@ function RenderAbsentActions({
               : "border-yellow-500 text-yellow-600 hover:bg-yellow-500/10 hover:border-yellow-500 hover:text-yellow-700 dark:border-yellow-500/70 dark:text-yellow-400 dark:hover:text-yellow-300",
           )}
         >
-          {isLoading
-            ? (
-              "..."
-            )
-            : (
-              <>
-                <Briefcase className="w-3 h-3 shrink-0" aria-hidden="true" />
-                <span>Mark DL</span>
-              </>
-            )}
+          {isLoading ? (
+            "..."
+          ) : (
+            <>
+              <Briefcase className="w-3 h-3 shrink-0" aria-hidden="true" />
+              <span>Mark DL</span>
+            </>
+          )}
         </Button>
         <Button
           variant="outline"
@@ -873,7 +878,8 @@ function RenderAbsentActions({
               "Correction Remark",
               "Incorrectly marked absent",
               "Incorrectly marked absent",
-            )}
+            )
+          }
           className={cn(
             "flex-1 h-auto min-h-8 py-1.5 text-xs gap-1.5 border-dashed transition-all",
             isLoading
@@ -881,16 +887,14 @@ function RenderAbsentActions({
               : "border-green-500 text-green-600 hover:bg-green-500/10 hover:border-green-500 hover:text-green-700 dark:border-green-500/70 dark:text-green-400 dark:hover:text-green-300",
           )}
         >
-          {isLoading
-            ? (
-              "..."
-            )
-            : (
-              <>
-                <CheckCircle2 className="w-3 h-3 shrink-0" aria-hidden="true" />
-                <span>Mark Present</span>
-              </>
-            )}
+          {isLoading ? (
+            "..."
+          ) : (
+            <>
+              <CheckCircle2 className="w-3 h-3 shrink-0" aria-hidden="true" />
+              <span>Mark Present</span>
+            </>
+          )}
         </Button>
       </div>
     </div>
@@ -925,27 +929,24 @@ export function AttendanceCalendar({
   );
   const [remarkDialogOpen, setRemarkDialogOpen] = useState(false);
   const [remark, setRemark] = useState("");
-  const [pendingRemarkAction, setPendingRemarkAction] = useState<
-    {
-      courseId: string;
-      dbDate: string;
-      sessionForDB: string;
-      buttonKey: string;
-      targetStatus: number;
-      title: string;
-      description: string;
-      placeholder: string;
-      defaultRemark: string;
-    } | null
-  >(null);
+  const [pendingRemarkAction, setPendingRemarkAction] = useState<{
+    courseId: string;
+    dbDate: string;
+    sessionForDB: string;
+    buttonKey: string;
+    targetStatus: number;
+    title: string;
+    description: string;
+    placeholder: string;
+    defaultRemark: string;
+  } | null>(null);
   const clickedButtons = useRef<Set<string>>(new Set());
 
   const { data: profile } = useProfile();
   const queryClient = useQueryClient();
   const { refetch: refetchCount } = useTrackingCount(profile);
-  const { data: trackingData, refetch: refetchTrackData } = useTrackingData(
-    profile,
-  );
+  const { data: trackingData, refetch: refetchTrackData } =
+    useTrackingData(profile);
 
   const academicRange = useMemo(() => {
     return computeAcademicRange(semester, year);
@@ -1332,14 +1333,15 @@ export function AttendanceCalendar({
 
   const monthOptions = useMemo(() => {
     return monthNames.map((name, index) => {
-      const isDisabled = academicRange && currentDate.year !== null
-        ? new Date(currentDate.year, index, 1) > academicRange.max ||
-          new Date(
+      const isDisabled =
+        academicRange && currentDate.year !== null
+          ? new Date(currentDate.year, index, 1) > academicRange.max ||
+            new Date(
               currentDate.year,
               index,
               getDaysInMonth(currentDate.year, index),
             ) < academicRange.min
-        : false;
+          : false;
       return { name, index, isDisabled };
     });
   }, [academicRange, currentDate.year, getDaysInMonth]);
@@ -1469,8 +1471,8 @@ export function AttendanceCalendar({
     );
   }
 
-  const shouldShowJumpToToday = selectedDate && !isToday(selectedDate) &&
-    isTodayInRange;
+  const shouldShowJumpToToday =
+    selectedDate && !isToday(selectedDate) && isTodayInRange;
 
   const renderEventCardActions = (
     event: ExtendedAttendanceEvent,
@@ -1504,8 +1506,7 @@ export function AttendanceCalendar({
         buttonKey,
         targetStatus,
         title,
-        description:
-          `Enter a remark for marking this session as ${defaultRemark}.`,
+        description: `Enter a remark for marking this session as ${defaultRemark}.`,
         placeholder,
         defaultRemark,
       });
@@ -1525,8 +1526,8 @@ export function AttendanceCalendar({
       );
     }
 
-    const hasTracking = event.isCorrection ||
-      (event.hasTrackerRecord && !event.isExtra);
+    const hasTracking =
+      event.isCorrection || (event.hasTrackerRecord && !event.isExtra);
     if (hasTracking) {
       return (
         <RenderTrackedActions
@@ -1592,9 +1593,11 @@ export function AttendanceCalendar({
                     key={option.name}
                     value={option.index.toString()}
                     disabled={option.isDisabled}
-                    className={currentDate.month === option.index
-                      ? "bg-foreground/5 mt-0.5"
-                      : "capitalize"}
+                    className={
+                      currentDate.month === option.index
+                        ? "bg-foreground/5 mt-0.5"
+                        : "capitalize"
+                    }
                   >
                     {option.name}
                   </SelectItem>
@@ -1617,9 +1620,11 @@ export function AttendanceCalendar({
                     key={option.year}
                     value={option.year.toString()}
                     disabled={option.isDisabled}
-                    className={currentDate.year === option.year
-                      ? "bg-foreground/5 mt-0.5"
-                      : "mt-0.5"}
+                    className={
+                      currentDate.year === option.year
+                        ? "bg-foreground/5 mt-0.5"
+                        : "mt-0.5"
+                    }
                   >
                     {option.year}
                   </SelectItem>
@@ -1739,156 +1744,151 @@ export function AttendanceCalendar({
               transition={{ duration: 0.2 }}
               className="flex-1 flex flex-col"
             >
-              {selectedDateEvents.length > 0
-                ? (
-                  <div className="flex flex-col gap-5 p-4">
-                    {selectedDateEvents.map((event, index) => {
-                      let badgeClass = "text-muted-foreground border-border";
-                      let Icon = Clock;
-                      let cardStyle =
-                        "border-border/40 bg-card hover:bg-accent/30 hover:border-border/60";
-                      if (event.status === "Present") {
-                        badgeClass =
-                          "text-green-500 border-green-500/40 bg-green-500/10";
-                        Icon = CheckCircle2;
-                        cardStyle =
-                          "border-green-500/50 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500";
-                      } else if (event.status === "Absent") {
-                        badgeClass =
-                          "text-red-500 border-red-500/40 bg-red-500/10";
-                        Icon = AlertCircle;
-                        cardStyle =
-                          "border-red-500/50 bg-red-500/5 hover:bg-red-500/10 hover:border-red-500";
-                      } else if (event.status === "Duty Leave") {
-                        badgeClass =
-                          "text-yellow-500 border-yellow-500/40 bg-yellow-500/10";
-                        cardStyle =
-                          "border-yellow-500/50 bg-yellow-500/5 hover:bg-yellow-500/10 hover:border-yellow-500";
-                      } else if (event.status.includes("Leave")) {
-                        badgeClass =
-                          "text-blue-500 border-blue-500/40 bg-blue-500/10";
-                        cardStyle =
-                          "border-blue-500/50 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500";
-                      }
+              {selectedDateEvents.length > 0 ? (
+                <div className="flex flex-col gap-5 p-4">
+                  {selectedDateEvents.map((event, index) => {
+                    let badgeClass = "text-muted-foreground border-border";
+                    let Icon = Clock;
+                    let cardStyle =
+                      "border-border/40 bg-card hover:bg-accent/30 hover:border-border/60";
+                    if (event.status === "Present") {
+                      badgeClass =
+                        "text-green-500 border-green-500/40 bg-green-500/10";
+                      Icon = CheckCircle2;
+                      cardStyle =
+                        "border-green-500/50 bg-green-500/5 hover:bg-green-500/10 hover:border-green-500";
+                    } else if (event.status === "Absent") {
+                      badgeClass =
+                        "text-red-500 border-red-500/40 bg-red-500/10";
+                      Icon = AlertCircle;
+                      cardStyle =
+                        "border-red-500/50 bg-red-500/5 hover:bg-red-500/10 hover:border-red-500";
+                    } else if (event.status === "Duty Leave") {
+                      badgeClass =
+                        "text-yellow-500 border-yellow-500/40 bg-yellow-500/10";
+                      cardStyle =
+                        "border-yellow-500/50 bg-yellow-500/5 hover:bg-yellow-500/10 hover:border-yellow-500";
+                    } else if (event.status.includes("Leave")) {
+                      badgeClass =
+                        "text-blue-500 border-blue-500/40 bg-blue-500/10";
+                      cardStyle =
+                        "border-blue-500/50 bg-blue-500/5 hover:bg-blue-500/10 hover:border-blue-500";
+                    }
 
-                      const dbDate = formatDateForDB(selectedDate);
-                      const sNum = getNormalizedSession(
-                        event.rawSession || event.sessionName,
-                      );
-                      const sessionForDB = toRoman(sNum);
-                      const resolvedCourseCode = getCourseCodeById(
-                        event.courseId,
-                      );
-                      const rawCode =
-                        event.courseCode ||
-                        resolvedCourseCode ||
-                        event.courseId;
-                      const displayCourseCode = rawCode
-                        ? rawCode.trim().toUpperCase()
-                        : "";
-                      const showCourseCode =
-                        Boolean(displayCourseCode) &&
-                        !/^\d+$/.test(displayCourseCode) &&
-                        displayCourseCode !== event.title.trim().toUpperCase();
+                    const dbDate = formatDateForDB(selectedDate);
+                    const sNum = getNormalizedSession(
+                      event.rawSession || event.sessionName,
+                    );
+                    const sessionForDB = toRoman(sNum);
+                    const resolvedCourseCode = getCourseCodeById(
+                      event.courseId,
+                    );
+                    const rawCode =
+                      event.courseCode || resolvedCourseCode || event.courseId;
+                    const displayCourseCode = rawCode
+                      ? rawCode.trim().toUpperCase()
+                      : "";
+                    const showCourseCode =
+                      Boolean(displayCourseCode) &&
+                      !/^\d+$/.test(displayCourseCode) &&
+                      displayCourseCode !== event.title.trim().toUpperCase();
 
-                      return (
-                        <motion.div
-                          key={`event-${event.sessionKey}-${index}`}
-                          initial={{ opacity: 0, y: 10 }}
-                          animate={{ opacity: 1, y: 0 }}
-                          transition={{ delay: index * 0.05 }}
-                          className={cn(
-                            "group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all gap-4",
-                            cardStyle,
-                          )}
-                        >
-                          <div className="flex flex-col gap-1.5">
-                            <div className="flex flex-col">
-                              <h3 className="font-semibold text-sm text-foreground leading-tight capitalize flex items-center gap-2">
-                                {event.title.toLowerCase()}
-                              </h3>
-                              {showCourseCode && (
-                                <span className="text-[11px] font-bold text-muted-foreground/80 tracking-wide uppercase mt-0.5">
-                                  {displayCourseCode}
-                                </span>
-                              )}
-                            </div>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
-                              <span className="bg-background/50 px-1.5 py-0.5 rounded border border-border/50">
-                                {event.sessionName
-                                  ? formatSessionName(event.sessionName)
-                                  : `Session ${event.sessionKey}`}
+                    return (
+                      <motion.div
+                        key={`event-${event.sessionKey}-${index}`}
+                        initial={{ opacity: 0, y: 10 }}
+                        animate={{ opacity: 1, y: 0 }}
+                        transition={{ delay: index * 0.05 }}
+                        className={cn(
+                          "group flex flex-col sm:flex-row sm:items-center justify-between p-4 rounded-xl border transition-all gap-4",
+                          cardStyle,
+                        )}
+                      >
+                        <div className="flex flex-col gap-1.5">
+                          <div className="flex flex-col">
+                            <h3 className="font-semibold text-sm text-foreground leading-tight capitalize flex items-center gap-2">
+                              {event.title.toLowerCase()}
+                            </h3>
+                            {showCourseCode && (
+                              <span className="text-[11px] font-bold text-muted-foreground/80 tracking-wide uppercase mt-0.5">
+                                {displayCourseCode}
                               </span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-3 text-xs text-muted-foreground flex-wrap">
+                            <span className="bg-background/50 px-1.5 py-0.5 rounded border border-border/50">
+                              {event.sessionName
+                                ? formatSessionName(event.sessionName)
+                                : `Session ${event.sessionKey}`}
+                            </span>
+                            <Badge
+                              variant="outline"
+                              className={cn(
+                                "h-5 px-1.5 gap-1 font-medium",
+                                badgeClass,
+                              )}
+                            >
+                              <Icon className="w-3 h-3" aria-hidden="true" />
+                              {event.status}
+                            </Badge>
+                            {isCourseDisabled(resolvedCourseCode) && (
                               <Badge
                                 variant="outline"
-                                className={cn(
-                                  "h-5 px-1.5 gap-1 font-medium",
-                                  badgeClass,
-                                )}
+                                className="h-5 px-1.5 gap-1 font-medium text-gray-500 border-gray-500/40 bg-gray-500/10"
                               >
-                                <Icon className="w-3 h-3" aria-hidden="true" />
-                                {event.status}
+                                Disabled
                               </Badge>
-                              {isCourseDisabled(resolvedCourseCode) && (
-                                <Badge
-                                  variant="outline"
-                                  className="h-5 px-1.5 gap-1 font-medium text-gray-500 border-gray-500/40 bg-gray-500/10"
-                                >
-                                  Disabled
-                                </Badge>
-                              )}
-                            </div>
-                            {event.remarks && !isLegacyRemark(event.remarks) &&
-                              (
-                                <p
-                                  className={cn(
-                                    "text-[11px] italic truncate max-w-50 sm:max-w-xs mt-1",
-                                    event.status === "Duty Leave"
-                                      ? "text-yellow-600/80 dark:text-yellow-400/80"
-                                      : "text-muted-foreground/80",
-                                  )}
-                                >
-                                  {event.remarks.trim()}
-                                </p>
-                              )}
+                            )}
                           </div>
-                          {renderEventCardActions(
-                            event,
-                            dbDate,
-                            sNum,
-                            sessionForDB,
+                          {event.remarks && !isLegacyRemark(event.remarks) && (
+                            <p
+                              className={cn(
+                                "text-[11px] italic truncate max-w-50 sm:max-w-xs mt-1",
+                                event.status === "Duty Leave"
+                                  ? "text-yellow-600/80 dark:text-yellow-400/80"
+                                  : "text-muted-foreground/80",
+                              )}
+                            >
+                              {event.remarks.trim()}
+                            </p>
                           )}
-                        </motion.div>
-                      );
-                    })}
+                        </div>
+                        {renderEventCardActions(
+                          event,
+                          dbDate,
+                          sNum,
+                          sessionForDB,
+                        )}
+                      </motion.div>
+                    );
+                  })}
+                </div>
+              ) : (
+                <div className="flex flex-col items-center justify-center flex-1 text-center px-6 py-12">
+                  <div className="rounded-full bg-accent/30 p-4 mb-3 ring-1 ring-border/50">
+                    <CalendarIcon
+                      className="h-6 w-6 text-muted-foreground/60"
+                      aria-hidden="true"
+                    />
                   </div>
-                )
-                : (
-                  <div className="flex flex-col items-center justify-center flex-1 text-center px-6 py-12">
-                    <div className="rounded-full bg-accent/30 p-4 mb-3 ring-1 ring-border/50">
-                      <CalendarIcon
-                        className="h-6 w-6 text-muted-foreground/60"
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <h3 className="text-sm font-semibold text-foreground">
-                      No classes recorded for this day.
-                    </h3>
-                    <p className="text-xs text-muted-foreground mt-1 mb-4 max-w-50">
-                      Enjoy your free time!
-                    </p>
-                    {shouldShowJumpToToday && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-8 text-xs"
-                        onClick={goToToday}
-                      >
-                        Jump to Today
-                      </Button>
-                    )}
-                  </div>
-                )}
+                  <h3 className="text-sm font-semibold text-foreground">
+                    No classes recorded for this day.
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1 mb-4 max-w-50">
+                    Enjoy your free time!
+                  </p>
+                  {shouldShowJumpToToday && (
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      className="h-8 text-xs"
+                      onClick={goToToday}
+                    >
+                      Jump to Today
+                    </Button>
+                  )}
+                </div>
+              )}
             </motion.div>
           </AnimatePresence>
         </CardContent>
@@ -1948,8 +1948,9 @@ export function AttendanceCalendar({
             </Label>
             <Input
               id="remark-calendar"
-              placeholder={pendingRemarkAction?.placeholder ||
-                "Enter remark..."}
+              placeholder={
+                pendingRemarkAction?.placeholder || "Enter remark..."
+              }
               value={remark}
               onChange={(e) => setRemark(e.target.value)}
               onKeyDown={(e) => {

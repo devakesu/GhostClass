@@ -43,15 +43,17 @@ describe("Loading", () => {
   it("shows warning and action buttons after 15 seconds in full mode", async () => {
     render(<Loading minimal={false} />);
 
-    expect(screen.queryByText(/The site will not load if EzyGo is down/))
-      .toBeNull();
+    expect(
+      screen.queryByText(/The site will not load if EzyGo is down/),
+    ).toBeNull();
 
     act(() => {
       vi.advanceTimersByTime(15001);
     });
 
-    expect(screen.getByText(/The site will not load if EzyGo is down/))
-      .toBeDefined();
+    expect(
+      screen.getByText(/The site will not load if EzyGo is down/),
+    ).toBeDefined();
     expect(screen.getByText("Refresh Page")).toBeDefined();
     expect(screen.getByText("Logout & Try Again")).toBeDefined();
   });
@@ -63,8 +65,9 @@ describe("Loading", () => {
       vi.advanceTimersByTime(15001);
     });
 
-    expect(screen.queryByText(/The site will not load if EzyGo is down/))
-      .toBeNull();
+    expect(
+      screen.queryByText(/The site will not load if EzyGo is down/),
+    ).toBeNull();
   });
 
   it("reloads page when refresh button is clicked", () => {

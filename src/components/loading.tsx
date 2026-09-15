@@ -31,9 +31,13 @@ import { handleLogout } from "@/lib/security/auth";
  * <Loading minimal message="Loading data…" />  // spinner + caption, no buttons
  * ```
  */
-export function Loading(
-  { minimal = false, message }: { minimal?: boolean; message?: string },
-) {
+export function Loading({
+  minimal = false,
+  message,
+}: {
+  minimal?: boolean;
+  message?: string;
+}) {
   const [showWarning, setShowWarning] = useState(false);
 
   useEffect(() => {
@@ -50,9 +54,11 @@ export function Loading(
 
   return (
     <div
-      className={minimal
-        ? "flex items-center justify-center w-full h-full py-8"
-        : "flex flex-col items-center justify-center min-h-screen w-full gap-8 p-8"}
+      className={
+        minimal
+          ? "flex items-center justify-center w-full h-full py-8"
+          : "flex flex-col items-center justify-center min-h-screen w-full gap-8 p-8"
+      }
       role="status"
       aria-live="polite"
       aria-busy="true"

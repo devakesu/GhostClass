@@ -22,8 +22,7 @@ const CARD_STYLE =
   `border-radius: 12px; overflow: hidden; ` +
   `box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05); border: 1px solid #e5e7eb;`;
 
-const HEADER_STYLE =
-  `background-color: ${BRAND_COLOR}; padding: 30px 40px; text-align: center;`;
+const HEADER_STYLE = `background-color: ${BRAND_COLOR}; padding: 30px 40px; text-align: center;`;
 
 /**
  * Absolute URL for the app logo. Email clients cannot resolve relative paths, so

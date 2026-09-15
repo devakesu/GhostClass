@@ -26,8 +26,8 @@ export async function GET() {
 
   // Only expose detailed metrics in non-production environments to avoid information disclosure
   // Default to production-safe behavior if NODE_ENV is not explicitly set to development/test
-  const includeDetails = process.env.NODE_ENV === "development" ||
-    process.env.NODE_ENV === "test";
+  const includeDetails =
+    process.env.NODE_ENV === "development" || process.env.NODE_ENV === "test";
 
   const basePayload = {
     status,
@@ -36,23 +36,23 @@ export async function GET() {
 
   const payload = includeDetails
     ? {
-      ...basePayload,
-      rateLimiter: {
-        activeRequests: rateLimiterStats.activeRequests,
-        queueLength: rateLimiterStats.queueLength,
-        maxConcurrent: rateLimiterStats.maxConcurrent,
-        cacheSize: rateLimiterStats.cacheSize,
-        utilizationPercent: Math.round(
-          (rateLimiterStats.activeRequests / rateLimiterStats.maxConcurrent) *
-            100,
-        ),
-      },
-      circuitBreaker: {
-        state: circuitBreakerStatus.state,
-        failures: circuitBreakerStatus.failures,
-        isOpen: circuitBreakerStatus.isOpen,
-      },
-    }
+        ...basePayload,
+        rateLimiter: {
+          activeRequests: rateLimiterStats.activeRequests,
+          queueLength: rateLimiterStats.queueLength,
+          maxConcurrent: rateLimiterStats.maxConcurrent,
+          cacheSize: rateLimiterStats.cacheSize,
+          utilizationPercent: Math.round(
+            (rateLimiterStats.activeRequests / rateLimiterStats.maxConcurrent) *
+              100,
+          ),
+        },
+        circuitBreaker: {
+          state: circuitBreakerStatus.state,
+          failures: circuitBreakerStatus.failures,
+          isOpen: circuitBreakerStatus.isOpen,
+        },
+      }
     : basePayload;
 
   return NextResponse.json(payload, {

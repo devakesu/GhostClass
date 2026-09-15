@@ -45,8 +45,10 @@ function getErrorCode(error: unknown): string | undefined {
 }
 
 function isTerminalError(code?: string): boolean {
-  return code === "messaging/invalid-registration-token" ||
-    code === "messaging/registration-token-not-registered";
+  return (
+    code === "messaging/invalid-registration-token" ||
+    code === "messaging/registration-token-not-registered"
+  );
 }
 
 /**
@@ -109,9 +111,8 @@ export async function sendPushNotification({
     );
     return { success: true, messageId };
   } catch (error: unknown) {
-    const errorMsg = error instanceof Error
-      ? error.message
-      : "Unknown push dispatch failure";
+    const errorMsg =
+      error instanceof Error ? error.message : "Unknown push dispatch failure";
     const safeToken = redact("id", token);
 
     logger.error(

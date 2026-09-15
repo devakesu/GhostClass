@@ -20,9 +20,10 @@ export const handleFeatureUse = async (featureName: string) => {
 
 // Track e-commerce events
 // Note: Event parameters must be strings, numbers, or booleans. Arrays/objects are not sent.
-export const handlePurchase = async (
-  orderData: { id: string; total: number },
-) => {
+export const handlePurchase = async (orderData: {
+  id: string;
+  total: number;
+}) => {
   await trackEvent("purchase", {
     transaction_id: orderData.id,
     value: orderData.total,

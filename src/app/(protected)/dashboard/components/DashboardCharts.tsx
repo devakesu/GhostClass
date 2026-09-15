@@ -20,8 +20,8 @@ const ChartSkeleton = () => (
 
 const AttendanceChart = dynamic(
   () =>
-    import("@/components/attendance/attendance-chart").then((mod) =>
-      mod.AttendanceChart
+    import("@/components/attendance/attendance-chart").then(
+      (mod) => mod.AttendanceChart,
     ),
   {
     loading: () => <ChartSkeleton />,
@@ -124,17 +124,13 @@ export function DashboardCharts({
       >
         <Card className="custom-container flex flex-col">
           <CardHeader className="flex flex-col gap-0.5">
-            <CardTitle className="text-[16px]">
-              Attendance Overview
-            </CardTitle>
+            <CardTitle className="text-[16px]">Attendance Overview</CardTitle>
             <CardDescription className="text-accent-foreground/60 text-sm">
               See where you&apos;ve been keeping up
             </CardDescription>
           </CardHeader>
           <CardContent className="flex-1 px-4 pt-2 pb-2">
-            <div className="h-85 w-full">
-              {renderChartContent()}
-            </div>
+            <div className="h-85 w-full">{renderChartContent()}</div>
           </CardContent>
         </Card>
       </motion.div>
@@ -154,7 +150,9 @@ export function DashboardCharts({
             </CardHeader>
             <CardContent className="px-4 pb-2">
               <div className="flex items-center gap-1.5">
-                {isLoadingAttendance ? <Skeleton className="h-8 w-16" /> : (
+                {isLoadingAttendance ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
                   <>
                     <span className="text-2xl font-bold text-green-500">
                       {stats.realPresent}
@@ -184,13 +182,13 @@ export function DashboardCharts({
         >
           <Card className="custom-container flex flex-col justify-center py-4 px-2 h-full">
             <CardHeader className="pb-1 px-4">
-              <CardTitle className="text-sm font-medium">
-                Absent
-              </CardTitle>
+              <CardTitle className="text-sm font-medium">Absent</CardTitle>
             </CardHeader>
             <CardContent className="px-4 pb-2">
               <div className="flex items-center gap-1.5">
-                {isLoadingAttendance ? <Skeleton className="h-8 w-16" /> : (
+                {isLoadingAttendance ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
                   <>
                     <span className="text-2xl font-bold text-red-500">
                       {stats.realAbsent}
@@ -226,7 +224,9 @@ export function DashboardCharts({
             </CardHeader>
             <CardContent className="px-4 pb-2">
               <div className="flex items-center gap-1.5">
-                {isLoadingAttendance ? <Skeleton className="h-8 w-16" /> : (
+                {isLoadingAttendance ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
                   <>
                     <span className="text-2xl font-bold text-yellow-500">
                       {stats.realDL}
@@ -282,16 +282,16 @@ export function DashboardCharts({
             </CardHeader>
             <CardContent className="px-4 pb-2">
               <div className="flex items-center gap-1.5">
-                {isLoadingCourses
-                  ? <Skeleton className="h-8 w-16" />
-                  : (
-                    <div className="text-2xl font-bold">
-                      {activeCourseCount.active}
-                      <span className="text-muted-foreground text-sm font-normal ml-1.5">
-                        / {activeCourseCount.total}
-                      </span>
-                    </div>
-                  )}
+                {isLoadingCourses ? (
+                  <Skeleton className="h-8 w-16" />
+                ) : (
+                  <div className="text-2xl font-bold">
+                    {activeCourseCount.active}
+                    <span className="text-muted-foreground text-sm font-normal ml-1.5">
+                      / {activeCourseCount.total}
+                    </span>
+                  </div>
+                )}
               </div>
             </CardContent>
           </Card>

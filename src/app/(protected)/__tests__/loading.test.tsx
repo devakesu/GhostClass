@@ -10,7 +10,9 @@ import { render, screen } from "@testing-library/react";
 
 vi.mock("@/components/loading", () => ({
   Loading: () => (
-    <div role="status" aria-label="Loading content">Loading...</div>
+    <div role="status" aria-label="Loading content">
+      Loading...
+    </div>
   ),
 }));
 

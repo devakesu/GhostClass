@@ -145,8 +145,9 @@ describe("utils.server.ts", () => {
         err.name = "AbortError";
         return Promise.reject(err);
       });
-      await expect(egressFetch("/test", { signal: controller.signal })).rejects
-        .toThrow();
+      await expect(
+        egressFetch("/test", { signal: controller.signal }),
+      ).rejects.toThrow();
     });
 
     it("fails over on retryable statuses (429, 502, etc)", async () => {

@@ -171,9 +171,9 @@ describe("axios lib", () => {
         json: async () => ({ token: "b".repeat(64) }),
       });
 
-      const requestSpy = vi.spyOn(axiosInstance, "request").mockResolvedValue(
-        { data: "success" } as any,
-      );
+      const requestSpy = vi
+        .spyOn(axiosInstance, "request")
+        .mockResolvedValue({ data: "success" } as any);
 
       const interceptor = (axiosInstance.interceptors.response as any)
         .handlers[0]?.rejected;
@@ -201,9 +201,9 @@ describe("axios lib", () => {
         json: async () => ({ token: "e".repeat(64) }),
       });
 
-      const requestSpy = vi.spyOn(axiosInstance, "request").mockResolvedValue(
-        { data: "success" } as any,
-      );
+      const requestSpy = vi
+        .spyOn(axiosInstance, "request")
+        .mockResolvedValue({ data: "success" } as any);
 
       const interceptor = (axiosInstance.interceptors.response as any)
         .handlers[0]?.rejected;
@@ -226,9 +226,9 @@ describe("axios lib", () => {
         ok: true,
         json: async () => ({ success: true }),
       });
-      const requestSpy = vi.spyOn(axiosInstance, "request").mockResolvedValue(
-        { data: "success" } as any,
-      );
+      const requestSpy = vi
+        .spyOn(axiosInstance, "request")
+        .mockResolvedValue({ data: "success" } as any);
 
       const interceptor = (axiosInstance.interceptors.response as any)
         .handlers[0]?.rejected;

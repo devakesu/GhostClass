@@ -28,22 +28,25 @@ describe("HelpClient", () => {
     });
 
     // Check it's hidden initially
-    expect(screen.getByText(/The bunk calculator tells you/i)).not
-      .toBeVisible();
+    expect(
+      screen.getByText(/The bunk calculator tells you/i),
+    ).not.toBeVisible();
 
     fireEvent.click(button);
     expect(screen.getByText(/The bunk calculator tells you/i)).toBeVisible();
 
     fireEvent.click(button);
-    expect(screen.getByText(/The bunk calculator tells you/i)).not
-      .toBeVisible();
+    expect(
+      screen.getByText(/The bunk calculator tells you/i),
+    ).not.toBeVisible();
   });
 
   it("renders mock components", () => {
     render(<HelpClient />);
     expect(screen.getAllByTestId("mock-course-card")[0]).toBeInTheDocument();
-    expect(screen.getAllByText("Data Structures & Algorithms")[0])
-      .toBeInTheDocument();
+    expect(
+      screen.getAllByText("Data Structures & Algorithms")[0],
+    ).toBeInTheDocument();
     expect(screen.getAllByText("Target: 75%")[0]).toBeInTheDocument();
   });
 

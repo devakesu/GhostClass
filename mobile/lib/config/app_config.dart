@@ -97,8 +97,7 @@ class AppConfig {
       const String.fromEnvironment('APP_COMMIT_SHA', defaultValue: 'local');
 
   /// Immutable image digest injected by CI.
-  static String get imageDigest =>
-      const String.fromEnvironment('IMAGE_DIGEST');
+  static String get imageDigest => const String.fromEnvironment('IMAGE_DIGEST');
 
   /// Build timestamp injected by CI for release builds.
   static String get buildTimestamp =>

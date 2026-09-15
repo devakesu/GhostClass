@@ -162,10 +162,12 @@ describe("useCSRFToken", () => {
       expect(axiosModule.setCsrfToken).toHaveBeenCalledWith("test-csrf-token");
     });
 
-    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`))
-      .toBeNull();
-    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`))
-      .toBeNull();
+    expect(
+      window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`),
+    ).toBeNull();
+    expect(
+      window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`),
+    ).toBeNull();
     expect(window.sessionStorage.getItem(CSRF_LAST_INIT_KEY)).not.toBeNull();
   });
 
@@ -198,10 +200,12 @@ describe("useCSRFToken", () => {
       expect(axiosModule.setCsrfToken).toHaveBeenCalledWith("test-csrf-token");
     });
 
-    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`))
-      .toBeNull();
-    expect(window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`))
-      .toBeNull();
+    expect(
+      window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.0.0`),
+    ).toBeNull();
+    expect(
+      window.sessionStorage.getItem(`${CSRF_LAST_INIT_KEY_PREFIX}1.1.0`),
+    ).toBeNull();
     expect(window.sessionStorage.getItem(CSRF_LAST_INIT_KEY)).toBeNull();
   });
 
@@ -376,16 +380,18 @@ describe("useCSRFToken", () => {
   });
 
   it("should skip if token exists after waiting for existing promise", async () => {
-    vi.mocked(axiosModule.getCsrfToken).mockReturnValueOnce(null)
+    vi.mocked(axiosModule.getCsrfToken)
+      .mockReturnValueOnce(null)
       .mockReturnValue("token-from-other");
 
-    vi.mocked(axios.get).mockImplementation(() =>
-      new Promise((resolve) => {
-        setTimeout(
-          () => resolve({ data: { token: "token-from-other" }, status: 200 }),
-          50,
-        );
-      })
+    vi.mocked(axios.get).mockImplementation(
+      () =>
+        new Promise((resolve) => {
+          setTimeout(
+            () => resolve({ data: { token: "token-from-other" }, status: 200 }),
+            50,
+          );
+        }),
     );
 
     renderHook(() => useCSRFToken());

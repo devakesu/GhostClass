@@ -5,7 +5,9 @@ export default async function ContactClient() {
   const supabase = await createClient();
 
   // 1. Check if user exists
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
 
   let userDetails: { name: string; email: string } | undefined = undefined;
 

@@ -27,7 +27,8 @@ export async function safeResponseJson<T>(res: Response): Promise<T | null> {
   try {
     // Support mocks that only provide .json() and not .text()
     if (
-      typeof res.text !== "function" && "json" in res &&
+      typeof res.text !== "function" &&
+      "json" in res &&
       typeof (res as unknown as { json: unknown }).json === "function"
     ) {
       return await (res as unknown as { json: () => Promise<T> }).json();

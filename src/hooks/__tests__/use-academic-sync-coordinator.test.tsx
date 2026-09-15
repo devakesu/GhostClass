@@ -69,7 +69,9 @@ describe("use-academic-sync-coordinator", () => {
           return Promise.resolve({ data: { default_semester: "even" } });
         }
         if (url === "/user/setting/default_academic_year") {
-          return Promise.resolve({ data: { default_academic_year: "2024-25" } });
+          return Promise.resolve({
+            data: { default_academic_year: "2024-25" },
+          });
         }
         return Promise.reject(new Error("Not found"));
       });

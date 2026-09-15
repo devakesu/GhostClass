@@ -77,7 +77,8 @@ const NotificationCard = ({
     <div
       onClick={() => onMarkRead(n.id, n.is_read)}
       onKeyDown={(e) =>
-        (e.key === "Enter" || e.key === " ") && onMarkRead(n.id, n.is_read)}
+        (e.key === "Enter" || e.key === " ") && onMarkRead(n.id, n.is_read)
+      }
       role="button"
       tabIndex={0}
       className={cn(
@@ -189,8 +190,8 @@ export default function NotificationsPage() {
     const items: VirtualItem[] = [];
 
     // 1. ACTION REQUIRED (Unread Conflicts)
-    const unreadActions = actionNotifications.filter((n: Notification) =>
-      !n.is_read
+    const unreadActions = actionNotifications.filter(
+      (n: Notification) => !n.is_read,
     );
     if (unreadActions.length > 0) {
       items.push({
@@ -204,8 +205,8 @@ export default function NotificationsPage() {
     }
 
     // 2. UNREAD (Unread Regular)
-    const unreadRegular = regularNotifications.filter((n: Notification) =>
-      !n.is_read
+    const unreadRegular = regularNotifications.filter(
+      (n: Notification) => !n.is_read,
     );
     if (unreadRegular.length > 0) {
       items.push({ type: "header", id: "unread-header", label: "UNREAD" });
@@ -215,8 +216,8 @@ export default function NotificationsPage() {
     }
 
     // 3. EARLIER (All Read Notifications)
-    const readNotifications = regularNotifications.filter((n: Notification) =>
-      n.is_read
+    const readNotifications = regularNotifications.filter(
+      (n: Notification) => n.is_read,
     );
     if (readNotifications.length > 0) {
       items.push({ type: "header", id: "earlier-header", label: "EARLIER" });
@@ -247,8 +248,9 @@ export default function NotificationsPage() {
     const documentHeight = document.documentElement.scrollHeight;
 
     // Use whichever scroll position is greater (container vs window)
-    const isNearBottom = (scrollHeight - scrollTop - clientHeight < 400) ||
-      (documentHeight - windowScrollTop - windowHeight < 400);
+    const isNearBottom =
+      scrollHeight - scrollTop - clientHeight < 400 ||
+      documentHeight - windowScrollTop - windowHeight < 400;
 
     if (isNearBottom) {
       if (hasNextPage && !isFetchingNextPage) {
@@ -385,96 +387,91 @@ export default function NotificationsPage() {
       </header>
 
       <main className="container mx-auto max-w-2xl flex-1 flex flex-col px-4 md:px-6 pt-4 md:pt-6">
-        {isEmpty
-          ? (
-            <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
-              <div className="h-20 w-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
-                <BellOff
-                  className="h-9 w-9 text-muted-foreground/50"
-                  aria-hidden="true"
-                />
-              </div>
-              <h3 className="text-lg font-medium">All caught up!</h3>
-              <p className="text-sm text-muted-foreground max-w-62.5 mt-1">
-                You have no new notifications.
-              </p>
+        {isEmpty ? (
+          <div className="flex flex-col items-center justify-center min-h-[50vh] text-center">
+            <div className="h-20 w-20 rounded-full bg-muted/30 flex items-center justify-center mb-4">
+              <BellOff
+                className="h-9 w-9 text-muted-foreground/50"
+                aria-hidden="true"
+              />
             </div>
-          )
-          : (
-            <div
-              key={`${actionNotifications.length}-${regularNotifications.length}`}
-              style={{
-                height: `${rowVirtualizer.getTotalSize()}px`,
-                width: "100%",
-                position: "relative",
-              }}
-            >
-              {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                const item = virtualItems[virtualRow.index];
-                let headerToneClass = "text-muted-foreground";
+            <h3 className="text-lg font-medium">All caught up!</h3>
+            <p className="text-sm text-muted-foreground max-w-62.5 mt-1">
+              You have no new notifications.
+            </p>
+          </div>
+        ) : (
+          <div
+            key={`${actionNotifications.length}-${regularNotifications.length}`}
+            style={{
+              height: `${rowVirtualizer.getTotalSize()}px`,
+              width: "100%",
+              position: "relative",
+            }}
+          >
+            {rowVirtualizer.getVirtualItems().map((virtualRow) => {
+              const item = virtualItems[virtualRow.index];
+              let headerToneClass = "text-muted-foreground";
 
-                if (item.type === "header") {
-                  if (item.label === "ACTION REQUIRED") {
-                    headerToneClass = "text-amber-500";
-                  } else if (item.label === "UNREAD") {
-                    headerToneClass = "text-blue-500";
-                  }
+              if (item.type === "header") {
+                if (item.label === "ACTION REQUIRED") {
+                  headerToneClass = "text-amber-500";
+                } else if (item.label === "UNREAD") {
+                  headerToneClass = "text-blue-500";
                 }
+              }
 
-                return (
-                  <div
-                    key={item.type === "header"
-                      ? item.id
-                      : `notification-${item.id}`}
-                    data-index={virtualRow.index}
-                    ref={rowVirtualizer.measureElement}
-                    style={{
-                      position: "absolute",
-                      top: 0,
-                      left: 0,
-                      width: "100%",
-                      transform: `translateY(${virtualRow.start}px)`,
-                    }}
-                    className="px-4"
-                  >
-                    {item.type === "header"
-                      ? (
-                        <div
-                          className={cn(
-                            "flex items-center gap-2 px-1 pt-6 pb-3",
-                            headerToneClass,
-                          )}
-                        >
-                          {item.label === "ACTION REQUIRED" && (
-                            <AlertCircle
-                              className="h-3.5 w-3.5"
-                              aria-hidden="true"
-                            />
-                          )}
-                          <h3 className="text-[11px] font-black uppercase tracking-widest">
-                            {item.label}
-                          </h3>
-                        </div>
-                      )
-                      : (
-                        <NotificationCard
-                          n={item.data}
-                          onMarkRead={handleToggleRead}
-                          isReading={readingId === item.id}
+              return (
+                <div
+                  key={
+                    item.type === "header" ? item.id : `notification-${item.id}`
+                  }
+                  data-index={virtualRow.index}
+                  ref={rowVirtualizer.measureElement}
+                  style={{
+                    position: "absolute",
+                    top: 0,
+                    left: 0,
+                    width: "100%",
+                    transform: `translateY(${virtualRow.start}px)`,
+                  }}
+                  className="px-4"
+                >
+                  {item.type === "header" ? (
+                    <div
+                      className={cn(
+                        "flex items-center gap-2 px-1 pt-6 pb-3",
+                        headerToneClass,
+                      )}
+                    >
+                      {item.label === "ACTION REQUIRED" && (
+                        <AlertCircle
+                          className="h-3.5 w-3.5"
+                          aria-hidden="true"
                         />
                       )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                      <h3 className="text-[11px] font-black uppercase tracking-widest">
+                        {item.label}
+                      </h3>
+                    </div>
+                  ) : (
+                    <NotificationCard
+                      n={item.data}
+                      onMarkRead={handleToggleRead}
+                      isReading={readingId === item.id}
+                    />
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         {/* LOADING INDICATOR AT BOTTOM */}
         {isFetchingNextPage && (
           <div className="h-10 flex items-center justify-center py-4">
             <div className="flex items-center gap-2 text-muted-foreground text-xs animate-pulse">
-              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />
-              {" "}
+              <Loader2 className="h-4 w-4 animate-spin" aria-hidden="true" />{" "}
               Loading more...
             </div>
           </div>

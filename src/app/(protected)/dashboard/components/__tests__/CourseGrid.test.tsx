@@ -88,8 +88,9 @@ describe("CourseGrid", () => {
   it("renders empty state when no courses", () => {
     render(<CourseGrid {...mockProps} sortedCourses={[]} />);
     expect(screen.getByText(/No courses found/i)).toBeInTheDocument();
-    expect(screen.getByRole("button", { name: /Add Your First Course/i }))
-      .toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Add Your First Course/i }),
+    ).toBeInTheDocument();
   });
 
   it("calls onAddCourse when add button is clicked", async () => {

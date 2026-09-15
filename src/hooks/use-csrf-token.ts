@@ -91,7 +91,9 @@ function cleanupStaleKeys() {
 
 function handleInitResponse(data: unknown) {
   if (
-    data && typeof data === "object" && "token" in data &&
+    data &&
+    typeof data === "object" &&
+    "token" in data &&
     typeof data.token === "string"
   ) {
     setCsrfToken(data.token);

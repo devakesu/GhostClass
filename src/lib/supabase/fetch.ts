@@ -24,9 +24,11 @@ function combineSignals(
     return tierSignal;
   }
 
-  const abortSignalAny = (AbortSignal as typeof AbortSignal & {
-    any?: (signals: AbortSignal[]) => AbortSignal;
-  }).any;
+  const abortSignalAny = (
+    AbortSignal as typeof AbortSignal & {
+      any?: (signals: AbortSignal[]) => AbortSignal;
+    }
+  ).any;
 
   if (typeof abortSignalAny === "function") {
     return abortSignalAny([callerSignal, tierSignal]);
@@ -82,9 +84,10 @@ function resolveDevOverrides(
   }
 
   const devUrl = process.env.NEXT_PUBLIC_SUPABASE_DEV_URL;
-  const devKey = type === "admin"
-    ? process.env.SUPABASE_DEV_SECRET_KEY
-    : process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY;
+  const devKey =
+    type === "admin"
+      ? process.env.SUPABASE_DEV_SECRET_KEY
+      : process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY;
 
   if (devUrl && devKey) {
     return { url: devUrl, key: devKey };
@@ -110,10 +113,11 @@ function resolveDevOverrides(
  */
 export function getSupabaseConfig(type: "client" | "admin" = "client") {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = type === "admin"
-    ? (process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY)
-    : (process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
-      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY);
+  const key =
+    type === "admin"
+      ? process.env.SUPABASE_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+      : process.env.NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY ||
+        process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY;
 
   const resolved = resolveDevOverrides(url, key, type);
 
@@ -193,11 +197,12 @@ async function attemptTierFetch(
   isLast: boolean,
   isDev: boolean,
 ): Promise<
-  { success: true; response: Response } | {
-    success: false;
-    retryable: boolean;
-    error?: unknown;
-  }
+  | { success: true; response: Response }
+  | {
+      success: false;
+      retryable: boolean;
+      error?: unknown;
+    }
 > {
   const url = `${tier.base}${path}`;
   const tierController = new AbortController();
@@ -225,7 +230,9 @@ async function attemptTierFetch(
     clearTimeout(tierTimeout);
 
     if (
-      SUPABASE_RETRYABLE_STATUSES.has(res.status) && !isLast && isSafeMethod
+      SUPABASE_RETRYABLE_STATUSES.has(res.status) &&
+      !isLast &&
+      isSafeMethod
     ) {
       await res.body?.cancel();
       return { success: false, retryable: true };
@@ -244,7 +251,8 @@ async function extractBodyOverride(
   init: RequestInit | undefined,
   input: RequestInfo | URL,
 ): Promise<ArrayBuffer | null> {
-  const rawBody = (init?.body as BodyInit | null | undefined) ??
+  const rawBody =
+    (init?.body as BodyInit | null | undefined) ??
     (input instanceof Request && !input.bodyUsed ? input.body : null);
   if (rawBody instanceof ReadableStream) {
     try {
@@ -272,9 +280,8 @@ export function buildSupabaseTieredFetch(
     if (!u) return null;
     try {
       const url = new URL(u);
-      const basePath = url.pathname === "/"
-        ? ""
-        : stripTrailingSlashes(url.pathname);
+      const basePath =
+        url.pathname === "/" ? "" : stripTrailingSlashes(url.pathname);
       return `${url.origin}${basePath}`;
     } catch {
       return null;
@@ -328,12 +335,12 @@ export function buildSupabaseTieredFetch(
     const path = `${parsedInputUrl.pathname}${parsedInputUrl.search}`;
     const callerSignal: AbortSignal | null =
       (init?.signal as AbortSignal | undefined) ??
-        (input instanceof Request ? input.signal : null);
-    const method =
-      (init?.method ?? (input instanceof Request ? input.method : "GET"))
-        .toUpperCase();
-    const isSafeMethod = method === "GET" || method === "HEAD" ||
-      method === "OPTIONS";
+      (input instanceof Request ? input.signal : null);
+    const method = (
+      init?.method ?? (input instanceof Request ? input.method : "GET")
+    ).toUpperCase();
+    const isSafeMethod =
+      method === "GET" || method === "HEAD" || method === "OPTIONS";
 
     let bodyOverride: ArrayBuffer | null = null;
     if (tiers.length > 1) {

@@ -27,8 +27,7 @@ describe("instrumentation-server", () => {
 
     const breadcrumb: any = {
       data: {
-        url:
-          "https://www.google-analytics.com/collect?api_secret=secret123&v=1",
+        url: "https://www.google-analytics.com/collect?api_secret=secret123&v=1",
       },
     };
     const processed: any = options.beforeBreadcrumb!(breadcrumb);
@@ -81,8 +80,8 @@ describe("instrumentation-server", () => {
     const event: any = {
       request: {
         headers: {
-          "authorization": "Bearer secret",
-          "cookie": "session=abc",
+          authorization: "Bearer secret",
+          cookie: "session=abc",
           "user-agent": "browser",
         },
       },
@@ -106,10 +105,10 @@ describe("instrumentation-server", () => {
         },
         {
           data: {
-            "url": "https://google-analytics.com/collect?api_secret=456",
+            url: "https://google-analytics.com/collect?api_secret=456",
           },
         },
-        { data: { "other": "no-change" } },
+        { data: { other: "no-change" } },
       ],
     };
     const result: any = options.beforeSendTransaction!(event as any, {} as any);

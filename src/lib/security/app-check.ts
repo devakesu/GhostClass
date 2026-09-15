@@ -97,13 +97,18 @@ export interface AuthResult {
   isMobileRequest?: boolean;
 }
 
-function isSessionMatched(boundSession: string, currentSession: string): boolean {
-  const normalizedBound = typeof extractStableSessionId === "function"
-    ? extractStableSessionId(boundSession)
-    : boundSession;
-  const normalizedCurrent = typeof extractStableSessionId === "function"
-    ? extractStableSessionId(currentSession)
-    : currentSession;
+function isSessionMatched(
+  boundSession: string,
+  currentSession: string,
+): boolean {
+  const normalizedBound =
+    typeof extractStableSessionId === "function"
+      ? extractStableSessionId(boundSession)
+      : boundSession;
+  const normalizedCurrent =
+    typeof extractStableSessionId === "function"
+      ? extractStableSessionId(currentSession)
+      : currentSession;
   return normalizedBound === normalizedCurrent;
 }
 
@@ -256,9 +261,7 @@ async function verifyAppCheckAuth(
   };
 }
 
-async function verifyCsrfAuth(
-  headerList: Headers,
-): Promise<AuthResult> {
+async function verifyCsrfAuth(headerList: Headers): Promise<AuthResult> {
   const sessionId = await getSessionIdFromCookie();
   const res = await verifyCsrfTokenWithSessionBinding(headerList, sessionId);
   if (!res.isValid) {
@@ -300,8 +303,10 @@ async function verifyAuthentication(
   }
 
   if (
-    process.env.NODE_ENV !== "production" && process.env.VITEST === "true" &&
-    !hasAppCheckToken && !csrfToken
+    process.env.NODE_ENV !== "production" &&
+    process.env.VITEST === "true" &&
+    !hasAppCheckToken &&
+    !csrfToken
   ) {
     return { isValid: true, authType: "none" };
   }
@@ -318,8 +323,8 @@ async function verifyAuthentication(
   const method = req.method.toUpperCase();
   const isStateChanging = ["POST", "PUT", "DELETE", "PATCH"].includes(method);
   if (isStateChanging && !hasAppCheckToken) {
-    const isVitestBypass = process.env.NODE_ENV !== "production" &&
-      process.env.VITEST === "true";
+    const isVitestBypass =
+      process.env.NODE_ENV !== "production" && process.env.VITEST === "true";
     if (!isVitestBypass) {
       return {
         isValid: false,
@@ -399,9 +404,8 @@ export function withSecurity<T = unknown>(
     },
   ) => {
     const rawParams = context?.params;
-    const resolvedParams = rawParams instanceof Promise
-      ? await rawParams
-      : (rawParams ?? {});
+    const resolvedParams =
+      rawParams instanceof Promise ? await rawParams : (rawParams ?? {});
 
     let clientIp: string | null = null;
     try {
@@ -411,22 +415,28 @@ export function withSecurity<T = unknown>(
     }
 
     if (!(await handleRateLimit(req, clientIp))) {
-      return NextResponse.json({ error: "Rate limit exceeded" }, {
-        status: 429,
-        headers: { "Retry-After": "60" },
-      });
+      return NextResponse.json(
+        { error: "Rate limit exceeded" },
+        {
+          status: 429,
+          headers: { "Retry-After": "60" },
+        },
+      );
     }
 
     const authRes = await verifyAuthentication(req, options);
     if (!authRes.isValid) {
-      return NextResponse.json({
-        error: authRes.error || "Unauthenticated",
-        message: authRes.error || "Unauthenticated",
-        reason: authRes.reason || SECURITY_ERRORS.DEFAULT.reason,
-        action: authRes.action || SECURITY_ERRORS.DEFAULT.action,
-        criticalRisk: authRes.criticalRisk ?? false,
-        type: "security",
-      }, { status: authRes.authType === "csrf" ? 403 : 401 });
+      return NextResponse.json(
+        {
+          error: authRes.error || "Unauthenticated",
+          message: authRes.error || "Unauthenticated",
+          reason: authRes.reason || SECURITY_ERRORS.DEFAULT.reason,
+          action: authRes.action || SECURITY_ERRORS.DEFAULT.action,
+          criticalRisk: authRes.criticalRisk ?? false,
+          type: "security",
+        },
+        { status: authRes.authType === "csrf" ? 403 : 401 },
+      );
     }
 
     const response = await handler(req, {
@@ -438,9 +448,12 @@ export function withSecurity<T = unknown>(
     });
     if (!response) {
       Sentry.captureException(new Error("Handler no response"));
-      return NextResponse.json({ error: "Internal security error" }, {
-        status: 500,
-      });
+      return NextResponse.json(
+        { error: "Internal security error" },
+        {
+          status: 500,
+        },
+      );
     }
 
     return response;

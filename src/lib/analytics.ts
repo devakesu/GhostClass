@@ -89,8 +89,9 @@ export async function trackPageView(
         params: {
           page_location: pageData.page_location,
           ...(pageData.page_title && { page_title: pageData.page_title }),
-          ...(pageData.page_referrer &&
-            { page_referrer: pageData.page_referrer }),
+          ...(pageData.page_referrer && {
+            page_referrer: pageData.page_referrer,
+          }),
         },
       },
     ],
@@ -135,8 +136,7 @@ export function getOrCreateClientId(): string {
   // it does not contain authentication or other sensitive data.
   const isProd = process.env.NODE_ENV === "production";
   const secureAttr = isProd ? "; Secure" : "";
-  document.cookie =
-    `${cookieName}=${clientId}; path=/; max-age=63072000; SameSite=Lax${secureAttr}`; // 2 years
+  document.cookie = `${cookieName}=${clientId}; path=/; max-age=63072000; SameSite=Lax${secureAttr}`; // 2 years
 
   return clientId;
 }

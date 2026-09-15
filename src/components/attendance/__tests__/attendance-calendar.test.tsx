@@ -29,14 +29,12 @@ const {
 
 vi.mock("@/hooks/users/user", () => ({ useUser: mockUseUser }));
 vi.mock("@/hooks/users/profile", () => ({ useProfile: mockUseProfile }));
-vi.mock(
-  "@/hooks/tracker/useTrackingData",
-  () => ({ useTrackingData: mockUseTrackingData }),
-);
-vi.mock(
-  "@/hooks/tracker/useTrackingCount",
-  () => ({ useTrackingCount: mockUseTrackingCount }),
-);
+vi.mock("@/hooks/tracker/useTrackingData", () => ({
+  useTrackingData: mockUseTrackingData,
+}));
+vi.mock("@/hooks/tracker/useTrackingCount", () => ({
+  useTrackingCount: mockUseTrackingCount,
+}));
 
 vi.mock("@/hooks/users/settings", () => ({
   useFetchSemester: () => ({ data: "even", isLoading: false }),
@@ -90,9 +88,7 @@ describe("AttendanceCalendar", () => {
 
   const renderWithProviders = (ui: React.ReactElement) => {
     return render(
-      <QueryClientProvider client={queryClient}>
-        {ui}
-      </QueryClientProvider>,
+      <QueryClientProvider client={queryClient}>{ui}</QueryClientProvider>,
     );
   };
 
@@ -104,8 +100,9 @@ describe("AttendanceCalendar", () => {
         year="2025-26"
       />,
     );
-    expect(await screen.findByRole("heading", { level: 3 }))
-      .toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { level: 3 }),
+    ).toBeInTheDocument();
   });
 
   it("renders custom DL remarks for an extra event", async () => {
@@ -165,7 +162,7 @@ describe("AttendanceCalendar", () => {
         year="2025-26"
         coursesData={{
           courses: {
-            "GAMAT402": {
+            GAMAT402: {
               id: 999,
               code: "GAMAT402",
               name: "Advanced Applied Mathematics",
@@ -214,4 +211,3 @@ describe("AttendanceCalendar", () => {
     expect(await screen.findByText("GAMAT301")).toBeInTheDocument();
   });
 });
-

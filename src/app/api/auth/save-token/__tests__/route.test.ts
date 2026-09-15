@@ -28,7 +28,7 @@ vi.mock("@/lib/crypto", () => ({
 vi.mock("@/lib/ratelimit", () => ({
   authRateLimiter: {
     limit: vi.fn(() =>
-      Promise.resolve({ success: true, limit: 10, reset: 0, remaining: 9 })
+      Promise.resolve({ success: true, limit: 10, reset: 0, remaining: 9 }),
     ),
   },
 }));
@@ -59,7 +59,7 @@ vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
   getSessionIdFromCookie: vi.fn(() => Promise.resolve(null)),
   verifyCsrfTokenWithSessionBinding: vi.fn(() =>
-    Promise.resolve({ isValid: true })
+    Promise.resolve({ isValid: true }),
   ),
 }));
 
@@ -73,7 +73,7 @@ vi.mock("@/lib/supabase/admin", () => ({
 
 vi.mock("@/lib/user/sync", () => ({
   performProfileSync: vi.fn(() =>
-    Promise.resolve({ updates: 0, deletions: 0 })
+    Promise.resolve({ updates: 0, deletions: 0 }),
   ),
 }));
 
@@ -86,7 +86,7 @@ vi.mock("@supabase/ssr", () => ({
   createServerClient: vi.fn(() => ({
     auth: {
       signInWithPassword: vi.fn(() =>
-        Promise.resolve({ data: { user: { id: "auth-id" } }, error: null })
+        Promise.resolve({ data: { user: { id: "auth-id" } }, error: null }),
       ),
     },
   })),
@@ -116,9 +116,12 @@ describe("POST /api/auth/save-token", () => {
   beforeEach(() => {
     vi.clearAllMocks();
     __resetAllowedHostsCache();
-    vi.mocked(authRateLimiter.limit).mockResolvedValue(
-      { success: true, limit: 10, reset: 0, remaining: 9 } as any,
-    );
+    vi.mocked(authRateLimiter.limit).mockResolvedValue({
+      success: true,
+      limit: 10,
+      reset: 0,
+      remaining: 9,
+    } as any);
     mockHeaders.get.mockImplementation((name) => {
       if (name === "x-csrf-token") return "valid-csrf";
       if (name === "origin") return "https://localhost:3000";
@@ -172,7 +175,7 @@ describe("POST /api/auth/save-token", () => {
             Promise.resolve({
               data: { user: { id: "proxy-auth-id" } },
               error: null,
-            })
+            }),
           ),
         },
       },
@@ -180,7 +183,7 @@ describe("POST /api/auth/save-token", () => {
         upsert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
         single: vi.fn(() =>
-          Promise.resolve({ data: { id: "99999" }, error: null })
+          Promise.resolve({ data: { id: "99999" }, error: null }),
         ),
         eq: vi.fn().mockReturnThis(),
         maybeSingle: vi.fn(() => Promise.resolve({ data: null })),
@@ -199,14 +202,12 @@ describe("POST /api/auth/save-token", () => {
   });
 
   it("returns 429 when rate limited", async () => {
-    vi.mocked(authRateLimiter.limit).mockResolvedValue(
-      {
-        success: false,
-        limit: 1,
-        reset: Date.now() + 1000,
-        remaining: 0,
-      } as any,
-    );
+    vi.mocked(authRateLimiter.limit).mockResolvedValue({
+      success: false,
+      limit: 1,
+      reset: Date.now() + 1000,
+      remaining: 0,
+    } as any);
 
     const req = { json: async () => ({ token: "test-token" }) } as any;
     const response = await POST(req, {} as any);
@@ -240,7 +241,7 @@ describe("POST /api/auth/save-token", () => {
             Promise.resolve({
               data: { user: { id: "new-auth-id" } },
               error: null,
-            })
+            }),
           ),
         },
       },
@@ -248,7 +249,7 @@ describe("POST /api/auth/save-token", () => {
         upsert: vi.fn().mockReturnThis(),
         select: vi.fn().mockReturnThis(),
         single: vi.fn(() =>
-          Promise.resolve({ data: { id: "12345" }, error: null })
+          Promise.resolve({ data: { id: "12345" }, error: null }),
         ),
         eq: vi.fn().mockReturnThis(),
         maybeSingle: vi.fn(() => Promise.resolve({ data: null })),
@@ -285,7 +286,7 @@ describe("POST /api/auth/save-token", () => {
             Promise.resolve({
               data: { user: null },
               error: { message: "User already registered", status: 422 },
-            })
+            }),
           ),
         },
       },
@@ -302,7 +303,7 @@ describe("POST /api/auth/save-token", () => {
                   auth_password_iv: "0123456789abcdef01234567",
                 },
                 error: null,
-              })
+              }),
             ),
             upsert: vi.fn().mockResolvedValue({ error: null }),
           };
@@ -312,7 +313,7 @@ describe("POST /api/auth/save-token", () => {
             select: vi.fn().mockReturnThis(),
             eq: vi.fn().mockReturnThis(),
             maybeSingle: vi.fn(() =>
-              Promise.resolve({ data: { target_percentage: 75 } })
+              Promise.resolve({ data: { target_percentage: 75 } }),
             ),
           };
         }
@@ -357,7 +358,8 @@ describe("POST /api/auth/save-token", () => {
     const mockSupabaseAdmin = {
       auth: {
         admin: {
-          createUser: vi.fn()
+          createUser: vi
+            .fn()
             .mockResolvedValueOnce({
               data: { user: null },
               error: { message: "User already registered", status: 422 },
@@ -369,13 +371,15 @@ describe("POST /api/auth/save-token", () => {
           listUsers: vi.fn(() =>
             Promise.resolve({
               data: {
-                users: [{
-                  id: "orphan-uuid",
-                  email: "ezygo_99999@localhost:3000",
-                }],
+                users: [
+                  {
+                    id: "orphan-uuid",
+                    email: "ezygo_99999@localhost:3000",
+                  },
+                ],
               },
               error: null,
-            })
+            }),
           ),
           deleteUser: vi.fn(() => Promise.resolve({ error: null })),
         },
@@ -384,7 +388,7 @@ describe("POST /api/auth/save-token", () => {
         select: vi.fn().mockReturnThis(),
         eq: vi.fn().mockReturnThis(),
         single: vi.fn(() =>
-          Promise.resolve({ data: { auth_id: null }, error: null })
+          Promise.resolve({ data: { auth_id: null }, error: null }),
         ), // Orphan detected
         upsert: vi.fn().mockResolvedValue({ error: null }),
       })),

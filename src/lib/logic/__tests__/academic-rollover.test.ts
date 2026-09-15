@@ -1,9 +1,5 @@
 import { describe, expect, it } from "vitest";
-import {
-  hasAcademicRollover,
-  semestersDiffer,
-  yearsDiffer,
-} from "../academic";
+import { hasAcademicRollover, semestersDiffer, yearsDiffer } from "../academic";
 
 describe("Academic Rollover & Context Normalization", () => {
   describe("yearsDiffer", () => {

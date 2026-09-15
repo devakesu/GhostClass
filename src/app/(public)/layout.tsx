@@ -16,9 +16,7 @@ export default function PublicLayout({
 
         <main className="flex-1 w-full pt-20">
           <OutageProvider>
-            <ErrorBoundary>
-              {children}
-            </ErrorBoundary>
+            <ErrorBoundary>{children}</ErrorBoundary>
           </OutageProvider>
         </main>
 

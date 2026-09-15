@@ -171,7 +171,8 @@ export function isDutyLeaveConstraintError(error: unknown): boolean {
   const errorObj = error as Record<string, unknown>;
 
   // Check direct error properties
-  const isDirectMatch = errorObj.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE &&
+  const isDirectMatch =
+    errorObj.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE &&
     errorObj.hint === DB_CONSTRAINTS.DUTY_LEAVE_LIMIT;
 
   if (isDirectMatch) return true;
@@ -179,7 +180,8 @@ export function isDutyLeaveConstraintError(error: unknown): boolean {
   // Check if error is wrapped in a details property or other nested structure
   if (errorObj.details && typeof errorObj.details === "object") {
     const details = errorObj.details as Record<string, unknown>;
-    const isNestedMatch = details.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE &&
+    const isNestedMatch =
+      details.code === DB_CONSTRAINTS.DUTY_LEAVE_CODE &&
       details.hint === DB_CONSTRAINTS.DUTY_LEAVE_LIMIT;
 
     if (isNestedMatch) {

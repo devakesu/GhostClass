@@ -152,11 +152,14 @@ describe("UserSettingsProvider", () => {
     vi.stubGlobal("localStorage", createMockStorage());
     vi.stubGlobal("sessionStorage", createMockStorage());
 
-    vi.mocked(useQuery).mockImplementation((options: unknown) => ({
-      data: (options as { placeholderData?: unknown })?.placeholderData,
-      isLoading: false,
-      isFetching: false,
-    } as unknown as ReturnType<typeof useQuery>));
+    vi.mocked(useQuery).mockImplementation(
+      (options: unknown) =>
+        ({
+          data: (options as { placeholderData?: unknown })?.placeholderData,
+          isLoading: false,
+          isFetching: false,
+        }) as unknown as ReturnType<typeof useQuery>,
+    );
 
     vi.mocked(useMutation).mockReturnValue({
       mutate: mockMutate,
@@ -228,10 +231,12 @@ describe("UserSettingsProvider", () => {
   it("configures stable refetch policy for user settings", () => {
     render(<WrappedConsumer />);
 
-    const firstCallArgs = vi.mocked(useQuery).mock.calls[0]?.[0] as {
-      refetchOnWindowFocus?: boolean;
-      refetchInterval?: boolean;
-    } | undefined;
+    const firstCallArgs = vi.mocked(useQuery).mock.calls[0]?.[0] as
+      | {
+          refetchOnWindowFocus?: boolean;
+          refetchInterval?: boolean;
+        }
+      | undefined;
 
     expect(firstCallArgs).toBeDefined();
     expect(firstCallArgs?.refetchOnWindowFocus).toBe(false);
@@ -240,9 +245,9 @@ describe("UserSettingsProvider", () => {
 
   describe("useUserSettings guard", () => {
     it("throws when used outside provider", () => {
-      const consoleSpy = vi.spyOn(console, "error").mockImplementation(
-        () => {},
-      );
+      const consoleSpy = vi
+        .spyOn(console, "error")
+        .mockImplementation(() => {});
       expect(() => render(<TestConsumer />)).toThrow(
         "useUserSettings must be used inside <UserSettingsProvider>",
       );
@@ -695,9 +700,11 @@ describe("UserSettingsProvider", () => {
         authStateCallback?.("SIGNED_IN", { user: { id: userId } });
       });
 
-      expect(vi.mocked(useQuery)).toHaveBeenCalledWith(expect.objectContaining({
-        placeholderData: settings,
-      }));
+      expect(vi.mocked(useQuery)).toHaveBeenCalledWith(
+        expect.objectContaining({
+          placeholderData: settings,
+        }),
+      );
     });
 
     it("rejects legacy format when userId is provided", async () => {
@@ -787,11 +794,14 @@ describe("UserSettingsProvider", () => {
         JSON.stringify({ userId, settings }),
       );
 
-      vi.mocked(useQuery).mockImplementation(() => ({
-        data: null,
-        isLoading: false,
-        isFetching: false,
-      } as unknown as ReturnType<typeof useQuery>));
+      vi.mocked(useQuery).mockImplementation(
+        () =>
+          ({
+            data: null,
+            isLoading: false,
+            isFetching: false,
+          }) as unknown as ReturnType<typeof useQuery>,
+      );
 
       render(<WrappedConsumer />);
       await act(async () => {
@@ -799,9 +809,11 @@ describe("UserSettingsProvider", () => {
       });
 
       await waitFor(() => {
-        expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({
-          target_percentage: 88,
-        }));
+        expect(mockMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            target_percentage: 88,
+          }),
+        );
       });
     });
 
@@ -809,11 +821,14 @@ describe("UserSettingsProvider", () => {
       window.localStorage.setItem("showBunkCalc", "false");
       window.localStorage.setItem("targetPercentage", "92");
 
-      vi.mocked(useQuery).mockImplementation(() => ({
-        data: null,
-        isLoading: false,
-        isFetching: false,
-      } as unknown as ReturnType<typeof useQuery>));
+      vi.mocked(useQuery).mockImplementation(
+        () =>
+          ({
+            data: null,
+            isLoading: false,
+            isFetching: false,
+          }) as unknown as ReturnType<typeof useQuery>,
+      );
 
       render(<WrappedConsumer />);
       await act(async () => {
@@ -821,9 +836,11 @@ describe("UserSettingsProvider", () => {
       });
 
       await waitFor(() => {
-        expect(mockMutate).toHaveBeenCalledWith(expect.objectContaining({
-          target_percentage: 92,
-        }));
+        expect(mockMutate).toHaveBeenCalledWith(
+          expect.objectContaining({
+            target_percentage: 92,
+          }),
+        );
       });
       expect(window.localStorage.removeItem).toHaveBeenCalledWith(
         "showBunkCalc",
@@ -839,9 +856,11 @@ describe("UserSettingsProvider", () => {
         authStateCallback?.("SIGNED_IN", { user: { id: userId } });
       });
 
-      const queryCall = vi.mocked(useQuery).mock.calls.find((c) =>
-        (c[0] as { queryKey?: unknown[] })?.queryKey?.[1] === userId
-      );
+      const queryCall = vi
+        .mocked(useQuery)
+        .mock.calls.find(
+          (c) => (c[0] as { queryKey?: unknown[] })?.queryKey?.[1] === userId,
+        );
       const queryFn = (queryCall?.[0] as { queryFn?: () => Promise<unknown> })
         ?.queryFn;
 
@@ -879,9 +898,11 @@ describe("UserSettingsProvider", () => {
 
       const calls = vi.mocked(useMutation).mock.calls;
       const mutationCall = calls[calls.length - 1];
-      const mutationFn = (mutationCall?.[0] as {
-        mutationFn?: (vars: unknown) => Promise<unknown>;
-      })?.mutationFn;
+      const mutationFn = (
+        mutationCall?.[0] as {
+          mutationFn?: (vars: unknown) => Promise<unknown>;
+        }
+      )?.mutationFn;
 
       if (mutationFn) {
         // Success case
@@ -897,9 +918,9 @@ describe("UserSettingsProvider", () => {
     it("exercises retry logic branches", () => {
       render(<WrappedConsumer />);
       const queryCall = vi.mocked(useQuery).mock.calls[0];
-      const retry =
-        (queryCall?.[0] as { retry?: (count: number, err: unknown) => boolean })
-          ?.retry;
+      const retry = (
+        queryCall?.[0] as { retry?: (count: number, err: unknown) => boolean }
+      )?.retry;
       if (retry) {
         expect(retry(0, { code: "PGRST116" })).toBe(false);
         expect(retry(1, new Error("other"))).toBe(true);

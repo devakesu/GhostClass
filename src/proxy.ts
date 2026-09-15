@@ -22,7 +22,8 @@ function clearSessionCookies(res: NextResponse, request: NextRequest) {
     const allCookies = request.cookies.getAll();
     for (const cookie of allCookies) {
       if (
-        cookie.name.startsWith("sb-") && cookie.name.includes("-auth-token")
+        cookie.name.startsWith("sb-") &&
+        cookie.name.includes("-auth-token")
       ) {
         res.cookies.delete(cookie.name);
       }
@@ -91,7 +92,9 @@ async function shouldBypassTermsRedirect(
       });
       return true;
     }
-  } catch { /* proceed to redirect */ }
+  } catch {
+    /* proceed to redirect */
+  }
 
   return false;
 }
@@ -103,29 +106,32 @@ function isRefreshTokenNotFoundError(error: unknown): boolean {
     status?: unknown;
     message?: unknown;
   };
-  return authError.code === "refresh_token_not_found" ||
-    (authError.status === 400 && typeof authError.message === "string" &&
-      authError.message.includes("Invalid Refresh Token"));
+  return (
+    authError.code === "refresh_token_not_found" ||
+    (authError.status === 400 &&
+      typeof authError.message === "string" &&
+      authError.message.includes("Invalid Refresh Token"))
+  );
 }
 
 /**
  * Attempts to get the user with a single retry on network failure.
  */
-async function getUserWithRetry(
-  supabase: {
-    auth: {
-      getUser(): Promise<
-        { data: { user: { id: string } | null }; error: unknown }
-      >;
-    };
-  },
-) {
+async function getUserWithRetry(supabase: {
+  auth: {
+    getUser(): Promise<{
+      data: { user: { id: string } | null };
+      error: unknown;
+    }>;
+  };
+}) {
   try {
     const res = await supabase.auth.getUser();
     return res;
   } catch (err: unknown) {
     const error = err as { message?: string; status?: number };
-    const isTransient = error?.message?.includes("fetch") ||
+    const isTransient =
+      error?.message?.includes("fetch") ||
       error?.message?.includes("Network") ||
       error?.status === 502 ||
       error?.status === 503 ||
@@ -222,7 +228,8 @@ async function resolveSessionUser(
     );
     if (error) {
       if (
-        !isRefreshTokenNotFoundError(error) && !isAuthSessionMissingError(error)
+        !isRefreshTokenNotFoundError(error) &&
+        !isAuthSessionMissingError(error)
       ) {
         logger.warn(
           "Supabase auth refresh failed in middleware; treating as unauthenticated.",
@@ -284,11 +291,11 @@ async function enforceRoutingScenarios({
   ];
   const isAuthRoute = pathname === "/";
   const isAcceptTermsRoute = pathname === "/accept-terms";
-  const isNavigationRequest = request.method === "GET" ||
-    request.method === "HEAD";
+  const isNavigationRequest =
+    request.method === "GET" || request.method === "HEAD";
 
   const isProtectedRoute = protectedRoutePrefixes.some((routePrefix) =>
-    pathname.startsWith(routePrefix)
+    pathname.startsWith(routePrefix),
   );
 
   // Scenario A: Unauthenticated
@@ -308,7 +315,8 @@ async function enforceRoutingScenarios({
 
   // Scenario B: Terms Enforcement
   if (
-    user && (!termsVersion || termsVersion !== TERMS_VERSION) &&
+    user &&
+    (!termsVersion || termsVersion !== TERMS_VERSION) &&
     isProtectedRoute
   ) {
     if (await shouldBypassTermsRedirect(supabase, user.id, isProd, response)) {
@@ -361,7 +369,9 @@ async function enforceRoutingScenarios({
 
   // Scenario C: Already Accepted Terms
   if (
-    user && termsVersion === TERMS_VERSION && isAcceptTermsRoute &&
+    user &&
+    termsVersion === TERMS_VERSION &&
+    isAcceptTermsRoute &&
     isNavigationRequest
   ) {
     const url = request.nextUrl.clone();
@@ -398,8 +408,8 @@ export async function proxy(request: NextRequest) {
   const nonce = createNonce();
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-nonce", nonce);
-  const isNavigationRequest = request.method === "GET" ||
-    request.method === "HEAD";
+  const isNavigationRequest =
+    request.method === "GET" || request.method === "HEAD";
   const redirectStatus = isNavigationRequest ? 307 : 303;
 
   const cspHeader = getCspHeader(nonce);
@@ -408,23 +418,23 @@ export async function proxy(request: NextRequest) {
   });
 
   const pathname = request.nextUrl.pathname;
-  const isApiDocs = pathname === "/api-docs" ||
-    pathname.startsWith("/api-docs/");
+  const isApiDocs =
+    pathname === "/api-docs" || pathname.startsWith("/api-docs/");
   const effectiveCspHeader = isApiDocs
     ? [
-      "default-src 'self'",
-      "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-      "script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
-      "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
-      "font-src 'self' data: https://fonts.gstatic.com",
-      "img-src 'self' data: blob: https://cdn.jsdelivr.net",
-      "connect-src 'self' https://cdn.jsdelivr.net",
-      "worker-src 'self' blob:",
-      "frame-ancestors 'none'",
-      "object-src 'none'",
-      "base-uri 'self'",
-    ].join("; ")
+        "default-src 'self'",
+        "script-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "script-src-elem 'self' 'unsafe-inline' https://cdn.jsdelivr.net",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "style-src-elem 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https://cdn.jsdelivr.net",
+        "connect-src 'self' https://cdn.jsdelivr.net",
+        "worker-src 'self' blob:",
+        "frame-ancestors 'none'",
+        "object-src 'none'",
+        "base-uri 'self'",
+      ].join("; ")
     : cspHeader;
 
   response.headers.set("Content-Security-Policy", effectiveCspHeader);
@@ -437,29 +447,25 @@ export async function proxy(request: NextRequest) {
   const isProd = process.env.NODE_ENV === "production";
   const { url: supabaseUrl, key: supabaseKey } = getSupabaseConfig("client");
 
-  const supabase = createServerClient(
-    supabaseUrl!,
-    supabaseKey!,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-          response = NextResponse.next({
-            request: { headers: requestHeaders },
-          });
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-          applyProxyHeaders(response, effectiveCspHeader, nonce, isApiDocs);
-        },
+  const supabase = createServerClient(supabaseUrl!, supabaseKey!, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
+      },
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value),
+        );
+        response = NextResponse.next({
+          request: { headers: requestHeaders },
+        });
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        );
+        applyProxyHeaders(response, effectiveCspHeader, nonce, isApiDocs);
       },
     },
-  );
+  });
 
   const { user, isUnauthenticatedCertain } = await resolveSessionUser(
     supabase,

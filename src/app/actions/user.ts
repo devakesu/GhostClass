@@ -56,7 +56,9 @@ export async function acceptTermsAction(version: string, csrfToken?: string) {
 
   const supabase = await createClient();
 
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
   const { error } = await supabase
@@ -161,7 +163,9 @@ export async function selectUserClassAction(
   if (!isValid) throw new Error("Invalid security token");
 
   const supabase = await createClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
 
   const supabaseAdmin = getAdminClient();

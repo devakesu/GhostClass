@@ -11,11 +11,13 @@ const DEFAULT_PACKAGE_NAME = "com.devakesu.apps.ghostclass";
  * to ensure build transparency, auditability, and reproducibility.
  */
 export function GET() {
-  const packageName = process.env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME?.trim() ||
+  const packageName =
+    process.env.NEXT_PUBLIC_ANDROID_PACKAGE_NAME?.trim() ||
     process.env.ANDROID_PACKAGE_NAME?.trim() ||
     DEFAULT_PACKAGE_NAME;
 
-  const rawFingerprints = process.env.NEXT_PUBLIC_ANDROID_SHA256_FINGERPRINTS ||
+  const rawFingerprints =
+    process.env.NEXT_PUBLIC_ANDROID_SHA256_FINGERPRINTS ||
     process.env.ANDROID_SHA256_FINGERPRINTS ||
     "";
 

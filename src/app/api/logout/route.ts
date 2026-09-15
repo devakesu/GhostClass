@@ -25,9 +25,7 @@ const handler = async (req: NextRequest) => {
       { status: 400, headers: { "Cache-Control": "no-store" } },
     );
   }
-  const { success, reset } = await authRateLimiter.limit(
-    `logout_${ip}`,
-  );
+  const { success, reset } = await authRateLimiter.limit(`logout_${ip}`);
   if (!success) {
     return NextResponse.json(
       { message: "Too many requests. Please try again later." },
@@ -35,8 +33,10 @@ const handler = async (req: NextRequest) => {
         status: 429,
         headers: {
           "Cache-Control": "no-store",
-          "Retry-After": Math.max(0, Math.ceil((reset - Date.now()) / 1000))
-            .toString(),
+          "Retry-After": Math.max(
+            0,
+            Math.ceil((reset - Date.now()) / 1000),
+          ).toString(),
         },
       },
     );

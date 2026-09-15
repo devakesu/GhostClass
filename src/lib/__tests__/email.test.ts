@@ -6,7 +6,7 @@ describe("email.ts", () => {
   beforeEach(() => {
     vi.resetModules();
     vi.spyOn(global, "fetch").mockImplementation(() =>
-      Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as any)
+      Promise.resolve({ ok: true, json: () => Promise.resolve({}) } as any),
     );
   });
 
@@ -88,9 +88,9 @@ describe("email.ts", () => {
     expect(result.provider).toBe("SendPulse");
     expect(result.id).toBe("sp-123");
 
-    const sendPulseCall = vi.mocked(global.fetch).mock.calls.find(([url]) =>
-      String(url).includes("smtp/emails")
-    );
+    const sendPulseCall = vi
+      .mocked(global.fetch)
+      .mock.calls.find(([url]) => String(url).includes("smtp/emails"));
     expect(sendPulseCall).toBeDefined();
     if (sendPulseCall) {
       const sendPulseOptions = sendPulseCall[1];
@@ -213,12 +213,12 @@ describe("email.ts", () => {
     vi.stubEnv("SENDPULSE_CLIENT_SECRET", "sp-secret");
 
     // Mock crypto.getRandomValues to return >= 128 (starts with Brevo)
-    const spy = vi.spyOn(crypto, "getRandomValues").mockImplementation(
-      (arr: any) => {
+    const spy = vi
+      .spyOn(crypto, "getRandomValues")
+      .mockImplementation((arr: any) => {
         arr[0] = 200;
         return arr;
-      },
-    );
+      });
 
     global.fetch = vi.fn().mockResolvedValue({
       ok: true,
@@ -268,14 +268,15 @@ describe("email.ts", () => {
     vi.stubEnv("BREVO_API_KEY", "brevo-key");
     vi.stubEnv("SENDPULSE_CLIENT_ID", "sp-id");
     vi.stubEnv("SENDPULSE_CLIENT_SECRET", "sp-secret");
-    const spy = vi.spyOn(crypto, "getRandomValues").mockImplementation(
-      (arr: any) => {
+    const spy = vi
+      .spyOn(crypto, "getRandomValues")
+      .mockImplementation((arr: any) => {
         arr[0] = 50;
         return arr;
-      },
-    ); // Start with SendPulse
+      }); // Start with SendPulse
 
-    global.fetch = vi.fn()
+    global.fetch = vi
+      .fn()
       .mockRejectedValueOnce(new Error("SP primary fail")) // SP fail
       .mockRejectedValueOnce(new Error("SP auth fail")) // SP auth fail for primary
       .mockRejectedValueOnce(new Error("Brevo secondary fail")); // Brevo fail
@@ -491,7 +492,10 @@ describe("email.ts", () => {
         oauthFetchCount++;
         return {
           ok: true,
-          json: async () => ({ access_token: "cached-sp-token", expires_in: 3600 }),
+          json: async () => ({
+            access_token: "cached-sp-token",
+            expires_in: 3600,
+          }),
         };
       }
       if (url.includes("smtp/emails")) {

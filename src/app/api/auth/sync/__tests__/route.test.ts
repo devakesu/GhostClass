@@ -35,7 +35,7 @@ vi.mock("@/lib/crypto", () => ({
 vi.mock("@/lib/ratelimit", () => ({
   authRateLimiter: {
     limit: vi.fn(() =>
-      Promise.resolve({ success: true, reset: 0, limit: 10, remaining: 9 })
+      Promise.resolve({ success: true, reset: 0, limit: 10, remaining: 9 }),
     ),
   },
 }));
@@ -53,11 +53,12 @@ vi.mock("@/lib/utils.server", () => ({
 }));
 
 vi.mock("@/lib/security/app-check", () => ({
-  withSecurity: vi.fn((handler) => (req: any, context: any) =>
-    handler(req, {
-      ...context,
-      authType: isMobileRequest() ? "app-check" : "csrf",
-    })
+  withSecurity: vi.fn(
+    (handler) => (req: any, context: any) =>
+      handler(req, {
+        ...context,
+        authType: isMobileRequest() ? "app-check" : "csrf",
+      }),
   ),
   isMobileRequest,
 }));

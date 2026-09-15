@@ -41,20 +41,22 @@ function validateSupabaseEnv(errors: string[]) {
     errors.push("❌ NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY is required");
   }
 
-  const devSupabasePublishableKey = process.env
-    .NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY?.trim();
+  const devSupabasePublishableKey =
+    process.env.NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY?.trim();
   if (devSupabasePublishableKey && devSupabasePublishableKey.length < 20) {
     errors.push("❌ NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY looks invalid");
   }
 
   if (
-    process.env.NODE_ENV === "production" && !process.env.SUPABASE_SECRET_KEY
+    process.env.NODE_ENV === "production" &&
+    !process.env.SUPABASE_SECRET_KEY
   ) {
     errors.push("❌ SUPABASE_SECRET_KEY is required in production");
   }
 
-  const devSupabaseSecretKey = (process.env.SUPABASE_DEV_SECRET_KEY ||
-    process.env.SUPABASE_SERVICE_ROLE_KEY)?.trim();
+  const devSupabaseSecretKey = (
+    process.env.SUPABASE_DEV_SECRET_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY
+  )?.trim();
   if (devSupabaseSecretKey && devSupabaseSecretKey.length < 20) {
     errors.push(
       "❌ SUPABASE_DEV_SECRET_KEY/SUPABASE_SERVICE_ROLE_KEY looks invalid",
@@ -72,8 +74,7 @@ function validateEmailAndRedisEnv(errors: string[]) {
 
   const hasBrevo = !!process.env.BREVO_API_KEY;
   const hasSendPulse = !!(
-    process.env.SENDPULSE_CLIENT_ID &&
-    process.env.SENDPULSE_CLIENT_SECRET
+    process.env.SENDPULSE_CLIENT_ID && process.env.SENDPULSE_CLIENT_SECRET
   );
 
   if (!hasBrevo && !hasSendPulse) {
@@ -227,7 +228,8 @@ function validateCfProxyEgress(errors: string[]) {
       if (!["https:", "http:"].includes(cfParsed.protocol)) {
         errors.push("❌ CF_PROXY_URL must use http or https protocol");
       } else if (
-        process.env.NODE_ENV === "production" && cfParsed.protocol !== "https:"
+        process.env.NODE_ENV === "production" &&
+        cfParsed.protocol !== "https:"
       ) {
         errors.push("❌ CF_PROXY_URL must use https:// in production");
       }
@@ -261,7 +263,8 @@ function validateAwsSecondaryEgress(errors: string[]) {
       if (!["https:", "http:"].includes(awsParsed.protocol)) {
         errors.push("❌ AWS_SECONDARY_URL must use http or https protocol");
       } else if (
-        process.env.NODE_ENV === "production" && awsParsed.protocol !== "https:"
+        process.env.NODE_ENV === "production" &&
+        awsParsed.protocol !== "https:"
       ) {
         errors.push("❌ AWS_SECONDARY_URL must use https:// in production");
       }
@@ -303,7 +306,8 @@ function validateAwsSecondaryEgress(errors: string[]) {
 function validateSwAndIp(errors: string[]) {
   const enableSwInDev = process.env.NEXT_PUBLIC_ENABLE_SW_IN_DEV;
   if (
-    enableSwInDev && !["true", "false"].includes(enableSwInDev.toLowerCase())
+    enableSwInDev &&
+    !["true", "false"].includes(enableSwInDev.toLowerCase())
   ) {
     errors.push(
       '❌ NEXT_PUBLIC_ENABLE_SW_IN_DEV must be either "true" or "false"',
@@ -321,8 +325,8 @@ function validateSwAndIp(errors: string[]) {
 }
 
 function validateSupabaseProxies(errors: string[]) {
-  const supabaseCfProxyUrl = process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL
-    ?.trim();
+  const supabaseCfProxyUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_CF_PROXY_URL?.trim();
   if (supabaseCfProxyUrl) {
     try {
       const parsed = new URL(supabaseCfProxyUrl);
@@ -331,7 +335,8 @@ function validateSupabaseProxies(errors: string[]) {
           "❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must use http or https protocol",
         );
       } else if (
-        process.env.NODE_ENV === "production" && parsed.protocol !== "https:"
+        process.env.NODE_ENV === "production" &&
+        parsed.protocol !== "https:"
       ) {
         errors.push(
           "❌ NEXT_PUBLIC_SUPABASE_CF_PROXY_URL must use https:// in production (proxies auth tokens)",
@@ -344,8 +349,8 @@ function validateSupabaseProxies(errors: string[]) {
     }
   }
 
-  const supabaseAwsProxyUrl = process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL
-    ?.trim();
+  const supabaseAwsProxyUrl =
+    process.env.NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL?.trim();
   if (supabaseAwsProxyUrl) {
     try {
       const parsed = new URL(supabaseAwsProxyUrl);
@@ -354,7 +359,8 @@ function validateSupabaseProxies(errors: string[]) {
           "❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must use http or https protocol",
         );
       } else if (
-        process.env.NODE_ENV === "production" && parsed.protocol !== "https:"
+        process.env.NODE_ENV === "production" &&
+        parsed.protocol !== "https:"
       ) {
         errors.push(
           "❌ NEXT_PUBLIC_SUPABASE_AWS_PROXY_URL must use https:// in production (proxies auth tokens)",
@@ -404,10 +410,14 @@ function validateAndroidFingerprints(errors: string[]) {
   )?.trim();
   if (!raw) return;
 
-  const parts = raw.split(",").map((s) => s.trim()).filter(Boolean);
+  const parts = raw
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
   for (const fp of parts) {
     const segments = fp.split(":");
-    const isValid = segments.length === 32 &&
+    const isValid =
+      segments.length === 32 &&
       segments.every((b) => b.length === 2 && !Number.isNaN(parseInt(b, 16)));
     if (!isValid) {
       errors.push(
@@ -653,12 +663,16 @@ function validateDeploymentSecurityEnv(warnings: string[]) {
 
     let isLocalDomain = false;
     try {
-      const appDomainHostname = new URL(`https://${appDomain}`).hostname
-        .toLowerCase();
-      isLocalDomain = appDomainHostname === "localhost" ||
-        appDomainHostname === "127.0.0.1" || appDomainHostname === "::1";
+      const appDomainHostname = new URL(
+        `https://${appDomain}`,
+      ).hostname.toLowerCase();
+      isLocalDomain =
+        appDomainHostname === "localhost" ||
+        appDomainHostname === "127.0.0.1" ||
+        appDomainHostname === "::1";
     } catch {
-      isLocalDomain = !appDomain ||
+      isLocalDomain =
+        !appDomain ||
         appDomain === "localhost" ||
         appDomain === "127.0.0.1" ||
         appDomain.startsWith("localhost:") ||

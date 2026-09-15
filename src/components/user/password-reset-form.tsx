@@ -86,9 +86,9 @@ function getStepSubtitle(
       return "Enter the code and your new password";
     case "username":
     default:
-      return `Enter your ${
-        getLoginMethodProps(loginMethod).label.toLowerCase()
-      } to begin`;
+      return `Enter your ${getLoginMethodProps(
+        loginMethod,
+      ).label.toLowerCase()} to begin`;
   }
 }
 
@@ -108,7 +108,7 @@ async function refreshCsrfTokenPostReset(): Promise<void> {
       cache: "no-store",
     });
     if (csrfRefreshRes.ok) {
-      const csrfData = await csrfRefreshRes.json().catch(() => null) as {
+      const csrfData = (await csrfRefreshRes.json().catch(() => null)) as {
         token?: string;
       } | null;
       if (typeof csrfData?.token === "string") {
@@ -135,9 +135,10 @@ function writeCustomPostResetSettings(
   userId: string,
   settings: NonNullable<Parameters<typeof persistPostResetSettings>[1]>,
 ): void {
-  const bunkEnabled = typeof settings.bunk_calculator_enabled === "boolean"
-    ? settings.bunk_calculator_enabled
-    : true;
+  const bunkEnabled =
+    typeof settings.bunk_calculator_enabled === "boolean"
+      ? settings.bunk_calculator_enabled
+      : true;
   const rawTarget = settings.target_percentage;
 
   let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
@@ -165,9 +166,10 @@ function writeCustomPostResetSettings(
       targetPercentage.toString(),
     );
   } catch (storageError) {
-    const msg = storageError instanceof Error
-      ? storageError.message
-      : String(storageError);
+    const msg =
+      storageError instanceof Error
+        ? storageError.message
+        : String(storageError);
     logger.dev("Failed to write settings to storage after password reset", {
       context: "PasswordResetForm/handleResetSubmit",
       error: msg,
@@ -183,9 +185,10 @@ function writeDefaultPostResetSettings(userId: string): void {
       DEFAULT_TARGET_PERCENTAGE.toString(),
     );
   } catch (storageError) {
-    const msg = storageError instanceof Error
-      ? storageError.message
-      : String(storageError);
+    const msg =
+      storageError instanceof Error
+        ? storageError.message
+        : String(storageError);
     logger.dev(
       "Failed to write default settings to storage after password reset",
       {
@@ -208,7 +211,10 @@ async function persistPostResetSettings(
     | { bunk_calculator_enabled?: boolean; target_percentage?: number }
     | undefined,
 ): Promise<void> {
-  const { data: { user }, error: getUserError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: getUserError,
+  } = await supabase.auth.getUser();
   if (getUserError || !user) {
     logger.error(
       "User session not available after password reset; skipping settings prefetch",
@@ -435,17 +441,14 @@ export function PasswordResetForm({
         <form onSubmit={handleUsernameSubmit} className="flex flex-col gap-4">
           <div className="grid gap-2">
             <div className="flex items-center justify-between">
-              <Label htmlFor="login">
-                {currentMethodProps.label}
-              </Label>
+              <Label htmlFor="login">{currentMethodProps.label}</Label>
               <div className="flex gap-1">
                 <Button
                   type="button"
                   size="icon"
                   variant={loginMethod === "username" ? "secondary" : "ghost"}
                   className="h-6 w-6 p-3"
-                  onClick={() =>
-                    setLoginMethod("username")}
+                  onClick={() => setLoginMethod("username")}
                 >
                   <User className="h-4 w-4" aria-label="Username" />
                 </Button>
@@ -454,8 +457,7 @@ export function PasswordResetForm({
                   size="icon"
                   variant={loginMethod === "email" ? "secondary" : "ghost"}
                   className="h-6 w-6 p-3"
-                  onClick={() =>
-                    setLoginMethod("email")}
+                  onClick={() => setLoginMethod("email")}
                 >
                   <Mail className="h-4 w-4" aria-label="Email" />
                 </Button>
@@ -629,8 +631,7 @@ export function PasswordResetForm({
             <Input
               id="otp"
               value={otp}
-              onChange={(e) =>
-                setOtp(e.target.value)}
+              onChange={(e) => setOtp(e.target.value)}
               placeholder="Enter the reset code"
               className="custom-input"
               required
@@ -643,8 +644,7 @@ export function PasswordResetForm({
                 id="new-password"
                 type={showPassword ? "text" : "password"}
                 value={password}
-                onChange={(e) =>
-                  setPassword(e.target.value)}
+                onChange={(e) => setPassword(e.target.value)}
                 placeholder="Enter your new password"
                 className="custom-input"
                 required
@@ -656,9 +656,11 @@ export function PasswordResetForm({
                 className="absolute right-0 top-0 h-full px-3 hover:bg-transparent mr-1.5"
                 onClick={() => setShowPassword(!showPassword)}
               >
-                {showPassword
-                  ? <EyeOff className="h-4 w-4" aria-hidden="true" />
-                  : <Eye className="h-4 w-4" aria-hidden="true" />}
+                {showPassword ? (
+                  <EyeOff className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                )}
               </Button>
             </div>
           </div>
@@ -681,9 +683,11 @@ export function PasswordResetForm({
                 className="absolute right-0 top-0 h-full px-3 hover:bg-transparent mr-1.5"
                 onClick={() => setShowNewPassword(!showNewPassword)}
               >
-                {showNewPassword
-                  ? <EyeOff className="h-4 w-4" aria-hidden="true" />
-                  : <Eye className="h-4 w-4" aria-hidden="true" />}
+                {showNewPassword ? (
+                  <EyeOff className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Eye className="h-4 w-4" aria-hidden="true" />
+                )}
               </Button>
             </div>
           </div>

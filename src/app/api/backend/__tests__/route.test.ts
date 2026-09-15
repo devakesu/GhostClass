@@ -23,7 +23,7 @@ vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
   getSessionIdFromCookie: vi.fn(() => Promise.resolve(null)),
   verifyCsrfTokenWithSessionBinding: vi.fn(() =>
-    Promise.resolve({ isValid: true })
+    Promise.resolve({ isValid: true }),
   ),
 }));
 
@@ -35,7 +35,7 @@ vi.mock("@/lib/ratelimit", () => ({
         limit: 100,
         remaining: 99,
         reset: Date.now(),
-      })
+      }),
     ),
   },
 }));
@@ -46,7 +46,7 @@ vi.mock("@/lib/ezygo-batch-fetcher", () => ({
 }));
 
 vi.mock("@/lib/security/app-check", async () => {
-  const actual = await vi.importActual("@/lib/security/app-check") as any;
+  const actual = (await vi.importActual("@/lib/security/app-check")) as any;
   return {
     ...actual,
     verifyAppCheckToken: vi.fn(() => Promise.resolve({ isValid: true })),
@@ -122,9 +122,8 @@ describe("Backend Proxy Route", () => {
     vi.stubEnv("NEXT_PUBLIC_BACKEND_URL", "https://api.example.com");
     vi.stubEnv("NEXT_PUBLIC_APP_DOMAIN", "localhost");
 
-    const { __resetAllowedHostsCache } = await import(
-      "@/lib/security/origin-validation"
-    );
+    const { __resetAllowedHostsCache } =
+      await import("@/lib/security/origin-validation");
     __resetAllowedHostsCache();
 
     const routeModule = await import("../[...path]/route");
@@ -569,12 +568,9 @@ describe("Backend Proxy Route", () => {
     });
 
     it("should reject requests with path traversal segments", async () => {
-      const request = new NextRequest(
-        "http://localhost:3000/api/backend/..",
-        {
-          method: "GET",
-        },
-      );
+      const request = new NextRequest("http://localhost:3000/api/backend/..", {
+        method: "GET",
+      });
 
       const response1 = await forward(request, "GET", ["..", "internal"]);
       expect(response1.status).toBe(400);
@@ -1075,9 +1071,8 @@ describe("Backend Proxy Route", () => {
 
   describe("Cache Invalidation and Edge Cases", () => {
     it("should invalidate cache for default_semester setting", async () => {
-      const { invalidateEzygoCacheForUser } = await import(
-        "@/lib/ezygo-batch-fetcher"
-      );
+      const { invalidateEzygoCacheForUser } =
+        await import("@/lib/ezygo-batch-fetcher");
       const mockInvalidate = vi.mocked(invalidateEzygoCacheForUser);
 
       vi.mocked(mockFetch).mockResolvedValue(
@@ -1149,10 +1144,9 @@ describe("Backend Proxy Route", () => {
         method: "GET",
         headers: { "x-csrf-token": "mock-token" },
       });
-      const response = await GET(
-        request,
-        { params: Promise.resolve({ path: [] }) } as any,
-      );
+      const response = await GET(request, {
+        params: Promise.resolve({ path: [] }),
+      } as any);
       expect(response.status).toBe(400);
       const body = await response.json();
       expect(body.message).toBe("Missing path");
@@ -1166,10 +1160,9 @@ describe("Backend Proxy Route", () => {
           headers: { "x-csrf-token": "mock-token" },
         },
       );
-      const response = await GET(
-        request,
-        { params: Promise.resolve({ path: ["users#fragment"] }) } as any,
-      );
+      const response = await GET(request, {
+        params: Promise.resolve({ path: ["users#fragment"] }),
+      } as any);
       expect(response.status).toBe(400);
       expect((await response.json()).message).toBe("Invalid path format");
     });

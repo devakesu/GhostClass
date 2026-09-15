@@ -56,7 +56,7 @@ function refreshCsrfToken(): Promise<string | null> {
 
       const data = await response.json().catch(() => null);
       const token =
-        (data && Object.prototype.hasOwnProperty.call(data, "token"))
+        data && Object.prototype.hasOwnProperty.call(data, "token")
           ? String(data.token)
           : null;
 
@@ -95,8 +95,11 @@ function syncSession(): Promise<boolean> {
 
       if (!response.ok) return false;
       const data = await response.json().catch(() => null);
-      return !!(data && Object.prototype.hasOwnProperty.call(data, "success") &&
-        data.success);
+      return !!(
+        data &&
+        Object.prototype.hasOwnProperty.call(data, "success") &&
+        data.success
+      );
     } catch (error) {
       logger.warn("[axios] Error during session sync", error);
       return false;
@@ -109,9 +112,8 @@ function syncSession(): Promise<boolean> {
 }
 
 function checkForCspMetaTag(): boolean {
-  if (
-    process.env.NODE_ENV !== "production" || typeof document === "undefined"
-  ) return true;
+  if (process.env.NODE_ENV !== "production" || typeof document === "undefined")
+    return true;
   return !!document.querySelector('meta[http-equiv="Content-Security-Policy"]');
 }
 
@@ -120,7 +122,8 @@ let cspWarningLogged = false;
 export function getCsrfToken(): string | null {
   if (typeof sessionStorage === "undefined") return null;
   if (
-    process.env.NODE_ENV === "production" && !checkForCspMetaTag() &&
+    process.env.NODE_ENV === "production" &&
+    !checkForCspMetaTag() &&
     !cspWarningLogged
   ) {
     cspWarningLogged = true;
@@ -136,7 +139,8 @@ export function setCsrfToken(token: string | null): void {
     return;
   }
   if (
-    typeof token !== "string" || token.length !== CSRF_TOKEN_MIN_LENGTH ||
+    typeof token !== "string" ||
+    token.length !== CSRF_TOKEN_MIN_LENGTH ||
     !CSRF_TOKEN_HEX_PATTERN.test(token)
   ) {
     logger.error("[CSRF] Invalid token format");
@@ -156,16 +160,17 @@ export const resetOutageDetection = () => {
 };
 
 async function handleCsrfRetry(error: unknown) {
-  const errObj = error as {
-    config?: RetryableRequestConfig;
-    response?: { status?: number; data?: Record<string, unknown> };
-  } | undefined;
+  const errObj = error as
+    | {
+        config?: RetryableRequestConfig;
+        response?: { status?: number; data?: Record<string, unknown> };
+      }
+    | undefined;
   if (!errObj || !errObj.config) return null;
   const config = errObj.config;
   const data = errObj.response?.data;
-  const msg = (data && typeof data === "object")
-    ? (data.message || data.error)
-    : "";
+  const msg =
+    data && typeof data === "object" ? data.message || data.error : "";
 
   const msgStr = String(msg).toLowerCase();
   const isCsrfError =
@@ -174,11 +179,7 @@ async function handleCsrfRetry(error: unknown) {
     msgStr.includes("csrf token session") ||
     msgStr.includes("session mismatch");
 
-  if (
-    errObj.response?.status === 403 &&
-    isCsrfError &&
-    !config._csrfRetried
-  ) {
+  if (errObj.response?.status === 403 && isCsrfError && !config._csrfRetried) {
     config._csrfRetried = true;
     const freshToken = await refreshCsrfToken();
     if (freshToken) {
@@ -190,10 +191,12 @@ async function handleCsrfRetry(error: unknown) {
 }
 
 async function handleAuthRetry(error: unknown) {
-  const errObj = error as {
-    config?: RetryableRequestConfig;
-    response?: { status?: number };
-  } | undefined;
+  const errObj = error as
+    | {
+        config?: RetryableRequestConfig;
+        response?: { status?: number };
+      }
+    | undefined;
   if (!errObj || !errObj.config) return null;
   const config = errObj.config;
   if (errObj.response?.status === 401 && !config._authRetried) {
@@ -220,9 +223,11 @@ axiosInstance.interceptors.response.use(
     const retryAuth = await handleAuthRetry(err);
     if (retryAuth) return retryAuth;
 
-    const errObj = err as {
-      response?: { status?: number; statusText?: string };
-    } | undefined;
+    const errObj = err as
+      | {
+          response?: { status?: number; statusText?: string };
+        }
+      | undefined;
     const status = errObj?.response?.status;
     if (status === 503 && !isOutageDetected) {
       isOutageDetected = true;

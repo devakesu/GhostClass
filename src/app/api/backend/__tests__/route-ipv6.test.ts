@@ -37,7 +37,7 @@ vi.mock("@/lib/security/csrf", () => ({
   validateCsrfToken: vi.fn(() => Promise.resolve(true)),
   getSessionIdFromCookie: vi.fn(() => Promise.resolve(null)),
   verifyCsrfTokenWithSessionBinding: vi.fn(() =>
-    Promise.resolve({ isValid: true })
+    Promise.resolve({ isValid: true }),
   ),
 }));
 

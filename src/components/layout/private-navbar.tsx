@@ -63,8 +63,11 @@ export const Navbar = () => {
   const router = useRouter();
   const topLoader = useTopLoader();
   const { data: profile } = useProfile();
-  const { settings, updateBunkCalc, isLoading: settingsLoading } =
-    useUserSettings();
+  const {
+    settings,
+    updateBunkCalc,
+    isLoading: settingsLoading,
+  } = useUserSettings();
   const { theme, toggleTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
 
@@ -146,9 +149,10 @@ export const Navbar = () => {
   };
 
   // Announce unread count changes to screen readers
-  const unreadLabel = unreadCount > 0
-    ? `Notifications: ${unreadCount} unread`
-    : "Notifications: No unread messages";
+  const unreadLabel =
+    unreadCount > 0
+      ? `Notifications: ${unreadCount} unread`
+      : "Notifications: No unread messages";
 
   const handleAddSuccess = async () => {
     // AddRecordTrigger handles full query invalidation and refetching
@@ -166,10 +170,11 @@ export const Navbar = () => {
   // Check !== undefined && !== null since optional chaining returns undefined for null/undefined settings
   // This allows bunk_calculator_enabled to be false (a valid value) while falling back
   // to a default when settings is not yet loaded or is explicitly null
-  const currentBunkCalc = settings?.bunk_calculator_enabled !== undefined &&
-      settings?.bunk_calculator_enabled !== null
-    ? settings.bunk_calculator_enabled
-    : true;
+  const currentBunkCalc =
+    settings?.bunk_calculator_enabled !== undefined &&
+    settings?.bunk_calculator_enabled !== null
+      ? settings.bunk_calculator_enabled
+      : true;
 
   const renderAvatarContent = () => {
     if (!profile) {
@@ -211,9 +216,11 @@ export const Navbar = () => {
         <div className="h-4 w-4 animate-pulse rounded bg-muted-foreground/20" />
       );
     }
-    return theme === "dark"
-      ? <Moon className="h-4 w-4" aria-hidden="true" />
-      : <Sun className="h-4 w-4" aria-hidden="true" />;
+    return theme === "dark" ? (
+      <Moon className="h-4 w-4" aria-hidden="true" />
+    ) : (
+      <Sun className="h-4 w-4" aria-hidden="true" />
+    );
   };
 
   return (
@@ -319,54 +326,56 @@ export const Navbar = () => {
           </div>
 
           {/* Institution Selector */}
-          {!institutionsLoading && institutions && institutions.length > 0 &&
+          {!institutionsLoading &&
+            institutions &&
+            institutions.length > 0 &&
             pathname !== "/profile" && (
-            <div className="flex max-lg:hidden">
-              <Select
-                value={selectedInstitution}
-                onValueChange={handleInstitutionChange}
-              >
-                <SelectTrigger
-                  className="w-28 md:w-40 lg:max-w-40 xl:max-w-70 custom-button h-11 cursor-pointer dark:bg-foreground/10 dark:border-foreground/20"
-                  aria-label="Select institution"
+              <div className="flex max-lg:hidden">
+                <Select
+                  value={selectedInstitution}
+                  onValueChange={handleInstitutionChange}
                 >
-                  <SelectValue>
-                    {selectedInstitution &&
-                      institutions?.find(
-                        (i) => i.id.toString() === selectedInstitution,
-                      ) && (
-                      <div className="flex items-center font-medium min-w-0">
-                        <Building2
-                          className="mr-2 h-4 w-4 shrink-0"
-                          aria-hidden="true"
-                        />
-                        <span className="truncate">
-                          {institutions.find(
-                            (i) => i.id.toString() === selectedInstitution,
-                          )?.institution.name || ""}
-                        </span>
-                      </div>
-                    )}
-                  </SelectValue>
-                </SelectTrigger>
-                <SelectContent className="custom-dropdown mt-1">
-                  {institutions.map((inst) => (
-                    <SelectItem key={inst.id} value={inst.id.toString()}>
-                      <div className="flex items-center cursor-pointer">
-                        <Building2
-                          className="mr-2 h-4 w-4 shrink-0"
-                          aria-hidden="true"
-                        />
-                        <span className="font-medium">
-                          {inst.institution.name}
-                        </span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          )}
+                  <SelectTrigger
+                    className="w-28 md:w-40 lg:max-w-40 xl:max-w-70 custom-button h-11 cursor-pointer dark:bg-foreground/10 dark:border-foreground/20"
+                    aria-label="Select institution"
+                  >
+                    <SelectValue>
+                      {selectedInstitution &&
+                        institutions?.find(
+                          (i) => i.id.toString() === selectedInstitution,
+                        ) && (
+                          <div className="flex items-center font-medium min-w-0">
+                            <Building2
+                              className="mr-2 h-4 w-4 shrink-0"
+                              aria-hidden="true"
+                            />
+                            <span className="truncate">
+                              {institutions.find(
+                                (i) => i.id.toString() === selectedInstitution,
+                              )?.institution.name || ""}
+                            </span>
+                          </div>
+                        )}
+                    </SelectValue>
+                  </SelectTrigger>
+                  <SelectContent className="custom-dropdown mt-1">
+                    {institutions.map((inst) => (
+                      <SelectItem key={inst.id} value={inst.id.toString()}>
+                        <div className="flex items-center cursor-pointer">
+                          <Building2
+                            className="mr-2 h-4 w-4 shrink-0"
+                            aria-hidden="true"
+                          />
+                          <span className="font-medium">
+                            {inst.institution.name}
+                          </span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
         </div>
 
         <div className="flex items-center gap-4 shrink-0">
@@ -389,8 +398,8 @@ export const Navbar = () => {
                     {unreadCount > 9 ? "9+" : unreadCount}
                   </span>
                   <span className="sr-only">
-                    {unreadCount}{" "}
-                    unread notification{unreadCount !== 1 ? "s" : ""}
+                    {unreadCount} unread notification
+                    {unreadCount !== 1 ? "s" : ""}
                   </span>
                 </>
               )}
@@ -546,43 +555,47 @@ export const Navbar = () => {
               </div>
 
               {/* Institution Selector (Tablet/Mobile Only) */}
-              {!institutionsLoading && institutions &&
+              {!institutionsLoading &&
+                institutions &&
                 institutions.length > 0 && (
-                <div className="px-2 py-2 lg:hidden border-t border-border/30 mt-1">
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex items-center gap-2 shrink-0">
-                      <Building2 className="h-4 w-4" aria-hidden="true" />
-                      <span className="text-sm">Institution</span>
-                    </div>
-                    <Select
-                      value={selectedInstitution}
-                      onValueChange={handleInstitutionChange}
-                    >
-                      <SelectTrigger
-                        id="institution-select-mobile"
-                        className="w-10 h-9 text-xs bg-background border-border/50 shrink-0 [&>span]:hidden [&>svg:last-child]:hidden"
-                        aria-label="Select institution"
+                  <div className="px-2 py-2 lg:hidden border-t border-border/30 mt-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <div className="flex items-center gap-2 shrink-0">
+                        <Building2 className="h-4 w-4" aria-hidden="true" />
+                        <span className="text-sm">Institution</span>
+                      </div>
+                      <Select
+                        value={selectedInstitution}
+                        onValueChange={handleInstitutionChange}
                       >
-                        <SelectValue>
-                          <Building2
-                            className="h-5 w-5 shrink-0"
-                            aria-hidden="true"
-                          />
-                        </SelectValue>
-                      </SelectTrigger>
-                      <SelectContent className="custom-dropdown z-60">
-                        {institutions.map((inst) => (
-                          <SelectItem key={inst.id} value={inst.id.toString()}>
-                            <span className="font-medium">
-                              {inst.institution.name}
-                            </span>
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                        <SelectTrigger
+                          id="institution-select-mobile"
+                          className="w-10 h-9 text-xs bg-background border-border/50 shrink-0 [&>span]:hidden [&>svg:last-child]:hidden"
+                          aria-label="Select institution"
+                        >
+                          <SelectValue>
+                            <Building2
+                              className="h-5 w-5 shrink-0"
+                              aria-hidden="true"
+                            />
+                          </SelectValue>
+                        </SelectTrigger>
+                        <SelectContent className="custom-dropdown z-60">
+                          {institutions.map((inst) => (
+                            <SelectItem
+                              key={inst.id}
+                              value={inst.id.toString()}
+                            >
+                              <span className="font-medium">
+                                {inst.institution.name}
+                              </span>
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
                   </div>
-                </div>
-              )}
+                )}
 
               <DropdownMenuSeparator />
               <DropdownMenuItem

@@ -150,7 +150,7 @@ describe("POST /api/contact", () => {
     });
     (nextHeaders as any).mockResolvedValue(
       new Headers({
-        "authorization": "Bearer token",
+        authorization: "Bearer token",
         "user-agent": "test-agent",
       }),
     );

@@ -15,7 +15,9 @@ vi.mock("@/lib/utils", () => ({
   generateSlotKey: (courseId: string, date: string, session: string) =>
     `${courseId}-${date}-${session}`,
   normalizeCourseCode: (code: string | undefined | null) =>
-    String(code ?? "").toUpperCase().replace(/[\s\u00A0-]/g, ""),
+    String(code ?? "")
+      .toUpperCase()
+      .replace(/[\s\u00A0-]/g, ""),
 }));
 
 vi.mock("lucide-react", () => ({
@@ -38,9 +40,10 @@ vi.mock("@/lib/logic/attendance-reconciliation", () => ({
 
 // Capture the Tooltip content prop so tests can invoke it directly.
 type TooltipPayload = { payload: Record<string, unknown> };
-type TooltipContentFn = (
-  props: { active?: boolean; payload?: TooltipPayload[] },
-) => React.ReactNode;
+type TooltipContentFn = (props: {
+  active?: boolean;
+  payload?: TooltipPayload[];
+}) => React.ReactNode;
 let capturedTooltipContent: TooltipContentFn | null = null;
 
 // Mock recharts so it renders minimal DOM without canvas/SVG complexities
@@ -53,23 +56,29 @@ vi.mock("recharts", async () => {
     capturedTooltipContent = content ?? null;
     return null;
   };
-  const MockReferenceLine = (
-    { label }: {
-      label?: (
-        props: { viewBox: { width: number; x: number; y: number } },
-      ) => React.ReactNode;
-    },
-  ) => {
+  const MockReferenceLine = ({
+    label,
+  }: {
+    label?: (props: {
+      viewBox: { width: number; x: number; y: number };
+    }) => React.ReactNode;
+  }) => {
     if (typeof label === "function") {
-      return React.createElement("div", {
-        "data-testid": "reference-line-label",
-      }, label({ viewBox: { width: 100, x: 0, y: 0 } }));
+      return React.createElement(
+        "div",
+        {
+          "data-testid": "reference-line-label",
+        },
+        label({ viewBox: { width: 100, x: 0, y: 0 } }),
+      );
     }
     return null;
   };
-  const MockYAxis = (
-    { tickFormatter }: { tickFormatter?: (v: number) => void },
-  ) => {
+  const MockYAxis = ({
+    tickFormatter,
+  }: {
+    tickFormatter?: (v: number) => void;
+  }) => {
     if (tickFormatter) tickFormatter(50);
     return null;
   };
@@ -324,14 +333,16 @@ describe("AttendanceChart", () => {
         matches: false,
         media: query,
         onchange: null,
-        addEventListener: vi.fn().mockImplementation(
-          (
-            _event: string,
-            handler: (e: Partial<MediaQueryListEvent>) => void,
-          ) => {
-            if (query === "(max-width: 640px)") mqlHandler = handler;
-          },
-        ),
+        addEventListener: vi
+          .fn()
+          .mockImplementation(
+            (
+              _event: string,
+              handler: (e: Partial<MediaQueryListEvent>) => void,
+            ) => {
+              if (query === "(max-width: 640px)") mqlHandler = handler;
+            },
+          ),
         removeEventListener: vi.fn(),
         dispatchEvent: vi.fn(),
       })),

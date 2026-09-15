@@ -25,9 +25,8 @@ export interface AppCheckVerifier {
 export function getAppCheck(): AppCheckVerifier | null {
   try {
     // Check if Firebase Admin is already initialized
-    const firebaseApp = getApps().length > 0
-      ? getApp()
-      : initializeFirebaseAdmin();
+    const firebaseApp =
+      getApps().length > 0 ? getApp() : initializeFirebaseAdmin();
 
     if (!firebaseApp) {
       logger.warn(
@@ -66,9 +65,8 @@ export function getAppCheck(): AppCheckVerifier | null {
  */
 export function getMessaging(): Messaging | null {
   try {
-    const firebaseApp = getApps().length > 0
-      ? getApp()
-      : initializeFirebaseAdmin();
+    const firebaseApp =
+      getApps().length > 0 ? getApp() : initializeFirebaseAdmin();
 
     if (!firebaseApp) {
       logger.warn(

@@ -126,18 +126,19 @@ describe("CircuitBreaker", () => {
 
     // Mock a slow request
     let resolve1: any;
-    const p1 = ezygoCircuitBreaker.execute(() =>
-      new Promise((r) => resolve1 = r)
+    const p1 = ezygoCircuitBreaker.execute(
+      () => new Promise((r) => (resolve1 = r)),
     );
 
     let resolve2: any;
-    const p2 = ezygoCircuitBreaker.execute(() =>
-      new Promise((r) => resolve2 = r)
+    const p2 = ezygoCircuitBreaker.execute(
+      () => new Promise((r) => (resolve2 = r)),
     );
 
     // 3rd request should be rejected
-    await expect(ezygoCircuitBreaker.execute(() => Promise.resolve("ok")))
-      .rejects.toThrow("Circuit breaker is testing recovery");
+    await expect(
+      ezygoCircuitBreaker.execute(() => Promise.resolve("ok")),
+    ).rejects.toThrow("Circuit breaker is testing recovery");
 
     resolve1("ok");
     resolve2("ok");

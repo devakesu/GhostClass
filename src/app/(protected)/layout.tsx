@@ -77,9 +77,9 @@ function ProtectedChrome({ children }: { children: React.ReactNode }) {
                 isHidden ? "pointer-events-none" : "pointer-events-auto",
               )}
               style={{ paddingRight: "var(--scrollbar-width, 0px)" }}
-              {...((isHidden && typeof HTMLElement !== "undefined")
+              {...((isHidden && typeof HTMLElement !== "undefined"
                 ? { inert: true }
-                : {}) as { inert?: boolean }}
+                : {}) as { inert?: boolean })}
             >
               <Navbar />
             </motion.div>

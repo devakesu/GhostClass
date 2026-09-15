@@ -14,9 +14,9 @@ describe("LoadingBlur", () => {
   });
 
   it("renders children and hides loading overlay by default", () => {
-    vi.mocked(useBuildInfo).mockReturnValue(
-      { buildInfo: { is_legacy: false } } as any,
-    );
+    vi.mocked(useBuildInfo).mockReturnValue({
+      buildInfo: { is_legacy: false },
+    } as any);
     render(
       <LoadingBlur isLoading={false}>
         <div data-testid="child">Child Content</div>
@@ -28,9 +28,9 @@ describe("LoadingBlur", () => {
   });
 
   it("shows loading overlay after a short delay when isLoading is true", () => {
-    vi.mocked(useBuildInfo).mockReturnValue(
-      { buildInfo: { is_legacy: false } } as any,
-    );
+    vi.mocked(useBuildInfo).mockReturnValue({
+      buildInfo: { is_legacy: false },
+    } as any);
     render(
       <LoadingBlur isLoading={true}>
         <div>Child Content</div>
@@ -45,9 +45,9 @@ describe("LoadingBlur", () => {
   });
 
   it("uses legacy styles when buildInfo indicates legacy", () => {
-    vi.mocked(useBuildInfo).mockReturnValue(
-      { buildInfo: { is_legacy: true } } as any,
-    );
+    vi.mocked(useBuildInfo).mockReturnValue({
+      buildInfo: { is_legacy: true },
+    } as any);
     const { container } = render(
       <LoadingBlur isLoading={true}>
         <div>Child Content</div>

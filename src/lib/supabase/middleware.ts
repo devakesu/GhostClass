@@ -19,31 +19,27 @@ export async function updateSession(request: NextRequest, nonce?: string) {
 
   const { url, key } = getSupabaseConfig("client");
 
-  const supabase = createServerClient(
-    url,
-    key,
-    {
-      cookies: {
-        getAll() {
-          return request.cookies.getAll();
-        },
-        setAll(cookiesToSet) {
-          cookiesToSet.forEach(({ name, value }) =>
-            request.cookies.set(name, value)
-          );
-
-          // Supabase needs to create a NEW response to set cookies
-          response = NextResponse.next({ request });
-
-          cookiesToSet.forEach(({ name, value, options }) =>
-            response.cookies.set(name, value, options)
-          );
-          response.headers.set("Content-Security-Policy", cspHeader);
-        },
+  const supabase = createServerClient(url, key, {
+    cookies: {
+      getAll() {
+        return request.cookies.getAll();
       },
-      ...(_customFetch ? { global: { fetch: _customFetch } } : {}),
+      setAll(cookiesToSet) {
+        cookiesToSet.forEach(({ name, value }) =>
+          request.cookies.set(name, value),
+        );
+
+        // Supabase needs to create a NEW response to set cookies
+        response = NextResponse.next({ request });
+
+        cookiesToSet.forEach(({ name, value, options }) =>
+          response.cookies.set(name, value, options),
+        );
+        response.headers.set("Content-Security-Policy", cspHeader);
+      },
     },
-  );
+    ...(_customFetch ? { global: { fetch: _customFetch } } : {}),
+  });
 
   try {
     await supabase.auth.getUser();

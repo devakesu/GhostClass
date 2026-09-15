@@ -59,7 +59,7 @@ describe("useTrackingData", () => {
           eq: vi.fn(() => ({
             order: vi.fn(() => ({
               order: vi.fn(() =>
-                Promise.resolve({ data: [{ id: 1 }], error: null })
+                Promise.resolve({ data: [{ id: 1 }], error: null }),
               ),
             })),
           })),
@@ -144,7 +144,7 @@ describe("useTrackingData", () => {
           eq: vi.fn(() => ({
             order: vi.fn(() => ({
               order: vi.fn(() =>
-                Promise.resolve({ data: null, error: mockError })
+                Promise.resolve({ data: null, error: mockError }),
               ),
             })),
           })),
@@ -172,7 +172,7 @@ describe("useTrackingData", () => {
           eq: vi.fn(() => ({
             order: vi.fn(() => ({
               order: vi.fn(() =>
-                Promise.resolve({ data: null, error: { message: "err" } })
+                Promise.resolve({ data: null, error: { message: "err" } }),
               ),
             })),
           })),

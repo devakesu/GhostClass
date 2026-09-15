@@ -104,9 +104,8 @@ describe("NotificationsClient", () => {
 
   describe("CSS Hover Effects (Line 47)", () => {
     it("should apply hover:shadow-md class to unread notifications", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -141,14 +140,17 @@ describe("NotificationsClient", () => {
       render(<NotificationsPage />);
 
       // Wait for sync to complete and notification to render
-      await waitFor(() => {
-        expect(screen.queryByText("Test Notification")).toBeInTheDocument();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(screen.queryByText("Test Notification")).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
 
       await waitFor(() => {
-        const notification = screen.getByText("Test Notification").closest(
-          'div[role="button"]',
-        );
+        const notification = screen
+          .getByText("Test Notification")
+          .closest('div[role="button"]');
         expect(notification).toBeInTheDocument();
         // Verify the hover:shadow-md class is present
         expect(notification?.className).toContain("hover:shadow-md");
@@ -156,9 +158,8 @@ describe("NotificationsClient", () => {
     });
 
     it("should not apply hover:shadow-md class to read notifications", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -193,14 +194,17 @@ describe("NotificationsClient", () => {
       render(<NotificationsPage />);
 
       // Wait for sync to complete and notification to render
-      await waitFor(() => {
-        expect(screen.queryByText("Read Notification")).toBeInTheDocument();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(screen.queryByText("Read Notification")).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
 
       await waitFor(() => {
-        const notification = screen.getByText("Read Notification").closest(
-          'div[role="button"]',
-        );
+        const notification = screen
+          .getByText("Read Notification")
+          .closest('div[role="button"]');
         expect(notification).toBeInTheDocument();
         // Read notifications should not have hover:shadow-md
         expect(notification?.className).not.toContain("hover:shadow-md");
@@ -208,9 +212,8 @@ describe("NotificationsClient", () => {
     });
 
     it("should apply cursor-pointer class for unread notifications", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -245,14 +248,17 @@ describe("NotificationsClient", () => {
       render(<NotificationsPage />);
 
       // Wait for sync to complete and notification to render
-      await waitFor(() => {
-        expect(screen.queryByText("Unread Notification")).toBeInTheDocument();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(screen.queryByText("Unread Notification")).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
 
       await waitFor(() => {
-        const notification = screen.getByText("Unread Notification").closest(
-          'div[role="button"]',
-        );
+        const notification = screen
+          .getByText("Unread Notification")
+          .closest('div[role="button"]');
         expect(notification).toBeInTheDocument();
         expect(notification?.className).toContain("cursor-pointer");
       });
@@ -261,9 +267,8 @@ describe("NotificationsClient", () => {
 
   describe("getNotificationIcon – default (unknown topic)", () => {
     it("renders an unread notification with an unknown topic without crashing", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -296,16 +301,19 @@ describe("NotificationsClient", () => {
 
       render(<NotificationsPage />);
 
-      await waitFor(() => {
-        expect(screen.queryByText("Unknown Topic Notification"))
-          .toBeInTheDocument();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(
+            screen.queryByText("Unknown Topic Notification"),
+          ).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
     });
 
     it("renders an unread notification with no topic at all without crashing", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
 
       vi.mocked(useNotifications).mockReturnValue({
         actionNotifications: [],
@@ -337,17 +345,21 @@ describe("NotificationsClient", () => {
 
       render(<NotificationsPage />);
 
-      await waitFor(() => {
-        expect(screen.queryByText("No Topic Notification")).toBeInTheDocument();
-      }, { timeout: 3000 });
+      await waitFor(
+        () => {
+          expect(
+            screen.queryByText("No Topic Notification"),
+          ).toBeInTheDocument();
+        },
+        { timeout: 3000 },
+      );
     });
   });
 
   describe("Notification click and keyboard interaction", () => {
     it("calls toggleRead when an unread notification is clicked", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
       const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
@@ -394,9 +406,8 @@ describe("NotificationsClient", () => {
     });
 
     it("calls toggleRead on Enter keydown for an unread notification", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
       const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
@@ -443,9 +454,8 @@ describe("NotificationsClient", () => {
     });
 
     it("calls toggleRead on Space keydown for an unread notification", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
       const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
@@ -492,9 +502,8 @@ describe("NotificationsClient", () => {
     });
 
     it("calls toggleRead when a read notification is clicked", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
       const mockToggleRead = vi.fn();
 
       vi.mocked(useNotifications).mockReturnValue({
@@ -577,9 +586,8 @@ describe("NotificationsClient", () => {
 
   describe("Handle Toggle Read Error", () => {
     it("logs error and shows toast on failure", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
       const mockToggleRead = vi.fn().mockRejectedValue(new Error("API Error"));
 
       vi.mocked(useNotifications).mockReturnValue({
@@ -619,9 +627,8 @@ describe("NotificationsClient", () => {
 
   describe("Empty State", () => {
     it("renders empty state when no notifications exist", async () => {
-      const { useNotifications } = await import(
-        "@/hooks/notifications/useNotifications"
-      );
+      const { useNotifications } =
+        await import("@/hooks/notifications/useNotifications");
       vi.mocked(useNotifications).mockReturnValue({
         ...MOCK_NOTIFICATIONS_VAL,
         actionNotifications: [],

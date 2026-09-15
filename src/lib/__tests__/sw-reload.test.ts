@@ -81,7 +81,8 @@ describe("SW Reload", () => {
     });
 
     // Simulate statechange to activated
-    const stateChangeHandler = vi.mocked(mockWaitingWorker.addEventListener)
+    const stateChangeHandler = vi
+      .mocked(mockWaitingWorker.addEventListener)
       .mock.calls.find((call) => call[0] === "statechange")?.[1] as any;
     if (stateChangeHandler) {
       (mockWaitingWorker as any).state = "activated";

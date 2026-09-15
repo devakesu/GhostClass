@@ -14,7 +14,7 @@ vi.mock("@/hooks/use-csrf-token", () => ({
 }));
 
 vi.mock("framer-motion", async (importOriginal) => {
-  const actual = await importOriginal() as any;
+  const actual = (await importOriginal()) as any;
   return {
     ...actual,
     useScroll: vi.fn(() => ({

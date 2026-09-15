@@ -51,7 +51,10 @@ export async function uploadUserAvatar(file: File) {
   const supabase = createClient();
 
   // 1. Get Current User
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
   if (authError || !user) {
     const err = new Error("User not authenticated during avatar upload");
     Sentry.captureException(err, {
@@ -98,9 +101,9 @@ export async function uploadUserAvatar(file: File) {
     }
 
     // 4. Get Public URL
-    const { data: { publicUrl } } = supabase.storage
-      .from("avatars")
-      .getPublicUrl(filePath);
+    const {
+      data: { publicUrl },
+    } = supabase.storage.from("avatars").getPublicUrl(filePath);
 
     // Guard: getPublicUrl() is synchronous and cannot fail — it constructs the URL
     // client-side from NEXT_PUBLIC_SUPABASE_URL. A misconfigured env var would silently

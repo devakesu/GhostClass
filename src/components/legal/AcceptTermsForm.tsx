@@ -137,7 +137,8 @@ export function AcceptTermsForm() {
               }}
             >
               above Disclaimer and all Policies listed here
-            </Link>.
+            </Link>
+            .
           </span>
         </label>
 

@@ -61,7 +61,8 @@ describe("Simple TrackingClient Test", () => {
         <TrackingClient />
       </QueryClientProvider>,
     );
-    expect(await screen.findByRole("heading", { name: /No Tracking History/i }))
-      .toBeInTheDocument();
+    expect(
+      await screen.findByRole("heading", { name: /No Tracking History/i }),
+    ).toBeInTheDocument();
   });
 });

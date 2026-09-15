@@ -83,12 +83,14 @@ describe("proxy – Scenario D: authenticated user on auth route", () => {
 
     // Stale redirect counter must be cleared so a fresh login doesn't inherit it
     const isDeleted = (name: string) =>
-      response.headers.getSetCookie().some(
-        (h) =>
-          h.toLowerCase().startsWith(name.toLowerCase() + "=") &&
-          (h.toLowerCase().includes("max-age=0") ||
-            h.toLowerCase().includes("expires=thu, 01 jan 1970")),
-      );
+      response.headers
+        .getSetCookie()
+        .some(
+          (h) =>
+            h.toLowerCase().startsWith(name.toLowerCase() + "=") &&
+            (h.toLowerCase().includes("max-age=0") ||
+              h.toLowerCase().includes("expires=thu, 01 jan 1970")),
+        );
     expect(isDeleted("terms_redirect_count")).toBe(true);
   });
 });
@@ -155,7 +157,7 @@ describe("proxy – cross-device terms sync", () => {
     // Should set the terms_version cookie
     const setCookies = response.headers.getSetCookie();
     const termsCookie = setCookies.find((h) =>
-      h.toLowerCase().startsWith("terms_version=")
+      h.toLowerCase().startsWith("terms_version="),
     );
     expect(termsCookie).toBeDefined();
     expect(termsCookie).toContain("2.3");
@@ -181,7 +183,7 @@ describe("proxy – cross-device terms sync", () => {
     // Should set the updated terms_version cookie
     const setCookies = response.headers.getSetCookie();
     const termsCookie = setCookies.find((h) =>
-      h.toLowerCase().startsWith("terms_version=")
+      h.toLowerCase().startsWith("terms_version="),
     );
     expect(termsCookie).toBeDefined();
     expect(termsCookie).toContain("2.3");
@@ -222,12 +224,14 @@ describe("proxy – cross-device terms sync", () => {
 
 describe("proxy – auth.getUser throws an error", () => {
   const isDeleted = (res: Response, name: string) =>
-    res.headers.getSetCookie().some(
-      (h) =>
-        h.toLowerCase().startsWith(name.toLowerCase() + "=") &&
-        (h.toLowerCase().includes("max-age=0") ||
-          h.toLowerCase().includes("expires=thu, 01 jan 1970")),
-    );
+    res.headers
+      .getSetCookie()
+      .some(
+        (h) =>
+          h.toLowerCase().startsWith(name.toLowerCase() + "=") &&
+          (h.toLowerCase().includes("max-age=0") ||
+            h.toLowerCase().includes("expires=thu, 01 jan 1970")),
+      );
 
   it("clears session cookies and redirects when getUser throws refresh_token_not_found", async () => {
     mockGetUser.mockRejectedValueOnce({

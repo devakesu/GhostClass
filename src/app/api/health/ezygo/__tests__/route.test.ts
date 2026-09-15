@@ -206,9 +206,8 @@ describe("EzyGo Health Check API Route", () => {
       vi.resetModules();
 
       // Re-import circuit breaker after resetModules to get the fresh mocked instance
-      const { ezygoCircuitBreaker: prodCircuitBreaker } = await import(
-        "@/lib/circuit-breaker"
-      );
+      const { ezygoCircuitBreaker: prodCircuitBreaker } =
+        await import("@/lib/circuit-breaker");
       vi.mocked(prodCircuitBreaker.getStatus).mockResolvedValue({
         state: "OPEN",
         failures: 3,
@@ -226,9 +225,8 @@ describe("EzyGo Health Check API Route", () => {
       vi.resetModules();
 
       // Re-import circuit breaker after resetModules to get the fresh mocked instance
-      const { ezygoCircuitBreaker: devCircuitBreaker } = await import(
-        "@/lib/circuit-breaker"
-      );
+      const { ezygoCircuitBreaker: devCircuitBreaker } =
+        await import("@/lib/circuit-breaker");
       vi.mocked(devCircuitBreaker.getStatus).mockResolvedValue({
         state: "OPEN",
         failures: 3,

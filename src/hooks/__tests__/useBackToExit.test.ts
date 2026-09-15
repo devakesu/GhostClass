@@ -439,9 +439,7 @@ describe("useBackToExit", () => {
   });
 
   it("ignores stale callback from replaced toast during dismiss + recreate flow", () => {
-    mockToast
-      .mockReturnValueOnce("toast-old")
-      .mockReturnValueOnce("toast-new");
+    mockToast.mockReturnValueOnce("toast-old").mockReturnValueOnce("toast-new");
 
     renderHook(() => useBackToExit());
 

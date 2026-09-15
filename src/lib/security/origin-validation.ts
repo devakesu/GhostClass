@@ -82,7 +82,8 @@ export function getAllowedHosts(): Set<string> | null {
 
   // In development, invalidate cache if NEXT_PUBLIC_APP_DOMAIN changes
   if (
-    process.env.NODE_ENV === "development" && allowedHostsComputed &&
+    process.env.NODE_ENV === "development" &&
+    allowedHostsComputed &&
     cachedAppDomain !== currentAppDomain
   ) {
     logger.dev(
@@ -136,7 +137,8 @@ export function normalizeHost(value: string | null): string | null {
   // contain '::'. Full-form addresses (e.g. "2001:db8:0:0:0:0:0:1") contain multiple
   // colons but no '::'. Guard the latter with a character-set check (hex digits,
   // colons, dots) to avoid a false positive for malformed values like "host:port:extra".
-  const isUnbracketedIPv6 = first.includes("::") ||
+  const isUnbracketedIPv6 =
+    first.includes("::") ||
     (/^[\da-fA-F:.]+$/.test(first) &&
       first.indexOf(":") !== first.lastIndexOf(":"));
   if (isUnbracketedIPv6) {
@@ -145,8 +147,9 @@ export function normalizeHost(value: string | null): string | null {
 
   // Strip optional :port suffix for consistent hostname comparison (IPv4 / hostname only)
   const portSeparatorIndex = first.indexOf(":");
-  return (portSeparatorIndex >= 0 ? first.slice(0, portSeparatorIndex) : first)
-    .toLowerCase();
+  return (
+    portSeparatorIndex >= 0 ? first.slice(0, portSeparatorIndex) : first
+  ).toLowerCase();
 }
 
 /**
@@ -156,7 +159,7 @@ export function normalizeHost(value: string | null): string | null {
 export function resolveRequestHostname(req: NextRequest): string | null {
   return (
     normalizeHost(req.headers.get("x-forwarded-host")) ??
-      normalizeHost(req.headers.get("host")) ??
-      normalizeHost(req.nextUrl.hostname)
+    normalizeHost(req.headers.get("host")) ??
+    normalizeHost(req.nextUrl.hostname)
   );
 }

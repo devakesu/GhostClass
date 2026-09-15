@@ -86,8 +86,9 @@ describe("crypto.ts", () => {
 
   it("throws error for invalid auth tag length in decrypt", () => {
     const iv = "0".repeat(24);
-    expect(() => decrypt({ iv, content: "0123456789abcdef:0123456789abcdef" }))
-      .toThrow("Invalid auth tag length");
+    expect(() =>
+      decrypt({ iv, content: "0123456789abcdef:0123456789abcdef" }),
+    ).toThrow("Invalid auth tag length");
   });
 
   it("throws generic error when decryption fails (e.g. wrong key)", () => {
@@ -129,7 +130,7 @@ describe("crypto.ts", () => {
 
   it("should throw error for non-hex IV", () => {
     expect(() =>
-      decrypt({ iv: "not-a-hex-value-at-all--", content: "tag:content" })
+      decrypt({ iv: "not-a-hex-value-at-all--", content: "tag:content" }),
     ).toThrow("Invalid IV format");
   });
 
@@ -143,7 +144,8 @@ describe("crypto.ts", () => {
     expect(() => decrypt({ iv: "", content: "test" })).toThrow(
       "Invalid input: IV and content are required",
     );
-    expect(() => decrypt({ iv: "123456789012345678901234", content: "" }))
-      .toThrow("Invalid input: IV and content are required");
+    expect(() =>
+      decrypt({ iv: "123456789012345678901234", content: "" }),
+    ).toThrow("Invalid input: IV and content are required");
   });
 });

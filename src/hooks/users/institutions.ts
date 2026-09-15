@@ -97,8 +97,8 @@ export function useDefaultInstitutionUser() {
             currentDefault?.institution_role?.name !== "student") &&
           institutions.length > 0
         ) {
-          const studentInstitution = institutions.find((inst) =>
-            inst?.institution_role?.name === "student"
+          const studentInstitution = institutions.find(
+            (inst) => inst?.institution_role?.name === "student",
           );
           if (studentInstitution) {
             await updateDefaultInstitutionUser.mutateAsync(

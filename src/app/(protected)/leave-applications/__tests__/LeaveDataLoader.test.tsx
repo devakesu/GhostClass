@@ -8,9 +8,7 @@ import * as Sentry from "@sentry/nextjs";
 
 vi.mock("../LeaveClient", () => ({
   default: ({ initialData }: any) => (
-    <div data-testid="leave-client">
-      {initialData ? "Has Data" : "No Data"}
-    </div>
+    <div data-testid="leave-client">{initialData ? "Has Data" : "No Data"}</div>
   ),
 }));
 

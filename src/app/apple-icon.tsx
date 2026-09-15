@@ -11,28 +11,26 @@ const iconSrc = readPublicPngAsDataUri("icon-192.png");
 
 export default function AppleIcon() {
   return new ImageResponse(
-    (
-      <div
-        style={{
-          background: "#0b0b0f",
-          width: "100%",
-          height: "100%",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        {iconSrc && (
-          <img
-            src={iconSrc}
-            alt="GhostClass app icon"
-            title="GhostClass app icon"
-            width={160}
-            height={160}
-          />
-        )}
-      </div>
-    ),
+    <div
+      style={{
+        background: "#0b0b0f",
+        width: "100%",
+        height: "100%",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      {iconSrc && (
+        <img
+          src={iconSrc}
+          alt="GhostClass app icon"
+          title="GhostClass app icon"
+          width={160}
+          height={160}
+        />
+      )}
+    </div>,
     { ...size },
   );
 }

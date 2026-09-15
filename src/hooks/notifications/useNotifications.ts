@@ -62,7 +62,9 @@ export function useNotifications(enabled = true, countOnly = false) {
   const { data: allUnreadData, isLoading: isUnreadLoading } = useQuery({
     queryKey: ["notifications", "unread"],
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user) return [];
 
       const { data, error } = await supabase
@@ -95,7 +97,9 @@ export function useNotifications(enabled = true, countOnly = false) {
   } = useInfiniteQuery<FetchResponse>({
     queryKey: ["notifications", "feed"],
     queryFn: async ({ pageParam = 0 }) => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user) return { data: [], nextPage: null };
 
       const from = (pageParam as number) * PAGE_SIZE;
@@ -117,9 +121,8 @@ export function useNotifications(enabled = true, countOnly = false) {
       }
 
       const notifications = data as Notification[];
-      const nextPage = notifications.length === PAGE_SIZE
-        ? (pageParam as number) + 1
-        : null;
+      const nextPage =
+        notifications.length === PAGE_SIZE ? (pageParam as number) + 1 : null;
 
       return { data: notifications, nextPage };
     },
@@ -136,10 +139,10 @@ export function useNotifications(enabled = true, countOnly = false) {
 
     // Separate unread into Actions (Conflicts) and Regular
     const actions = allUnread.filter((n) =>
-      n.topic?.toLowerCase().includes("conflict")
+      n.topic?.toLowerCase().includes("conflict"),
     );
-    const unreadRegular = allUnread.filter((n) =>
-      !n.topic?.toLowerCase().includes("conflict")
+    const unreadRegular = allUnread.filter(
+      (n) => !n.topic?.toLowerCase().includes("conflict"),
     );
 
     // Deduplicate feed: items in feed might also be in allUnread
@@ -170,7 +173,9 @@ export function useNotifications(enabled = true, countOnly = false) {
   const { data: unreadCount = 0 } = useQuery({
     queryKey: ["notifications", "unreadCount"],
     queryFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user) return 0;
 
       const { error, count } = await supabase
@@ -197,7 +202,9 @@ export function useNotifications(enabled = true, countOnly = false) {
   // 4. MUTATIONS
   const updateStatusMutation = useMutation({
     mutationFn: async ({ id, isRead }: { id?: number; isRead: boolean }) => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session?.user) return;
 
       let query = supabase
@@ -220,9 +227,10 @@ export function useNotifications(enabled = true, countOnly = false) {
         "notifications",
         "unread",
       ]);
-      const previousFeed = queryClient.getQueryData<
-        { pages: FetchResponse[]; pageParams: Array<unknown> }
-      >(["notifications", "feed"]);
+      const previousFeed = queryClient.getQueryData<{
+        pages: FetchResponse[];
+        pageParams: Array<unknown>;
+      }>(["notifications", "feed"]);
       const previousUnreadCount = queryClient.getQueryData<number>([
         "notifications",
         "unreadCount",
@@ -264,9 +272,9 @@ export function useNotifications(enabled = true, countOnly = false) {
       // 3. Optimistically update unread query (Actions + Regular Unread)
       if (id) {
         const itemInUnread = previousUnread?.find((n) => n.id === id);
-        const itemInFeed = previousFeed?.pages.flatMap((p) => p.data).find(
-          (n) => n.id === id,
-        );
+        const itemInFeed = previousFeed?.pages
+          .flatMap((p) => p.data)
+          .find((n) => n.id === id);
         const notification = itemInUnread || itemInFeed;
 
         if (isRead) {
@@ -284,9 +292,10 @@ export function useNotifications(enabled = true, countOnly = false) {
                 { ...notification, is_read: false },
                 ...old.filter((n) => n.id !== id),
               ];
-              return updated.sort((a, b) =>
-                new Date(b.created_at).getTime() -
-                new Date(a.created_at).getTime()
+              return updated.sort(
+                (a, b) =>
+                  new Date(b.created_at).getTime() -
+                  new Date(a.created_at).getTime(),
               );
             },
           );

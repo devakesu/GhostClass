@@ -26,8 +26,10 @@ const handler = async (
 
   if (authHeader?.startsWith("Bearer ")) {
     const token = authHeader.split(" ")[1];
-    const { data: { user }, error: authError } = await supabaseAdmin.auth
-      .getUser(token);
+    const {
+      data: { user },
+      error: authError,
+    } = await supabaseAdmin.auth.getUser(token);
     if (authError || !user) {
       return NextResponse.json({ error: "Invalid session" }, { status: 401 });
     }
@@ -44,9 +46,12 @@ const handler = async (
       body = await req.json();
     } catch (_err) {
       logger.warn(`[accept-terms] Failed to parse request body:`, _err);
-      return NextResponse.json({ error: "Invalid request body" }, {
-        status: 400,
-      });
+      return NextResponse.json(
+        { error: "Invalid request body" },
+        {
+          status: 400,
+        },
+      );
     }
   }
 
@@ -56,15 +61,19 @@ const handler = async (
   }
 
   // Validate version format — must be a short alphanumeric version string (e.g. "1.0", "2024-01")
-  const versionSchema = z.string().min(1).max(50).regex(
-    /^[0-9a-zA-Z._-]+$/,
-    "Invalid version format",
-  );
+  const versionSchema = z
+    .string()
+    .min(1)
+    .max(50)
+    .regex(/^[0-9a-zA-Z._-]+$/, "Invalid version format");
   const versionResult = versionSchema.safeParse(version);
   if (!versionResult.success) {
-    return NextResponse.json({ error: "Invalid version format" }, {
-      status: 400,
-    });
+    return NextResponse.json(
+      { error: "Invalid version format" },
+      {
+        status: 400,
+      },
+    );
   }
 
   // 3. Update database
@@ -82,9 +91,12 @@ const handler = async (
       tags: { type: "db_update_error", location: "api/user/accept-terms" },
       extra: { userId: redact("id", authUser.id), version: versionResult.data },
     });
-    return NextResponse.json({ error: "Failed to update terms acceptance" }, {
-      status: 500,
-    });
+    return NextResponse.json(
+      { error: "Failed to update terms acceptance" },
+      {
+        status: 500,
+      },
+    );
   }
 
   logger.info("API /user/accept-terms: Success", {

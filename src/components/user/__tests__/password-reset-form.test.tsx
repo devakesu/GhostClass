@@ -89,7 +89,8 @@ vi.mock("axios", () => ({
   default: {
     post: mockAxiosPost,
     isAxiosError: (err: unknown) =>
-      typeof err === "object" && err !== null &&
+      typeof err === "object" &&
+      err !== null &&
       (err as Record<string, unknown>).isAxiosError === true,
   },
   AxiosError: class AxiosError extends Error {
@@ -106,9 +107,11 @@ vi.mock("axios", () => ({
 
 vi.mock("framer-motion", () => ({
   motion: {
-    div: (
-      { children, ...rest }: React.PropsWithChildren<Record<string, unknown>>,
-    ) => React.createElement("div", rest, children),
+    div: ({
+      children,
+      ...rest
+    }: React.PropsWithChildren<Record<string, unknown>>) =>
+      React.createElement("div", rest, children),
   },
   AnimatePresence: ({ children }: React.PropsWithChildren) =>
     React.createElement(React.Fragment, null, children),
@@ -222,7 +225,7 @@ async function reachOptionStep() {
   );
 
   await waitFor(() =>
-    expect(screen.getByText("Send Code")).toBeInTheDocument()
+    expect(screen.getByText("Send Code")).toBeInTheDocument(),
   );
   vi.clearAllMocks();
 }
@@ -267,8 +270,9 @@ describe("PasswordResetForm – initial render", () => {
 
   it("renders the username step with the correct input", () => {
     renderForm();
-    expect(screen.getByPlaceholderText("academic_weapon_fr"))
-      .toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("academic_weapon_fr"),
+    ).toBeInTheDocument();
     expect(screen.getByText("Continue")).toBeInTheDocument();
     expect(screen.getByText("Cancel")).toBeInTheDocument();
   });
@@ -283,8 +287,9 @@ describe("PasswordResetForm – initial render", () => {
   it("switches to email placeholder when email icon is clicked", () => {
     renderForm();
     fireEvent.click(screen.getByLabelText("Email"));
-    expect(screen.getByPlaceholderText("cooked@attendance.edu"))
-      .toBeInTheDocument();
+    expect(
+      screen.getByPlaceholderText("cooked@attendance.edu"),
+    ).toBeInTheDocument();
   });
 
   it("switches to phone placeholder when phone icon is clicked", () => {
@@ -317,7 +322,7 @@ describe("PasswordResetForm – handleUsernameSubmit", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("Send Code")).toBeInTheDocument()
+      expect(screen.getByText("Send Code")).toBeInTheDocument(),
     );
     expect(mockNProgressStart).toHaveBeenCalled();
     expect(mockNProgressDone).toHaveBeenCalled();
@@ -337,7 +342,7 @@ describe("PasswordResetForm – handleUsernameSubmit", () => {
         screen.getByText(
           "Ezygo: No user found with this username/email/phone.",
         ),
-      ).toBeInTheDocument()
+      ).toBeInTheDocument(),
     );
   });
 
@@ -352,7 +357,7 @@ describe("PasswordResetForm – handleUsernameSubmit", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("Ezygo: User not found")).toBeInTheDocument()
+      expect(screen.getByText("Ezygo: User not found")).toBeInTheDocument(),
     );
     expect(mockNProgressDone).toHaveBeenCalled();
   });
@@ -367,8 +372,9 @@ describe("PasswordResetForm – handleUsernameSubmit", () => {
     );
 
     await waitFor(() =>
-      expect(screen.getByText("Ezygo: Failed to fetch reset options."))
-        .toBeInTheDocument()
+      expect(
+        screen.getByText("Ezygo: Failed to fetch reset options."),
+      ).toBeInTheDocument(),
     );
   });
 });
@@ -393,7 +399,7 @@ describe("PasswordResetForm – handleOptionSubmit", () => {
     fireEvent.submit(screen.getByText("Send Code").closest("form")!);
 
     await waitFor(() =>
-      expect(screen.getByLabelText("Reset Code")).toBeInTheDocument()
+      expect(screen.getByLabelText("Reset Code")).toBeInTheDocument(),
     );
     expect(mockNProgressDone).toHaveBeenCalled();
   });
@@ -417,7 +423,7 @@ describe("PasswordResetForm – handleOptionSubmit", () => {
     fireEvent.submit(screen.getByText("Send Code").closest("form")!);
 
     await waitFor(() =>
-      expect(screen.getByText("Ezygo: Rate limited")).toBeInTheDocument()
+      expect(screen.getByText("Ezygo: Rate limited")).toBeInTheDocument(),
     );
   });
 });
@@ -440,8 +446,9 @@ describe("PasswordResetForm – handleResetSubmit client-side validation", () =>
     fireEvent.submit(screen.getByLabelText("Reset Code").closest("form")!);
 
     await waitFor(() =>
-      expect(screen.getByText(/Password must be at least 6 characters/))
-        .toBeInTheDocument()
+      expect(
+        screen.getByText(/Password must be at least 6 characters/),
+      ).toBeInTheDocument(),
     );
     expect(mockEzygoPost).not.toHaveBeenCalled();
   });
@@ -458,7 +465,7 @@ describe("PasswordResetForm – handleResetSubmit client-side validation", () =>
     fireEvent.submit(screen.getByLabelText("Reset Code").closest("form")!);
 
     await waitFor(() =>
-      expect(screen.getByText("Passwords do not match.")).toBeInTheDocument()
+      expect(screen.getByText("Passwords do not match.")).toBeInTheDocument(),
     );
     expect(mockEzygoPost).not.toHaveBeenCalled();
   });
@@ -469,7 +476,7 @@ describe("PasswordResetForm – handleResetSubmit client-side validation", () =>
     fireEvent.submit(screen.getByLabelText("Reset Code").closest("form")!);
 
     await waitFor(() =>
-      expect(screen.getByText("Password is required")).toBeInTheDocument()
+      expect(screen.getByText("Password is required")).toBeInTheDocument(),
     );
   });
 
@@ -489,7 +496,7 @@ describe("PasswordResetForm – handleResetSubmit client-side validation", () =>
     await waitFor(() =>
       expect(
         screen.getByText("Password must be at most 128 characters long"),
-      ).toBeInTheDocument()
+      ).toBeInTheDocument(),
     );
     expect(mockEzygoPost).not.toHaveBeenCalled();
   });
@@ -531,7 +538,7 @@ describe("PasswordResetForm – handleResetSubmit success", () => {
     });
 
     await waitFor(() =>
-      expect(mockRouterPush).toHaveBeenCalledWith("/dashboard")
+      expect(mockRouterPush).toHaveBeenCalledWith("/dashboard"),
     );
   });
 
@@ -560,7 +567,7 @@ describe("PasswordResetForm – handleResetSubmit success", () => {
     });
 
     await waitFor(() =>
-      expect(mockRouterPush).toHaveBeenCalledWith("/dashboard")
+      expect(mockRouterPush).toHaveBeenCalledWith("/dashboard"),
     );
   });
 });
@@ -599,8 +606,9 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText("Secure session setup failed. Please try again."))
-        .toBeInTheDocument()
+      expect(
+        screen.getByText("Secure session setup failed. Please try again."),
+      ).toBeInTheDocument(),
     );
   });
 
@@ -617,7 +625,7 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText("Ezygo: Invalid OTP")).toBeInTheDocument()
+      expect(screen.getByText("Ezygo: Invalid OTP")).toBeInTheDocument(),
     );
   });
 
@@ -634,8 +642,9 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
     });
 
     await waitFor(() =>
-      expect(screen.getByText("Network error. Please check your connection."))
-        .toBeInTheDocument()
+      expect(
+        screen.getByText("Network error. Please check your connection."),
+      ).toBeInTheDocument(),
     );
   });
 
@@ -654,7 +663,7 @@ describe("PasswordResetForm – handleResetSubmit error cases", () => {
         screen.getByText(
           "CSRF token unavailable – please reload the page and try again.",
         ),
-      ).toBeInTheDocument()
+      ).toBeInTheDocument(),
     );
     expect(mockRouterPush).not.toHaveBeenCalled();
   });

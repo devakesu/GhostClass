@@ -41,16 +41,18 @@ describe("calculateCurrentAcademicInfo", () => {
   });
 
   it("should handle numeric semester strings", () => {
-    expect(calculateCurrentAcademicInfo({ year: "2023-24", semester: "1" }))
-      .toEqual({
-        current_year: "2023-24",
-        current_semester: "odd",
-      });
-    expect(calculateCurrentAcademicInfo({ year: "2023-24", semester: "2" }))
-      .toEqual({
-        current_year: "2023-24",
-        current_semester: "even",
-      });
+    expect(
+      calculateCurrentAcademicInfo({ year: "2023-24", semester: "1" }),
+    ).toEqual({
+      current_year: "2023-24",
+      current_semester: "odd",
+    });
+    expect(
+      calculateCurrentAcademicInfo({ year: "2023-24", semester: "2" }),
+    ).toEqual({
+      current_year: "2023-24",
+      current_semester: "even",
+    });
   });
 
   it("should detect semester based on date when metadata is partial or invalid", () => {

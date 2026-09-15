@@ -152,9 +152,8 @@ export function EditInstructorDialog({
             Edit Instructor
           </DialogTitle>
           <DialogDescription className="text-center">
-            Set the instructor name for{" "}
-            <strong>{courseCode}</strong>. This will be shared with your entire
-            class.
+            Set the instructor name for <strong>{courseCode}</strong>. This will
+            be shared with your entire class.
           </DialogDescription>
         </DialogHeader>
 

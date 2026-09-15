@@ -5,9 +5,10 @@ import { isStandalonePWA } from "@/lib/pwa";
 
 interface BeforeInstallPromptEvent extends Event {
   readonly platforms: string[];
-  readonly userChoice: Promise<
-    { outcome: "accepted" | "dismissed"; platform: string }
-  >;
+  readonly userChoice: Promise<{
+    outcome: "accepted" | "dismissed";
+    platform: string;
+  }>;
   prompt(): Promise<void>;
 }
 
@@ -40,17 +41,16 @@ if (typeof window !== "undefined" && !_moduleListener) {
 }
 
 export function usePWAInstall(): UsePWAInstallReturn {
-  const [deferredPrompt, setDeferredPrompt] = useState<
-    BeforeInstallPromptEvent | null
-  >(
-    // Seed from the early-captured value so the hook is immediately aware
-    // if the event already fired before this component mounted.
-    () => _earlyPrompt,
-  );
+  const [deferredPrompt, setDeferredPrompt] =
+    useState<BeforeInstallPromptEvent | null>(
+      // Seed from the early-captured value so the hook is immediately aware
+      // if the event already fired before this component mounted.
+      () => _earlyPrompt,
+    );
   // Initialise synchronously so we never call setState inside an effect body.
   // Chrome/Edge use the display-mode media query; iOS Safari uses navigator.standalone.
   const [isInstalled, setIsInstalled] = useState<boolean>(() =>
-    isStandalonePWA()
+    isStandalonePWA(),
   );
 
   useEffect(() => {

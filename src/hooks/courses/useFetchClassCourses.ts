@@ -24,9 +24,11 @@ interface UseFetchClassCoursesOptions {
  * These are custom courses added by class representatives or admins that might not
  * be present in the official EzyGo enrollment list.
  */
-export function useFetchClassCourses(
-  { semester, year, enabled = true }: UseFetchClassCoursesOptions = {},
-) {
+export function useFetchClassCourses({
+  semester,
+  year,
+  enabled = true,
+}: UseFetchClassCoursesOptions = {}) {
   const { data: profile } = useProfile();
   const classId = profile?.class?.id;
 

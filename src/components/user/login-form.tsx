@@ -122,7 +122,10 @@ async function verifyActiveSessionAndCleanup(
   isMounted: boolean,
 ): Promise<void> {
   try {
-    const { data: { session }, error } = await supabase.auth.getSession();
+    const {
+      data: { session },
+      error,
+    } = await supabase.auth.getSession();
     const isMissing = error ? isAuthSessionMissingError(error) : false;
     const isLock = error ? isSupabaseLockTimeoutError(error) : false;
 
@@ -172,9 +175,10 @@ function writeCustomSettingsToStorage(
   settings: NonNullable<SaveTokenData["settings"]>,
   queryClient: ReturnType<typeof useQueryClient>,
 ): void {
-  const bunkEnabled = typeof settings.bunk_calculator_enabled === "boolean"
-    ? settings.bunk_calculator_enabled
-    : true;
+  const bunkEnabled =
+    typeof settings.bunk_calculator_enabled === "boolean"
+      ? settings.bunk_calculator_enabled
+      : true;
   const rawTarget = settings.target_percentage;
 
   let targetPercentage = DEFAULT_TARGET_PERCENTAGE;
@@ -209,9 +213,10 @@ function writeCustomSettingsToStorage(
       disabled_courses: settings.disabled_courses || [],
     });
   } catch (storageError) {
-    const msg = storageError instanceof Error
-      ? storageError.message
-      : String(storageError);
+    const msg =
+      storageError instanceof Error
+        ? storageError.message
+        : String(storageError);
     logger.dev("Failed to write returned settings to storage after login", {
       context: "LoginForm/handleSubmit",
       error: msg,
@@ -224,9 +229,10 @@ function writeDefaultSettingsToStorage(supabaseUserId: string): void {
     localStorage.setItem(`showBunkCalc_${supabaseUserId}`, "true");
     localStorage.setItem(`targetPercentage_${supabaseUserId}`, "75");
   } catch (storageError) {
-    const msg = storageError instanceof Error
-      ? storageError.message
-      : String(storageError);
+    const msg =
+      storageError instanceof Error
+        ? storageError.message
+        : String(storageError);
     logger.dev("Failed to write default settings to storage after login", {
       context: "LoginForm/handleSubmit",
       error: msg,
@@ -311,7 +317,8 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
 
     // Real-time validation
     if (
-      password.length > 0 && password.length < PASSWORD_VALIDATION.MIN_LENGTH
+      password.length > 0 &&
+      password.length < PASSWORD_VALIDATION.MIN_LENGTH
     ) {
       setPasswordError(
         `At least ${PASSWORD_VALIDATION.MIN_LENGTH} characters required`,
@@ -380,9 +387,13 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
       }
 
       // 2. Securely Save Token (Bridge to GhostClass)
-      const saveTokenResponse = await axios.post("/api/auth/save-token", {
-        token,
-      }, { baseURL: "/" });
+      const saveTokenResponse = await axios.post(
+        "/api/auth/save-token",
+        {
+          token,
+        },
+        { baseURL: "/" },
+      );
 
       // 3. Persist returned user preferences cleanly
       persistPrefetchedSettings(saveTokenResponse.data, queryClient);
@@ -419,9 +430,10 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
         errorMsg = "Invalid credentials. Please check your password.";
       } else if (err.response?.data?.message) {
         const msg = err.response.data.message;
-        errorMsg = msg === "These credentials do not match our records."
-          ? "These credentials do not match EzyGo records."
-          : msg;
+        errorMsg =
+          msg === "These credentials do not match our records."
+            ? "These credentials do not match EzyGo records."
+            : msg;
       } else if (err.code === "ERR_NETWORK") {
         errorMsg =
           "Network error. Please check your connection. If this persists even after some time, kindly contact us using the link in the footer.";
@@ -515,7 +527,9 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
             </div>
 
             <p className="text-center text-sm font-medium max-w-80.5 text-muted-foreground/80 -mt-2">
-              {"Drop your ezygo credentials - we're just the aesthetic upgrade you deserved."}
+              {
+                "Drop your ezygo credentials - we're just the aesthetic upgrade you deserved."
+              }
             </p>
           </motion.div>
 
@@ -523,9 +537,7 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
           <div className="flex flex-col gap-4 mt-2">
             <motion.div className="grid gap-2" variants={itemVariants}>
               <div className="flex items-center justify-between">
-                <Label htmlFor="login">
-                  {currentMethodProps.label}
-                </Label>
+                <Label htmlFor="login">{currentMethodProps.label}</Label>
                 <div className="flex gap-1">
                   {(["username", "email", "phone"] as const).map((method) => (
                     <Button
@@ -595,9 +607,9 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   )}
                   onChange={handlePasswordChange}
                   aria-invalid={!!passwordError}
-                  aria-describedby={passwordError
-                    ? "password-error"
-                    : undefined}
+                  aria-describedby={
+                    passwordError ? "password-error" : undefined
+                  }
                 />
 
                 <Button
@@ -608,14 +620,11 @@ export function LoginForm({ className, ...props }: LoginFormProps) {
                   onClick={() => setShowPassword(!showPassword)}
                   aria-label={showPassword ? "Hide password" : "Show password"}
                 >
-                  {showPassword
-                    ? (
-                      <EyeOff
-                        className="h-5 w-5 opacity-70"
-                        aria-hidden="true"
-                      />
-                    )
-                    : <Eye className="h-5 w-5 opacity-70" aria-hidden="true" />}
+                  {showPassword ? (
+                    <EyeOff className="h-5 w-5 opacity-70" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-5 w-5 opacity-70" aria-hidden="true" />
+                  )}
                 </Button>
               </div>
             </motion.div>

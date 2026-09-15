@@ -92,15 +92,18 @@ async function performRegistration(
     setupUpdateListener(registration);
 
     if (!updateIntervalIdRef.current) {
-      updateIntervalIdRef.current = setInterval(() => {
-        if (!getIsMounted()) return;
-        registration.update().catch((error) => {
-          logger.dev("Service worker update check failed", {
-            context: "ServiceWorkerRegister",
-            error,
+      updateIntervalIdRef.current = setInterval(
+        () => {
+          if (!getIsMounted()) return;
+          registration.update().catch((error) => {
+            logger.dev("Service worker update check failed", {
+              context: "ServiceWorkerRegister",
+              error,
+            });
           });
-        });
-      }, 60 * 60 * 1000);
+        },
+        60 * 60 * 1000,
+      );
     }
   } catch (error) {
     logger.error("Service worker registration failed", {

@@ -90,7 +90,9 @@ export async function getAuthTokenWithFallback(userId?: string) {
     let finalUserId = userId;
     if (!finalUserId) {
       const supabase = await createClient();
-      const { data: { user } } = await supabase.auth.getUser();
+      const {
+        data: { user },
+      } = await supabase.auth.getUser();
       if (!user) return undefined;
       finalUserId = user.id;
     }

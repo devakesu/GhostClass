@@ -84,8 +84,8 @@ const defaultDisabledCoursesReturn = {
 };
 
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-const mockUseDisabledCourses = vi.fn((_opts?: unknown) =>
-  defaultDisabledCoursesReturn
+const mockUseDisabledCourses = vi.fn(
+  (_opts?: unknown) => defaultDisabledCoursesReturn,
 );
 
 vi.mock("@/hooks/courses/useDisabledCourses", () => ({
@@ -161,11 +161,10 @@ describe("CourseCard", () => {
 
   describe("statusColorClasses", () => {
     it("applies green border by default even when there is no attendance data (isLoading)", async () => {
-      vi.mocked(useCourseDetails).mockReturnValue(
-        { data: undefined, isLoading: true } as unknown as ReturnType<
-          typeof useCourseDetails
-        >,
-      );
+      vi.mocked(useCourseDetails).mockReturnValue({
+        data: undefined,
+        isLoading: true,
+      } as unknown as ReturnType<typeof useCourseDetails>);
       const noDataCourse: ExtendedCourse = {
         id: 1,
         name: "No Data Course",
@@ -178,27 +177,24 @@ describe("CourseCard", () => {
 
     it("applies green top border when attendance is at or above target", async () => {
       // 15/20 = 75% = target
-      vi.mocked(useCourseDetails).mockReturnValue(
-        {
-          data: { present: 15, total: 20, absent: 5 },
-          isLoading: false,
-        } as unknown as ReturnType<typeof useCourseDetails>,
-      );
+      vi.mocked(useCourseDetails).mockReturnValue({
+        data: { present: 15, total: 20, absent: 5 },
+        isLoading: false,
+      } as unknown as ReturnType<typeof useCourseDetails>);
       const { container } = render(<CourseCard course={sampleCourse} />);
       const card = container.querySelector(".custom-container");
-      expect(await within(card as HTMLElement).findByText("Computer Science"))
-        .toBeInTheDocument();
+      expect(
+        await within(card as HTMLElement).findByText("Computer Science"),
+      ).toBeInTheDocument();
       expect(card?.className).toMatch(/border-t-green-500/);
     });
 
     it("applies amber top border when attendance is within 10% below target", async () => {
       // 10/15 ≈ 66.67%, target=75, target-10=65 → amber
-      vi.mocked(useCourseDetails).mockReturnValue(
-        {
-          data: { present: 10, total: 15, absent: 5 },
-          isLoading: false,
-        } as unknown as ReturnType<typeof useCourseDetails>,
-      );
+      vi.mocked(useCourseDetails).mockReturnValue({
+        data: { present: 10, total: 15, absent: 5 },
+        isLoading: false,
+      } as unknown as ReturnType<typeof useCourseDetails>);
       const amberCourse: ExtendedCourse = {
         id: 2,
         name: "Amber Course",
@@ -208,19 +204,18 @@ describe("CourseCard", () => {
       };
       const { container } = render(<CourseCard course={amberCourse} />);
       const card = container.querySelector(".custom-container");
-      expect(await within(card as HTMLElement).findByText("Amber Course"))
-        .toBeInTheDocument();
+      expect(
+        await within(card as HTMLElement).findByText("Amber Course"),
+      ).toBeInTheDocument();
       expect(card?.className).toMatch(/border-t-red-500/);
     });
 
     it("applies red top border when attendance is more than 10% below target", async () => {
       // 6/15 = 40%, target=75, target-10=65 → red
-      vi.mocked(useCourseDetails).mockReturnValue(
-        {
-          data: { present: 6, total: 15, absent: 9 },
-          isLoading: false,
-        } as unknown as ReturnType<typeof useCourseDetails>,
-      );
+      vi.mocked(useCourseDetails).mockReturnValue({
+        data: { present: 6, total: 15, absent: 9 },
+        isLoading: false,
+      } as unknown as ReturnType<typeof useCourseDetails>);
       const redCourse: ExtendedCourse = {
         id: 3,
         name: "Red Course",
@@ -230,8 +225,9 @@ describe("CourseCard", () => {
       };
       const { container } = render(<CourseCard course={redCourse} />);
       const card = container.querySelector(".custom-container");
-      expect(await within(card as HTMLElement).findByText("Red Course"))
-        .toBeInTheDocument();
+      expect(
+        await within(card as HTMLElement).findByText("Red Course"),
+      ).toBeInTheDocument();
       expect(card?.className).toMatch(/border-t-red-500/);
     });
   });
@@ -504,10 +500,7 @@ describe("CourseCard", () => {
       expect(await screen.findByText("Computer Science")).toBeInTheDocument();
 
       // Dispatch a toggle event to turn off bunk calc
-      fireEvent(
-        window,
-        new CustomEvent("bunkCalcToggle", { detail: false }),
-      );
+      fireEvent(window, new CustomEvent("bunkCalcToggle", { detail: false }));
 
       // Bunk calculator section should no longer be visible
       await expect(
@@ -529,10 +522,7 @@ describe("CourseCard", () => {
       });
       render(<CourseCard course={sampleCourse} />);
 
-      fireEvent(
-        window,
-        new CustomEvent("bunkCalcToggle", { detail: true }),
-      );
+      fireEvent(window, new CustomEvent("bunkCalcToggle", { detail: true }));
 
       // Bunk calculator should become visible
       expect(await screen.findByText("Computer Science")).toBeInTheDocument();
@@ -583,7 +573,8 @@ describe("CourseCard", () => {
 
   describe("Duty Leaves rendering", () => {
     it("renders non-zero Duty Leaves when attendance report includes status 225", async () => {
-      const { useAttendanceReport } = await import("@/hooks/courses/attendance");
+      const { useAttendanceReport } =
+        await import("@/hooks/courses/attendance");
       vi.mocked(useAttendanceReport).mockReturnValue({
         data: {
           courses: { "42": { code: "CS101", name: "Computer Science" } },
@@ -602,7 +593,8 @@ describe("CourseCard", () => {
     });
 
     it("renders singular 'Duty Leave' when count is 1", async () => {
-      const { useAttendanceReport } = await import("@/hooks/courses/attendance");
+      const { useAttendanceReport } =
+        await import("@/hooks/courses/attendance");
       vi.mocked(useAttendanceReport).mockReturnValue({
         data: {
           courses: { "42": { code: "CS101", name: "Computer Science" } },

@@ -46,8 +46,10 @@ interface ErrorBoundaryState {
  * </ErrorBoundary>
  * ```
  */
-export class ErrorBoundary
-  extends Component<ErrorBoundaryProps, ErrorBoundaryState> {
+export class ErrorBoundary extends Component<
+  ErrorBoundaryProps,
+  ErrorBoundaryState
+> {
   constructor(props: ErrorBoundaryProps) {
     super(props);
     this.state = {
@@ -113,9 +115,11 @@ export class ErrorBoundary
     const appDomain = getAppDomain();
     // Validate domain: proper hostname format (no consecutive dots, no leading/trailing hyphens in labels)
     if (
-      !/^[a-zA-Z0-9.-]+$/.test(appDomain) || appDomain.length > 253 ||
+      !/^[a-zA-Z0-9.-]+$/.test(appDomain) ||
+      appDomain.length > 253 ||
       !appDomain.includes(".")
-    ) return;
+    )
+      return;
     const subject = encodeURIComponent("Error Report - GhostClass");
     const body = encodeURIComponent(
       `Hi Admin,\n\nI encountered an error while using GhostClass.\n\n` +
@@ -124,8 +128,7 @@ export class ErrorBoundary
         `Please help resolve this issue.\n\nThank you!`,
     );
 
-    window.location.href =
-      `mailto:admin@${appDomain}?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:admin@${appDomain}?subject=${subject}&body=${body}`;
   };
 
   render(): ReactNode {
@@ -187,10 +190,8 @@ export class ErrorBoundary
             </button>
           </div>
 
-          {
-            /* Optional: Show Error Message in Dev only if you want,
-              but usually hiding it is better for UX */
-          }
+          {/* Optional: Show Error Message in Dev only if you want,
+              but usually hiding it is better for UX */}
           {process.env.NODE_ENV === "development" && (
             <p className="mt-8 text-xs font-mono text-red-500 bg-red-50 dark:bg-red-950/50 p-2 rounded max-w-lg break-all">
               {this.state.error.toString()}

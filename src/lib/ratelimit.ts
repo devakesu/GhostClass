@@ -30,7 +30,8 @@ const RATE_LIMIT_WINDOW = parseInt(process.env.RATE_LIMIT_WINDOW || "10", 10);
 // Error messages use "[value redacted]" instead of the raw env var value to
 // avoid exposing attacker-influenced config values in deployment logs.
 if (
-  !Number.isFinite(RATE_LIMIT_REQUESTS) || RATE_LIMIT_REQUESTS < 1 ||
+  !Number.isFinite(RATE_LIMIT_REQUESTS) ||
+  RATE_LIMIT_REQUESTS < 1 ||
   RATE_LIMIT_REQUESTS > 1000
 ) {
   throw new Error(
@@ -38,7 +39,8 @@ if (
   );
 }
 if (
-  !Number.isFinite(RATE_LIMIT_WINDOW) || RATE_LIMIT_WINDOW < 1 ||
+  !Number.isFinite(RATE_LIMIT_WINDOW) ||
+  RATE_LIMIT_WINDOW < 1 ||
   RATE_LIMIT_WINDOW > 3600
 ) {
   throw new Error(
@@ -76,14 +78,17 @@ const CONTACT_WINDOW = parseInt(
   10,
 );
 if (
-  !Number.isFinite(CONTACT_LIMIT) || CONTACT_LIMIT < 1 || CONTACT_LIMIT > 1000
+  !Number.isFinite(CONTACT_LIMIT) ||
+  CONTACT_LIMIT < 1 ||
+  CONTACT_LIMIT > 1000
 ) {
   throw new Error(
     `CONTACT_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`,
   );
 }
 if (
-  !Number.isFinite(CONTACT_WINDOW) || CONTACT_WINDOW < 1 ||
+  !Number.isFinite(CONTACT_WINDOW) ||
+  CONTACT_WINDOW < 1 ||
   CONTACT_WINDOW > 3600
 ) {
   throw new Error(
@@ -102,14 +107,17 @@ const PROFILE_WINDOW = parseInt(
   10,
 );
 if (
-  !Number.isFinite(PROFILE_LIMIT) || PROFILE_LIMIT < 1 || PROFILE_LIMIT > 1000
+  !Number.isFinite(PROFILE_LIMIT) ||
+  PROFILE_LIMIT < 1 ||
+  PROFILE_LIMIT > 1000
 ) {
   throw new Error(
     `PROFILE_RATE_LIMIT_REQUESTS must be between 1-1000, got: [value redacted]`,
   );
 }
 if (
-  !Number.isFinite(PROFILE_WINDOW) || PROFILE_WINDOW < 1 ||
+  !Number.isFinite(PROFILE_WINDOW) ||
+  PROFILE_WINDOW < 1 ||
   PROFILE_WINDOW > 3600
 ) {
   throw new Error(
@@ -161,7 +169,8 @@ const CSP_REPORT_WINDOW = parseInt(
 );
 
 if (
-  !Number.isFinite(CSP_REPORT_LIMIT) || CSP_REPORT_LIMIT < 1 ||
+  !Number.isFinite(CSP_REPORT_LIMIT) ||
+  CSP_REPORT_LIMIT < 1 ||
   CSP_REPORT_LIMIT > 1000
 ) {
   throw new Error(
@@ -169,7 +178,8 @@ if (
   );
 }
 if (
-  !Number.isFinite(CSP_REPORT_WINDOW) || CSP_REPORT_WINDOW < 1 ||
+  !Number.isFinite(CSP_REPORT_WINDOW) ||
+  CSP_REPORT_WINDOW < 1 ||
   CSP_REPORT_WINDOW > 3600
 ) {
   throw new Error(
@@ -208,7 +218,10 @@ export function createResilientLimiter(
 
   const originalLimit = instance.limit.bind(instance);
 
-  instance.limit = async function (id: string, req?: Parameters<typeof originalLimit>[1]) {
+  instance.limit = async function (
+    id: string,
+    req?: Parameters<typeof originalLimit>[1],
+  ) {
     try {
       return await originalLimit(id, req);
     } catch (error: unknown) {

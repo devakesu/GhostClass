@@ -28,8 +28,7 @@ describe("Instrumentation Edge", () => {
 
     const breadcrumb = {
       data: {
-        url:
-          "https://www.google-analytics.com/collect?v=2&api_secret=supersecret",
+        url: "https://www.google-analytics.com/collect?v=2&api_secret=supersecret",
       },
     };
     const result = beforeBreadcrumb!(breadcrumb);
@@ -66,8 +65,8 @@ describe("Instrumentation Edge", () => {
     const event: any = {
       request: {
         headers: {
-          "authorization": "Bearer secret",
-          "cookie": "session=abc",
+          authorization: "Bearer secret",
+          cookie: "session=abc",
           "user-agent": "browser",
         },
       },
@@ -91,7 +90,7 @@ describe("Instrumentation Edge", () => {
         },
         {
           data: {
-            "url": "https://google-analytics.com/collect?api_secret=456",
+            url: "https://google-analytics.com/collect?api_secret=456",
           },
         },
       ],

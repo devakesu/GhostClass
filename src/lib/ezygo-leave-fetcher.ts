@@ -22,13 +22,13 @@ export async function fetchLeaveData(token: string) {
   // 1. Fetch student-specific dynamic data in parallel
   const [studentLeaves, sessions, events] = await Promise.all([
     fetchEzygoData<unknown>("/studentleaves", token).catch((e) =>
-      handleLeaveFetchError("studentleaves", e)
+      handleLeaveFetchError("studentleaves", e),
     ),
     fetchEzygoData<unknown>("/sessions", token).catch((e) =>
-      handleLeaveFetchError("sessions", e)
+      handleLeaveFetchError("sessions", e),
     ),
     fetchEzygoData<unknown>("/events", token).catch((e) =>
-      handleLeaveFetchError("events", e)
+      handleLeaveFetchError("events", e),
     ),
   ]);
 

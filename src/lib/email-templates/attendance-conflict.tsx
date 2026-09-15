@@ -82,24 +82,25 @@ export const AttendanceConflictEmail = ({
                   <td style={tableStyles.cellLabel}>👤 You Marked</td>
                   <td style={tableStyles.cellValueWithBadge}>
                     <span
-                      style={isDutyLeave
-                        ? badgeStyles.dutyLeave
-                        : badgeStyles.present}
+                      style={
+                        isDutyLeave
+                          ? badgeStyles.dutyLeave
+                          : badgeStyles.present
+                      }
                     >
-                      {markedAttendance || (isDutyLeave ? "Duty Leave" : "Present")}
+                      {markedAttendance ||
+                        (isDutyLeave ? "Duty Leave" : "Present")}
                     </span>
                   </td>
                 </tr>
-                {remarks && remarks.trim()
-                  ? (
-                    <tr>
-                      <td style={tableStyles.cellLabel}>
-                        📝 Your Manual Record Remarks:
-                      </td>
-                      <td style={tableStyles.cellValueBold}>{remarks.trim()}</td>
-                    </tr>
-                  )
-                  : null}
+                {remarks && remarks.trim() ? (
+                  <tr>
+                    <td style={tableStyles.cellLabel}>
+                      📝 Your Manual Record Remarks:
+                    </td>
+                    <td style={tableStyles.cellValueBold}>{remarks.trim()}</td>
+                  </tr>
+                ) : null}
                 <tr>
                   <td style={tableStyles.cellLabelLast}>🏫 Official</td>
                   <td style={tableStyles.cellValueWithBadgeLast}>
@@ -111,15 +112,15 @@ export const AttendanceConflictEmail = ({
           </Section>
 
           <Text style={emailStyles.note}>
-            {isDutyLeave
-              ? "We have automatically updated this entry to match the official status so you can track your attendance accurately while your Duty Leave application is processed."
-              : (
-                <>
-                  We have automatically flagged this entry as a{" "}
-                  <strong>Correction</strong>{" "}
-                  in your dashboard to keep your stats accurate.
-                </>
-              )}
+            {isDutyLeave ? (
+              "We have automatically updated this entry to match the official status so you can track your attendance accurately while your Duty Leave application is processed."
+            ) : (
+              <>
+                We have automatically flagged this entry as a{" "}
+                <strong>Correction</strong> in your dashboard to keep your stats
+                accurate.
+              </>
+            )}
           </Text>
 
           <Section style={emailStyles.buttonContainer}>

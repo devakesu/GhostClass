@@ -62,9 +62,7 @@ export default function ReactQueryProvider({ children }: PropsWithChildren) {
   return (
     <QueryClientProvider client={queryClient}>
       <UserSettingsProvider>
-        <AttendanceSettingsProvider>
-          {children}
-        </AttendanceSettingsProvider>
+        <AttendanceSettingsProvider>{children}</AttendanceSettingsProvider>
       </UserSettingsProvider>
     </QueryClientProvider>
   );

@@ -96,7 +96,8 @@ vi.mock("@/components/ui/select", () => ({
       {React.Children.map(children, (child: any) =>
         child
           ? React.cloneElement(child, { _onValueChange: onValueChange })
-          : null)}
+          : null,
+      )}
     </div>
   ),
   SelectTrigger: ({ children, ...props }: any) => (
@@ -107,7 +108,8 @@ vi.mock("@/components/ui/select", () => ({
   SelectContent: ({ children, _onValueChange }: any) => (
     <div>
       {React.Children.map(children, (child: any) =>
-        child ? React.cloneElement(child, { _onValueChange }) : null)}
+        child ? React.cloneElement(child, { _onValueChange }) : null,
+      )}
     </div>
   ),
   SelectItem: ({ children, value, _onValueChange, ...props }: any) => (
@@ -199,8 +201,9 @@ describe("AddAttendanceDialog", () => {
 
   it("does not show DL reason input when Present is selected (default)", () => {
     render(<AddAttendanceDialog {...defaultProps} />);
-    expect(screen.queryByPlaceholderText("Required for Duty Leave")).not
-      .toBeInTheDocument();
+    expect(
+      screen.queryByPlaceholderText("Required for Duty Leave"),
+    ).not.toBeInTheDocument();
   });
 
   it("shows DL reason input when Duty Leave is selected via radioGroupCallbackRef", async () => {
@@ -213,8 +216,9 @@ describe("AddAttendanceDialog", () => {
     });
 
     await waitFor(() => {
-      expect(screen.getByPlaceholderText("Required for Duty Leave"))
-        .toBeInTheDocument();
+      expect(
+        screen.getByPlaceholderText("Required for Duty Leave"),
+      ).toBeInTheDocument();
     });
   });
 
@@ -239,8 +243,9 @@ describe("AddAttendanceDialog", () => {
 
     // Input should disappear
     await waitFor(() => {
-      expect(screen.queryByPlaceholderText("Required for Duty Leave")).not
-        .toBeInTheDocument();
+      expect(
+        screen.queryByPlaceholderText("Required for Duty Leave"),
+      ).not.toBeInTheDocument();
     });
   });
 
@@ -348,9 +353,9 @@ describe("AddAttendanceDialog", () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       const fixedDate = new Date("2025-01-15T10:00:00Z");
       vi.setSystemTime(fixedDate);
-      const todayKey = `${fixedDate.getFullYear()}${
-        String(fixedDate.getMonth() + 1).padStart(2, "0")
-      }${String(fixedDate.getDate()).padStart(2, "0")}`;
+      const todayKey = `${fixedDate.getFullYear()}${String(
+        fixedDate.getMonth() + 1,
+      ).padStart(2, "0")}${String(fixedDate.getDate()).padStart(2, "0")}`;
 
       try {
         const propsWithAttendance = {
@@ -402,9 +407,9 @@ describe("AddAttendanceDialog", () => {
       vi.useFakeTimers({ toFake: ["Date"] });
       const fixedDate = new Date("2025-01-15T10:00:00Z");
       vi.setSystemTime(fixedDate);
-      const todayKey = `${fixedDate.getFullYear()}${
-        String(fixedDate.getMonth() + 1).padStart(2, "0")
-      }${String(fixedDate.getDate()).padStart(2, "0")}`;
+      const todayKey = `${fixedDate.getFullYear()}${String(
+        fixedDate.getMonth() + 1,
+      ).padStart(2, "0")}${String(fixedDate.getDate()).padStart(2, "0")}`;
 
       try {
         const propsWithAttendance = {

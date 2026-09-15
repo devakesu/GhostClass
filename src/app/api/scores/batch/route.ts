@@ -38,9 +38,12 @@ const handler = async (
   // 1. Rate limiting
   const ip = getClientIp(req.headers);
   if (!ip) {
-    return NextResponse.json({ error: "Unable to determine client IP" }, {
-      status: 400,
-    });
+    return NextResponse.json(
+      { error: "Unable to determine client IP" },
+      {
+        status: 400,
+      },
+    );
   }
   const { success } = await proxyRateLimiter.limit(`scores_batch_${ip}`);
   if (!success) {
@@ -49,7 +52,10 @@ const handler = async (
 
   // 2. Auth check
   const supabase = await createClient();
-  const { data: { user }, error: authError } = await supabase.auth.getUser();
+  const {
+    data: { user },
+    error: authError,
+  } = await supabase.auth.getUser();
   if (authError || !user) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
@@ -66,18 +72,24 @@ const handler = async (
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid JSON payload" }, {
-        status: 400,
-      });
+      return NextResponse.json(
+        { error: "Invalid JSON payload" },
+        {
+          status: 400,
+        },
+      );
     }
   }
 
   const validation = BatchRequestSchema.safeParse(body);
   if (!validation.success) {
-    return NextResponse.json({
-      error: "Invalid request format",
-      details: validation.error.format(),
-    }, { status: 400 });
+    return NextResponse.json(
+      {
+        error: "Invalid request format",
+        details: validation.error.format(),
+      },
+      { status: 400 },
+    );
   }
 
   const { examIds } = validation.data;
@@ -112,9 +124,8 @@ const handler = async (
       resultsMap.set(id, {
         questions: [],
         answers: [],
-        error: _err instanceof Error
-          ? _err.message
-          : "Failed to fetch from EzyGo",
+        error:
+          _err instanceof Error ? _err.message : "Failed to fetch from EzyGo",
       });
     }
   });

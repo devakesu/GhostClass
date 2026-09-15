@@ -21,9 +21,12 @@ interface ErrorFallbackProps {
  * ErrorFallback component that displays a user-friendly error message
  * with options to try again or go back to the dashboard.
  */
-export function ErrorFallback(
-  { error, reset, showDetails, homeUrl = "/dashboard" }: ErrorFallbackProps,
-) {
+export function ErrorFallback({
+  error,
+  reset,
+  showDetails,
+  homeUrl = "/dashboard",
+}: ErrorFallbackProps) {
   const router = useRouter();
   const isDevelopment = process.env.NODE_ENV === "development";
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -102,8 +105,7 @@ export function ErrorFallback(
         `Please help resolve this issue.\n\nThank you!`,
     );
 
-    window.location.href =
-      `mailto:admin@${appDomain}?subject=${subject}&body=${body}`;
+    window.location.href = `mailto:admin@${appDomain}?subject=${subject}&body=${body}`;
   };
 
   return (
@@ -146,11 +148,7 @@ export function ErrorFallback(
 
         {/* Action Buttons */}
         <div className="flex flex-col sm:flex-row gap-3 justify-center items-center pt-4">
-          <Button
-            onClick={handleTryAgain}
-            size="lg"
-            className="gap-2 min-w-45"
-          >
+          <Button onClick={handleTryAgain} size="lg" className="gap-2 min-w-45">
             <RefreshCcw className="w-4 h-4" aria-hidden="true" />
             Try Again
           </Button>

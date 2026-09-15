@@ -76,9 +76,10 @@ async function safeEzygoJson<T>(res: Response): Promise<T | null> {
 
 async function processCoursesData(
   coursesRes: Response,
-): Promise<
-  { coursesMap: Record<string, CourseItem>; coursesList: CourseItem[] }
-> {
+): Promise<{
+  coursesMap: Record<string, CourseItem>;
+  coursesList: CourseItem[];
+}> {
   let coursesList: CourseItem[] = [];
   const entries: [string, CourseItem][] = [];
   try {
@@ -145,10 +146,7 @@ function normalizeSemester(semVal: unknown): SemesterType | null {
   return null;
 }
 
-function resolveAcademicContext(
-  semRaw: unknown,
-  yearRaw: unknown,
-) {
+function resolveAcademicContext(semRaw: unknown, yearRaw: unknown) {
   const semVal = extractAcademicSettingValue(semRaw, "default_semester", [
     "current_semester",
     "current_term",
@@ -181,17 +179,19 @@ async function triggerAcademicSelfHeal(
   ezygoAcademicYear: string | null,
   currentAcademic: { current_semester: string; current_year: string },
 ): Promise<void> {
-  const needsSemesterUpdate = !ezygoAcademicSemester ||
+  const needsSemesterUpdate =
+    !ezygoAcademicSemester ||
     ezygoAcademicSemester !== currentAcademic.current_semester;
-  const needsYearUpdate = !ezygoAcademicYear ||
-    ezygoAcademicYear !== currentAcademic.current_year;
+  const needsYearUpdate =
+    !ezygoAcademicYear || ezygoAcademicYear !== currentAcademic.current_year;
 
   if (!needsSemesterUpdate && !needsYearUpdate) return;
 
   logger.info(
-    `[sync] Self-healing academic context for ${
-      redact("id", authId)
-    }: Setting EzyGo to ${currentAcademic.current_semester} ${currentAcademic.current_year} (current EzyGo: ${ezygoAcademicSemester} ${ezygoAcademicYear})`,
+    `[sync] Self-healing academic context for ${redact(
+      "id",
+      authId,
+    )}: Setting EzyGo to ${currentAcademic.current_semester} ${currentAcademic.current_year} (current EzyGo: ${ezygoAcademicSemester} ${ezygoAcademicYear})`,
   );
 
   try {
@@ -225,19 +225,21 @@ async function triggerAcademicSelfHeal(
 }
 
 function cleanClassName(input: string): string {
-  return input
-    // Remove odd/even
-    .replace(/\b(odd|even)\b/gi, "")
-    // Remove S1-S8 / s1-s8
-    .replace(/\bs[1-8]\b/gi, "")
-    // Remove academic year formats:
-    // 2025-26
-    // 2025-2026
-    // 25-26
-    .replace(/\b(?:\d{4}-\d{2}|\d{4}-\d{4}|\d{2}-\d{2})\b/g, "")
-    // Remove extra spaces
-    .replace(/\s+/g, " ")
-    .trim();
+  return (
+    input
+      // Remove odd/even
+      .replace(/\b(odd|even)\b/gi, "")
+      // Remove S1-S8 / s1-s8
+      .replace(/\bs[1-8]\b/gi, "")
+      // Remove academic year formats:
+      // 2025-26
+      // 2025-2026
+      // 25-26
+      .replace(/\b(?:\d{4}-\d{2}|\d{4}-\d{4}|\d{2}-\d{2})\b/g, "")
+      // Remove extra spaces
+      .replace(/\s+/g, " ")
+      .trim()
+  );
 }
 
 async function upsertManualClass(
@@ -292,9 +294,10 @@ async function upsertManualClass(
 async function detectClassWithoutCourses(
   existingUserClassId: string | null | undefined,
   currentAcademic: { current_semester: string; current_year: string },
-): Promise<
-  { classId: string | null; classInfo: { id: string; name: string } | null }
-> {
+): Promise<{
+  classId: string | null;
+  classInfo: { id: string; name: string } | null;
+}> {
   if (!existingUserClassId) {
     return { classId: null, classInfo: null };
   }
@@ -320,8 +323,8 @@ async function detectClassWithoutCourses(
     return { classId: null, classInfo: null };
   }
 
-  const currentClassId = currentClass.id ?? currentClass.class_id ??
-    existingUserClassId ?? null;
+  const currentClassId =
+    currentClass.id ?? currentClass.class_id ?? existingUserClassId ?? null;
   const currentClassName =
     typeof currentClass.name === "string" && currentClass.name.trim() !== ""
       ? currentClass.name
@@ -337,8 +340,8 @@ async function detectClassWithoutCourses(
     };
   }
 
-  const hasNoName = typeof currentClass.name !== "string" ||
-    currentClass.name.trim() === "";
+  const hasNoName =
+    typeof currentClass.name !== "string" || currentClass.name.trim() === "";
   if (hasNoName) {
     logger.warn(
       "[sync] detectAndSyncClass: Existing class has no name; keeping current class without cloning",
@@ -605,18 +608,20 @@ async function detectAndSyncClass(
     const sub = courseWithGroup.usersubgroup;
     const pcg = sub.programme_config_group_id ?? sub.usergroup?.id ?? null;
     if (pcg != null) {
-      const sem = normalizeSemester(
-        sub.academic_semester || currentAcademic.current_semester,
-      ) || "even";
+      const sem =
+        normalizeSemester(
+          sub.academic_semester || currentAcademic.current_semester,
+        ) || "even";
       const year = sub.academic_year || currentAcademic.current_year;
       const externalId = sub.id != null ? Number(sub.id) : null;
-      const nameRaw = (sub.name && sub.name.trim() !== "") ? sub.name : "Class";
+      const nameRaw = sub.name && sub.name.trim() !== "" ? sub.name : "Class";
       const name = shortTextSchema.parse(nameRaw);
 
       logger.info(
-        `[sync] detectAndSyncClass: cohort pcg=${pcg} sem=${sem} year=${year} externalId=${externalId} name=${
-          redact("username", nameRaw)
-        }`,
+        `[sync] detectAndSyncClass: cohort pcg=${pcg} sem=${sem} year=${year} externalId=${externalId} name=${redact(
+          "username",
+          nameRaw,
+        )}`,
       );
 
       return await syncCohortClass(
@@ -668,7 +673,7 @@ async function populateCourseCatalogAndMigrateTrackers(
           .from("tracker")
           .update({ course: m.university_code })
           .eq("auth_user_id", authId)
-          .eq("course", m.ezygo_id)
+          .eq("course", m.ezygo_id),
       );
 
     if (trackerUpdates.length > 0) {
@@ -752,21 +757,20 @@ function resolveMergedProfile(
   const { localGender, localBirthDate, localPhone } =
     readExistingProfileDecrypted(existingUser);
 
-  const remoteFirst = ezygoData.first_name ||
+  const remoteFirst =
+    ezygoData.first_name ||
     (ezygoData.full_name ? ezygoData.full_name.trim().split(" ")[0] : null);
-  const remoteLast = ezygoData.last_name ||
+  const remoteLast =
+    ezygoData.last_name ||
     (ezygoData.full_name
       ? ezygoData.full_name.trim().split(" ").slice(1).join(" ")
       : null);
 
   const mergedFirst = resolve(existingUser?.first_name, remoteFirst);
   const mergedLast = resolve(existingUser?.last_name, remoteLast);
-  const mergedPhone = localPhone ||
-    (ezygoData.mobile ?? ezygoData.user?.mobile ?? null);
-  const mergedGender = resolve(
-    localGender,
-    ezygoData.gender ?? ezygoData.sex,
-  );
+  const mergedPhone =
+    localPhone || (ezygoData.mobile ?? ezygoData.user?.mobile ?? null);
+  const mergedGender = resolve(localGender, ezygoData.gender ?? ezygoData.sex);
   const mergedBirthDate = resolve(
     localBirthDate,
     ezygoData.birth_date ?? ezygoData.dob,
@@ -868,9 +872,10 @@ async function parseProfileResponse(
   }
   const ezygoData = parsedProfile.data;
 
-  const resolvedEzygoId = (ezygoId && String(ezygoId).trim() !== "")
-    ? String(ezygoId)
-    : String(ezygoData.user_id || ezygoData.user?.id || "");
+  const resolvedEzygoId =
+    ezygoId && String(ezygoId).trim() !== ""
+      ? String(ezygoId)
+      : String(ezygoData.user_id || ezygoData.user?.id || "");
 
   if (!resolvedEzygoId) {
     throw new Error("Missing EzyGo User ID (local and remote)");
@@ -924,10 +929,7 @@ export async function performProfileSync(
     );
 
     const { ezygoAcademicSemester, ezygoAcademicYear, currentAcademic } =
-      resolveAcademicContext(
-        semRaw,
-        yearRaw,
-      );
+      resolveAcademicContext(semRaw, yearRaw);
 
     // Step 2: Self-heal academic context if missing, and WAIT for it to finish
     await triggerAcademicSelfHeal(
@@ -956,13 +958,17 @@ export async function performProfileSync(
       ezygoId,
     );
 
-    const existingUser = preFetchedExistingUser ?? (await supabaseAdmin
-      .from("users")
-      .select(
-        "first_name, last_name, phone, phone_iv, gender, gender_iv, birth_date, birth_date_iv, terms_version, class_id, last_synced_at",
-      )
-      .or(`id.eq.${resolvedEzygoId},auth_id.eq.${authId}`)
-      .maybeSingle()).data;
+    const existingUser =
+      preFetchedExistingUser ??
+      (
+        await supabaseAdmin
+          .from("users")
+          .select(
+            "first_name, last_name, phone, phone_iv, gender, gender_iv, birth_date, birth_date_iv, terms_version, class_id, last_synced_at",
+          )
+          .or(`id.eq.${resolvedEzygoId},auth_id.eq.${authId}`)
+          .maybeSingle()
+      ).data;
 
     // Step 3: Now fetch courses and roles (which depend on the healed semester)
     const [coursesRes, rolesData] = await Promise.all([
@@ -1000,8 +1006,8 @@ export async function performProfileSync(
     const encGender = mergedGender ? encrypt(mergedGender) : null;
     const encBirthDate = mergedBirthDate ? encrypt(mergedBirthDate) : null;
 
-    const upsertUsername = ezygoData.username ?? ezygoData.user?.username ??
-      null;
+    const upsertUsername =
+      ezygoData.username ?? ezygoData.user?.username ?? null;
     const upsertEmail = ezygoData.email ?? ezygoData.user?.email ?? null;
 
     const upsertData: Record<string, unknown> = {
@@ -1037,7 +1043,8 @@ export async function performProfileSync(
 
     return {
       id: resolvedEzygoId,
-      class: classInfo ||
+      class:
+        classInfo ||
         (existingUser?.class_id
           ? { id: existingUser.class_id, name: "Class" }
           : null),
@@ -1049,8 +1056,10 @@ export async function performProfileSync(
         phone: mergedPhone,
         gender: mergedGender,
         birthDate: mergedBirthDate,
-        lastSyncedAt: (upsertData.last_synced_at as string) ||
-          existingUser?.last_synced_at || null,
+        lastSyncedAt:
+          (upsertData.last_synced_at as string) ||
+          existingUser?.last_synced_at ||
+          null,
       },
       academic: {
         year: ezygoAcademicYear,

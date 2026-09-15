@@ -141,8 +141,8 @@ const renderTargetLine = (
   const domainRange = 100 - yAxisMin;
   if (domainRange <= 0) return null;
 
-  const targetY = background.y +
-    (background.height * (100 - targetVal)) / domainRange;
+  const targetY =
+    background.y + (background.height * (100 - targetVal)) / domainRange;
 
   return (
     <line
@@ -419,9 +419,10 @@ function computeAttendanceChartData(
       return true;
     })
     .map((course): CourseData => {
-      const officialPct = course.total > 0
-        ? parseFloat(((course.present / course.total) * 100).toFixed(2))
-        : 0;
+      const officialPct =
+        course.total > 0
+          ? parseFloat(((course.present / course.total) * 100).toFixed(2))
+          : 0;
 
       const mergedTotal = Math.max(course.total + course.selfTotal, 0);
       const mergedPresent = Math.min(
@@ -429,9 +430,10 @@ function computeAttendanceChartData(
         mergedTotal,
       );
 
-      const mergedPct = mergedTotal > 0
-        ? parseFloat(((mergedPresent / mergedTotal) * 100).toFixed(2))
-        : 0;
+      const mergedPct =
+        mergedTotal > 0
+          ? parseFloat(((mergedPresent / mergedTotal) * 100).toFixed(2))
+          : 0;
       const isLoss = mergedPct < officialPct;
 
       const displayedBase = Math.min(officialPct, mergedPct);
@@ -446,24 +448,21 @@ function computeAttendanceChartData(
       /* eslint-disable security/detect-object-injection */
       const courseTargetVal =
         (courseCodeKey ? courseTargets[courseCodeKey] : undefined) ??
-          (rawCodeKey ? courseTargets[rawCodeKey] : undefined) ??
-          (courseIdKey ? courseTargets[courseIdKey] : undefined);
+        (rawCodeKey ? courseTargets[rawCodeKey] : undefined) ??
+        (courseIdKey ? courseTargets[courseIdKey] : undefined);
       /* eslint-enable security/detect-object-injection */
 
-      const effectiveCourseTarget = typeof courseTargetVal === "number"
-        ? courseTargetVal
-        : safeTarget;
+      const effectiveCourseTarget =
+        typeof courseTargetVal === "number" ? courseTargetVal : safeTarget;
       const isSafe = mergedPct >= effectiveCourseTarget;
 
       const baseSuccess = isSafe ? displayedBase : 0;
       const baseDanger = !isSafe ? displayedBase : 0;
 
-      const extraSuccess = displayedExtra > 0 && !isLoss && isSafe
-        ? displayedExtra
-        : 0;
-      const extraDanger = displayedExtra > 0 && (isLoss || !isSafe)
-        ? displayedExtra
-        : 0;
+      const extraSuccess =
+        displayedExtra > 0 && !isLoss && isSafe ? displayedExtra : 0;
+      const extraDanger =
+        displayedExtra > 0 && (isLoss || !isSafe) ? displayedExtra : 0;
 
       return {
         ...course,
@@ -539,9 +538,8 @@ export function AttendanceChart({
     return window.matchMedia("(max-width: 640px)").matches;
   });
   const { targetPercentage, courseTargets } = useAttendanceSettings();
-  const safeTarget = Number(targetPercentage) > 0
-    ? Number(targetPercentage)
-    : 75;
+  const safeTarget =
+    Number(targetPercentage) > 0 ? Number(targetPercentage) : 75;
 
   useEffect(() => {
     // Measure container dimensions and keep them in sync with container size
@@ -828,13 +826,11 @@ export function AttendanceChart({
                         ):
                       </span>
                       <span
-                        className={`font-mono font-bold ${
-                          getPercentageColor(
-                            d.totalPercentage,
-                            d.officialPercentage,
-                            d.customTarget ?? safeTarget,
-                          )
-                        }`}
+                        className={`font-mono font-bold ${getPercentageColor(
+                          d.totalPercentage,
+                          d.officialPercentage,
+                          d.customTarget ?? safeTarget,
+                        )}`}
                       >
                         {d.totalPercentage}%{" "}
                         <span className="text-muted-foreground/40 font-normal">

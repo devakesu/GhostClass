@@ -17,39 +17,43 @@ export function useNotificationVirtualizer({
   virtualItems: VirtualItem[];
   parentRef: React.RefObject<HTMLDivElement | null>;
 }) {
-  const estimateSize = useCallback((index: number) => {
-    if (index < 0 || index >= virtualItems.length) return 80;
-    const item = virtualItems.at(index);
-    if (!item) return 80;
+  const estimateSize = useCallback(
+    (index: number) => {
+      if (index < 0 || index >= virtualItems.length) return 80;
+      const item = virtualItems.at(index);
+      if (!item) return 80;
 
-    if (item.type === "header") {
-      return 57;
-    }
+      if (item.type === "header") {
+        return 57;
+      }
 
-    const notification = item.data;
-    const description = typeof notification?.description === "string"
-      ? notification.description
-      : "";
+      const notification = item.data;
+      const description =
+        typeof notification?.description === "string"
+          ? notification.description
+          : "";
 
-    const baseHeightShort = 80;
-    const baseHeightMedium = 95;
+      const baseHeightShort = 80;
+      const baseHeightMedium = 95;
 
-    const extraPer100Chars = 12;
-    const maxExtra = 60;
-    const extraHeight = description.length > 80
-      ? Math.min(
-        maxExtra,
-        Math.ceil((description.length - 80) / 100) * extraPer100Chars,
-      )
-      : 0;
+      const extraPer100Chars = 12;
+      const maxExtra = 60;
+      const extraHeight =
+        description.length > 80
+          ? Math.min(
+              maxExtra,
+              Math.ceil((description.length - 80) / 100) * extraPer100Chars,
+            )
+          : 0;
 
-    const baseHeight = description.length > 80
-      ? baseHeightMedium
-      : baseHeightShort;
-    const marginBottom = 8;
+      const baseHeight =
+        description.length > 80 ? baseHeightMedium : baseHeightShort;
+      const marginBottom = 8;
 
-    return baseHeight + extraHeight + marginBottom;
-  }, [virtualItems]);
+      return baseHeight + extraHeight + marginBottom;
+    },
+    [virtualItems],
+  );
 
   const getScrollElement = useCallback(() => parentRef.current, [parentRef]);
 

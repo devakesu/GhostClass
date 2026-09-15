@@ -107,21 +107,21 @@ vi.mock("@/components/pwa-install-banner", () => ({
 vi.mock("@/components/attendance/AddAttendanceDialog", () => ({
   AddAttendanceDialog: ({ onSuccess }: any) => (
     <div data-testid="add-attendance-dialog">
-      <button data-testid="trigger-success" onClick={onSuccess}>Success</button>
+      <button data-testid="trigger-success" onClick={onSuccess}>
+        Success
+      </button>
     </div>
   ),
 }));
 
 vi.mock("@/components/attendance/AddCourseDialog", () => ({
-  AddCourseDialog: (
-    { open }: any,
-  ) => (open ? <div data-testid="add-course-dialog" /> : null),
+  AddCourseDialog: ({ open }: any) =>
+    open ? <div data-testid="add-course-dialog" /> : null,
 }));
 
 vi.mock("@/components/attendance/EditInstructorDialog", () => ({
-  EditInstructorDialog: (
-    { open }: any,
-  ) => (open ? <div data-testid="edit-instructor-dialog" /> : null),
+  EditInstructorDialog: ({ open }: any) =>
+    open ? <div data-testid="edit-instructor-dialog" /> : null,
 }));
 
 vi.mock("@/components/attendance/SelectClassDialog", () => ({
@@ -158,9 +158,8 @@ vi.mock("@/components/ui/select", () => ({
 }));
 
 vi.mock("@/components/ui/alert-dialog", () => ({
-  AlertDialog: (
-    { children, open }: any,
-  ) => (open ? <div data-testid="alert-dialog">{children}</div> : null),
+  AlertDialog: ({ children, open }: any) =>
+    open ? <div data-testid="alert-dialog">{children}</div> : null,
   AlertDialogContent: ({ children }: any) => <div>{children}</div>,
   AlertDialogHeader: ({ children }: any) => <div>{children}</div>,
   AlertDialogTitle: ({ children }: any) => <div>{children}</div>,
@@ -176,7 +175,9 @@ vi.mock("@/components/ui/alert-dialog", () => ({
 
 vi.mock("@/components/ui/card", () => ({
   Card: ({ children, ...props }: any) => (
-    <div data-testid="card" {...props}>{children}</div>
+    <div data-testid="card" {...props}>
+      {children}
+    </div>
   ),
   CardHeader: ({ children, ...props }: any) => <div {...props}>{children}</div>,
   CardTitle: ({ children, ...props }: any) => <div {...props}>{children}</div>,
@@ -209,72 +210,62 @@ describe("DashboardClient", () => {
     vi.useRealTimers();
     vi.clearAllMocks();
 
-    vi.mocked(useProfile).mockReturnValue(
-      {
-        data: mockProfile,
-        isLoading: false,
-        isFetching: false,
-        refetch: vi.fn(),
-      } as any,
-    );
-    vi.mocked(useFetchUserSettings).mockReturnValue(
-      {
-        data: { semester: "odd", academicYear: "2024-25" },
-        isLoading: false,
-      } as any,
-    );
-    vi.mocked(useAttendanceReport).mockReturnValue(
-      {
-        data: { studentAttendanceData: {}, sessions: {} },
-        isLoading: false,
-        isFetching: false,
-        refetch: vi.fn().mockResolvedValue({}),
-      } as any,
-    );
-    vi.mocked(useFetchCourses).mockReturnValue(
-      {
-        data: { courses: {} },
-        isLoading: false,
-        isFetching: false,
-        refetch: vi.fn().mockResolvedValue({}),
-      } as any,
-    );
-    vi.mocked(useTrackingData).mockReturnValue(
-      {
-        data: [],
-        isLoading: false,
-        isFetching: false,
-        refetch: vi.fn().mockResolvedValue([]),
-      } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn(),
+    } as any);
+    vi.mocked(useFetchUserSettings).mockReturnValue({
+      data: { semester: "odd", academicYear: "2024-25" },
+      isLoading: false,
+    } as any);
+    vi.mocked(useAttendanceReport).mockReturnValue({
+      data: { studentAttendanceData: {}, sessions: {} },
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn().mockResolvedValue({}),
+    } as any);
+    vi.mocked(useFetchCourses).mockReturnValue({
+      data: { courses: {} },
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn().mockResolvedValue({}),
+    } as any);
+    vi.mocked(useTrackingData).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+      refetch: vi.fn().mockResolvedValue([]),
+    } as any);
     vi.mocked(useFetchCourseInstructors).mockReturnValue({ data: [] } as any);
     vi.mocked(useFetchClassCourses).mockReturnValue({ data: [] } as any);
-    vi.mocked(useDisabledCourses).mockReturnValue(
-      { disabledCodes: new Set() } as any,
-    );
-    vi.mocked(useCourseLookup).mockReturnValue(
-      { getCourseCodeById: vi.fn((id) => id) } as any,
-    );
-    vi.mocked(useAllCourseDetails).mockReturnValue(
-      { data: [], isLoading: false, isFetching: false } as any,
-    );
-    vi.mocked(useSyncOnMount).mockReturnValue(
-      { isSyncing: false, syncSettled: true, syncFailed: false } as any,
-    );
-    vi.mocked(useSetSemester).mockReturnValue(
-      {
-        mutate: vi.fn(),
-        mutateAsync: vi.fn().mockResolvedValue({}),
-        isPending: false,
-      } as any,
-    );
-    vi.mocked(useSetAcademicYear).mockReturnValue(
-      {
-        mutate: vi.fn(),
-        mutateAsync: vi.fn().mockResolvedValue({}),
-        isPending: false,
-      } as any,
-    );
+    vi.mocked(useDisabledCourses).mockReturnValue({
+      disabledCodes: new Set(),
+    } as any);
+    vi.mocked(useCourseLookup).mockReturnValue({
+      getCourseCodeById: vi.fn((id) => id),
+    } as any);
+    vi.mocked(useAllCourseDetails).mockReturnValue({
+      data: [],
+      isLoading: false,
+      isFetching: false,
+    } as any);
+    vi.mocked(useSyncOnMount).mockReturnValue({
+      isSyncing: false,
+      syncSettled: true,
+      syncFailed: false,
+    } as any);
+    vi.mocked(useSetSemester).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: false,
+    } as any);
+    vi.mocked(useSetAcademicYear).mockReturnValue({
+      mutate: vi.fn(),
+      mutateAsync: vi.fn().mockResolvedValue({}),
+      isPending: false,
+    } as any);
   });
 
   it("renders correctly with default settings", async () => {
@@ -334,8 +325,9 @@ describe("DashboardClient", () => {
 
     fireEvent.click(screen.getByLabelText("Go to next academic period"));
 
-    expect(screen.getByText(/Confirm academic period change/i))
-      .toBeInTheDocument();
+    expect(
+      screen.getByText(/Confirm academic period change/i),
+    ).toBeInTheDocument();
   });
 
   it("calculates stats correctly", async () => {
@@ -367,9 +359,12 @@ describe("DashboardClient", () => {
 
     render(<DashboardClient />);
 
-    await waitFor(() => {
-      expect(screen.queryByTestId("loading-overlay")).not.toBeInTheDocument();
-    }, { timeout: 2000 });
+    await waitFor(
+      () => {
+        expect(screen.queryByTestId("loading-overlay")).not.toBeInTheDocument();
+      },
+      { timeout: 2000 },
+    );
 
     await waitFor(() => {
       expect(screen.getByTestId("course-card")).toBeInTheDocument();
@@ -378,9 +373,10 @@ describe("DashboardClient", () => {
   });
 
   it("shows empty state when no courses are found", async () => {
-    vi.mocked(useFetchCourses).mockReturnValue(
-      { data: { courses: {} }, isLoading: false } as any,
-    );
+    vi.mocked(useFetchCourses).mockReturnValue({
+      data: { courses: {} },
+      isLoading: false,
+    } as any);
     render(<DashboardClient />);
     await waitFor(() => {
       expect(screen.getByText(/No courses found/i)).toBeInTheDocument();
@@ -394,13 +390,14 @@ describe("DashboardClient", () => {
 
   it("handles confirm and cancel in AlertDialog", async () => {
     const mockMutate = vi.fn().mockResolvedValue({});
-    vi.mocked(useSetSemester).mockReturnValue(
-      { mutateAsync: mockMutate, isPending: false } as any,
-    );
+    vi.mocked(useSetSemester).mockReturnValue({
+      mutateAsync: mockMutate,
+      isPending: false,
+    } as any);
 
     render(<DashboardClient />);
     await waitFor(() =>
-      expect(screen.queryByTestId("loading-overlay")).not.toBeInTheDocument()
+      expect(screen.queryByTestId("loading-overlay")).not.toBeInTheDocument(),
     );
 
     fireEvent.click(screen.getByLabelText("Go to next academic period"));
@@ -419,17 +416,15 @@ describe("DashboardClient", () => {
 
   it("handles AddAttendanceDialog success callback", async () => {
     const refetchAttendance = vi.fn().mockResolvedValue({});
-    vi.mocked(useAttendanceReport).mockReturnValue(
-      {
-        data: { studentAttendanceData: {}, sessions: {} },
-        isLoading: false,
-        refetch: refetchAttendance,
-      } as any,
-    );
+    vi.mocked(useAttendanceReport).mockReturnValue({
+      data: { studentAttendanceData: {}, sessions: {} },
+      isLoading: false,
+      refetch: refetchAttendance,
+    } as any);
 
     render(<DashboardClient />);
     await waitFor(() =>
-      expect(screen.queryByTestId("loading-overlay")).not.toBeInTheDocument()
+      expect(screen.queryByTestId("loading-overlay")).not.toBeInTheDocument(),
     );
 
     const successBtn = screen.getByTestId("trigger-success");
@@ -445,7 +440,7 @@ describe("DashboardClient", () => {
 
     render(<DashboardClient />);
     await waitFor(() =>
-      expect(screen.getByTestId("course-card")).toBeInTheDocument()
+      expect(screen.getByTestId("course-card")).toBeInTheDocument(),
     );
 
     const editBtn = screen.getByTestId("edit-instructor-btn");
@@ -461,7 +456,7 @@ describe("DashboardClient", () => {
 
     render(<DashboardClient />);
     await waitFor(() =>
-      expect(screen.queryByTestId("loading-overlay")).not.toBeInTheDocument()
+      expect(screen.queryByTestId("loading-overlay")).not.toBeInTheDocument(),
     );
 
     fireEvent.click(screen.getByText(/Can't find a course/i));

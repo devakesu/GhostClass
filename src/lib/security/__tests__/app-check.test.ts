@@ -155,7 +155,9 @@ describe("app-check logic", () => {
       process.env.VITEST = "false";
       const h = new Headers({ "x-csrf-token": "token123" });
       vi.mocked(headers).mockResolvedValue(h);
-      vi.mocked(getSessionIdFromCookie).mockResolvedValue("sb-cookie-auth-token-xyz");
+      vi.mocked(getSessionIdFromCookie).mockResolvedValue(
+        "sb-cookie-auth-token-xyz",
+      );
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
       const { redis } = await import("@/lib/redis");
       vi.mocked(redis.get).mockResolvedValue("sb-cookie-auth-token-mismatch");
@@ -173,7 +175,9 @@ describe("app-check logic", () => {
       process.env.VITEST = "false";
       const h = new Headers({ "x-csrf-token": "token123" });
       vi.mocked(headers).mockResolvedValue(h);
-      vi.mocked(getSessionIdFromCookie).mockResolvedValue("sb-cookie-auth-token-xyz");
+      vi.mocked(getSessionIdFromCookie).mockResolvedValue(
+        "sb-cookie-auth-token-xyz",
+      );
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
       const { redis } = await import("@/lib/redis");
       vi.mocked(redis.get).mockResolvedValue("sb-cookie-auth-token-xyz");
@@ -192,7 +196,7 @@ describe("app-check logic", () => {
   describe("Bypass and Cron", () => {
     it("bypasses for Cron requests with valid secret", async () => {
       process.env.CRON_SECRET = "cron-secret";
-      const h = new Headers({ "authorization": "Bearer cron-secret" });
+      const h = new Headers({ authorization: "Bearer cron-secret" });
       vi.mocked(headers).mockResolvedValue(h);
 
       const wrapped = withSecurity(
@@ -208,10 +212,14 @@ describe("app-check logic", () => {
       process.env.VITEST = "false";
       const h = new Headers({ "x-csrf-token": "token123" });
       vi.mocked(headers).mockResolvedValue(h);
-      vi.mocked(getSessionIdFromCookie).mockResolvedValue("sb-cookie-auth-token-xyz");
+      vi.mocked(getSessionIdFromCookie).mockResolvedValue(
+        "sb-cookie-auth-token-xyz",
+      );
       vi.mocked(validateCsrfToken).mockResolvedValue(true);
       const { redis } = await import("@/lib/redis");
-      vi.mocked(redis.get).mockRejectedValue(new Error("Redis connection timeout"));
+      vi.mocked(redis.get).mockRejectedValue(
+        new Error("Redis connection timeout"),
+      );
 
       const wrapped = withSecurity(
         vi.fn().mockResolvedValue(new Response("ok")),

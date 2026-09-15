@@ -107,7 +107,8 @@ vi.mock("@/components/ui/alert-dialog", async () => {
           {React.Children.map(children, (child: any) =>
             React.isValidElement(child)
               ? React.cloneElement(child, { onOpenChange } as any)
-              : child)}
+              : child,
+          )}
         </div>
       );
     },
@@ -116,7 +117,8 @@ vi.mock("@/components/ui/alert-dialog", async () => {
         {React.Children.map(children, (child: any) =>
           React.isValidElement(child)
             ? React.cloneElement(child, { onOpenChange } as any)
-            : child)}
+            : child,
+        )}
       </div>
     ),
     AlertDialogHeader: ({ children }: any) => <div>{children}</div>,
@@ -125,7 +127,8 @@ vi.mock("@/components/ui/alert-dialog", async () => {
         {React.Children.map(children, (child: any) =>
           React.isValidElement(child)
             ? React.cloneElement(child, { onOpenChange } as any)
-            : child)}
+            : child,
+        )}
       </div>
     ),
     AlertDialogTitle: ({ children }: any) => <div>{children}</div>,
@@ -192,12 +195,14 @@ describe("TrackingClient Coverage Hardening", () => {
   });
 
   it('renders "No Tracking History" when data is empty', async () => {
-    vi.mocked(useTrackingData).mockReturnValue(
-      { data: [], isLoading: false } as any,
-    );
-    vi.mocked(useTrackingCount).mockReturnValue(
-      { data: 0, isLoading: false } as any,
-    );
+    vi.mocked(useTrackingData).mockReturnValue({
+      data: [],
+      isLoading: false,
+    } as any);
+    vi.mocked(useTrackingCount).mockReturnValue({
+      data: 0,
+      isLoading: false,
+    } as any);
 
     render(<TrackingClient />);
     expect(screen.getByText("No Tracking History")).toBeInTheDocument();
@@ -215,12 +220,14 @@ describe("TrackingClient Coverage Hardening", () => {
       semester: "even",
       year: "2024-25",
     };
-    vi.mocked(useTrackingData).mockReturnValue(
-      { data: [item], isLoading: false } as any,
-    );
-    vi.mocked(useTrackingCount).mockReturnValue(
-      { data: 1, isLoading: false } as any,
-    );
+    vi.mocked(useTrackingData).mockReturnValue({
+      data: [item],
+      isLoading: false,
+    } as any);
+    vi.mocked(useTrackingCount).mockReturnValue({
+      data: 1,
+      isLoading: false,
+    } as any);
 
     render(<TrackingClient />);
     // Check if the card is rendered (Absent → Present)
@@ -239,12 +246,14 @@ describe("TrackingClient Coverage Hardening", () => {
       semester: "even",
       year: "2024-25",
     }));
-    vi.mocked(useTrackingData).mockReturnValue(
-      { data: items, isLoading: false } as any,
-    );
-    vi.mocked(useTrackingCount).mockReturnValue(
-      { data: 15, isLoading: false } as any,
-    );
+    vi.mocked(useTrackingData).mockReturnValue({
+      data: items,
+      isLoading: false,
+    } as any);
+    vi.mocked(useTrackingCount).mockReturnValue({
+      data: 15,
+      isLoading: false,
+    } as any);
 
     render(<TrackingClient />);
 
@@ -268,12 +277,14 @@ describe("TrackingClient Coverage Hardening", () => {
       semester: "even",
       year: "2024-25",
     }));
-    vi.mocked(useTrackingData).mockReturnValue(
-      { data: items, isLoading: false } as any,
-    );
-    vi.mocked(useTrackingCount).mockReturnValue(
-      { data: 6, isLoading: false } as any,
-    );
+    vi.mocked(useTrackingData).mockReturnValue({
+      data: items,
+      isLoading: false,
+    } as any);
+    vi.mocked(useTrackingCount).mockReturnValue({
+      data: 6,
+      isLoading: false,
+    } as any);
 
     render(<TrackingClient />);
 
@@ -298,12 +309,14 @@ describe("TrackingClient Coverage Hardening", () => {
       semester: "even",
       year: "2024-25",
     };
-    vi.mocked(useTrackingData).mockReturnValue(
-      { data: [item], isLoading: false } as any,
-    );
-    vi.mocked(useTrackingCount).mockReturnValue(
-      { data: 1, isLoading: false } as any,
-    );
+    vi.mocked(useTrackingData).mockReturnValue({
+      data: [item],
+      isLoading: false,
+    } as any);
+    vi.mocked(useTrackingCount).mockReturnValue({
+      data: 1,
+      isLoading: false,
+    } as any);
 
     render(<TrackingClient />);
 
@@ -329,12 +342,14 @@ describe("TrackingClient Coverage Hardening", () => {
       semester: "even",
       year: "2024-25",
     };
-    vi.mocked(useTrackingData).mockReturnValue(
-      { data: [item], isLoading: false } as any,
-    );
-    vi.mocked(useTrackingCount).mockReturnValue(
-      { data: 1, isLoading: false } as any,
-    );
+    vi.mocked(useTrackingData).mockReturnValue({
+      data: [item],
+      isLoading: false,
+    } as any);
+    vi.mocked(useTrackingCount).mockReturnValue({
+      data: 1,
+      isLoading: false,
+    } as any);
 
     render(<TrackingClient />);
     expect(await screen.findByText(/Absent → Duty Leave/i)).toBeInTheDocument();
@@ -352,12 +367,14 @@ describe("TrackingClient Coverage Hardening", () => {
       semester: "even",
       year: "2024-25",
     };
-    vi.mocked(useTrackingData).mockReturnValue(
-      { data: [item], isLoading: false } as any,
-    );
-    vi.mocked(useTrackingCount).mockReturnValue(
-      { data: 1, isLoading: false } as any,
-    );
+    vi.mocked(useTrackingData).mockReturnValue({
+      data: [item],
+      isLoading: false,
+    } as any);
+    vi.mocked(useTrackingCount).mockReturnValue({
+      data: 1,
+      isLoading: false,
+    } as any);
 
     render(<TrackingClient />);
     expect(await screen.findByText(/Absent → Absent/i)).toBeInTheDocument();

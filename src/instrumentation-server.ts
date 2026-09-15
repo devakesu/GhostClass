@@ -59,7 +59,6 @@ try {
   // Non-fatal if undici dispatcher customization is unsupported in current environment
 }
 
-
 /**
  * Sanitize commit SHA for use as a Sentry release name.
  * Strips path-invalid characters like <>, spaces, etc.
@@ -158,7 +157,8 @@ Sentry.init({
     if (Array.isArray(event.spans)) {
       for (const span of event.spans) {
         if (
-          span.data?.["http.url"] && typeof span.data["http.url"] === "string"
+          span.data?.["http.url"] &&
+          typeof span.data["http.url"] === "string"
         ) {
           span.data["http.url"] = scrubGaApiSecret(span.data["http.url"]);
         }

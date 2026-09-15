@@ -92,8 +92,8 @@ export default async function RootLayout({
 
   const nonce = (await headers()).get("x-nonce") ?? undefined;
   const gaId = process.env.NEXT_PUBLIC_GA_ID;
-  const hasGoogleAnalytics = !!gaId && gaId !== "undefined" &&
-    gaId.startsWith("G-");
+  const hasGoogleAnalytics =
+    !!gaId && gaId !== "undefined" && gaId.startsWith("G-");
 
   return (
     <html
@@ -108,32 +108,27 @@ export default async function RootLayout({
         <meta name="msapplication-TileColor" content="#141414" />
         <meta name="msapplication-tap-highlight" content="no" />
         <meta name="theme-color" content="#141414" />
-        {
-          /* Blocking script: executes synchronously before any CSS or content is
+        {/* Blocking script: executes synchronously before any CSS or content is
             painted. Measures the real scrollbar track width by creating a hidden
             div with forced scrollbar (offsetWidth - clientWidth), then sets
             --scrollbar-width on :root. This is independent of CSS load order
             and of scrollbar-gutter, unlike calc(100vw - 100%) tricks.
             A ResizeObserver keeps the value current on zoom / display changes.
-            CSP nonce is required for strict-CSP compliance. */
-        }
+            CSP nonce is required for strict-CSP compliance. */}
         <script
           nonce={nonce}
           suppressHydrationWarning
           dangerouslySetInnerHTML={{
-            __html:
-              `(function(){try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');var n=t==='light'||t==='dark'?t:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(n==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',n==='dark'?'#141414':'#f8f8fc')}catch(e){document.documentElement.classList.remove('dark')}var cachedW=-1;function u(){var w=window.innerWidth-document.documentElement.clientWidth;if(w<=0||isNaN(w)){var d=document.createElement('div');d.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d);w=d.offsetWidth-d.clientWidth;d.remove()}if(w!==cachedW){cachedW=w;document.documentElement.style.setProperty('--scrollbar-width',w+'px')}}u();var ticking=false;function onResize(){if(!ticking){requestAnimationFrame(function(){u();ticking=false});ticking=true}}if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('resize',onResize,{passive:true})}})();`,
+            __html: `(function(){try{var t=localStorage.getItem('${THEME_STORAGE_KEY}');var n=t==='light'||t==='dark'?t:(window.matchMedia('(prefers-color-scheme: dark)').matches?'dark':'light');if(n==='light'){document.documentElement.classList.remove('dark')}else{document.documentElement.classList.add('dark')}var m=document.querySelector('meta[name="theme-color"]');if(m)m.setAttribute('content',n==='dark'?'#141414':'#f8f8fc')}catch(e){document.documentElement.classList.remove('dark')}var cachedW=-1;function u(){var w=window.innerWidth-document.documentElement.clientWidth;if(w<=0||isNaN(w)){var d=document.createElement('div');d.style.cssText='position:absolute;top:-9999px;width:99px;height:99px;overflow:scroll';document.documentElement.appendChild(d);w=d.offsetWidth-d.clientWidth;d.remove()}if(w!==cachedW){cachedW=w;document.documentElement.style.setProperty('--scrollbar-width',w+'px')}}u();var ticking=false;function onResize(){if(!ticking){requestAnimationFrame(function(){u();ticking=false});ticking=true}}if(typeof window!=='undefined'&&window.addEventListener){window.addEventListener('resize',onResize,{passive:true})}})();`,
           }}
         />
       </head>
       <body
         className={`overflow-x-hidden w-full max-w-screen antialiased ${klick.variable} ${manrope.variable} ${dmMono.variable}`}
       >
-        {
-          /* Pre-hydration loader — injected via script so React never owns this
+        {/* Pre-hydration loader — injected via script so React never owns this
             DOM node. Safe to imperatively .remove() from GlobalInit without
-            corrupting React's fiber tree. */
-        }
+            corrupting React's fiber tree. */}
         <script
           nonce={nonce}
           suppressHydrationWarning

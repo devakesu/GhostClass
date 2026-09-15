@@ -40,10 +40,7 @@ describe("useDashboardStats", () => {
     },
   ];
 
-  const mockClassCourses = [
-    { course_code: "CS101" },
-    { course_code: "CS103" },
-  ];
+  const mockClassCourses = [{ course_code: "CS101" }, { course_code: "CS103" }];
 
   it("calculates basic statistics correctly", () => {
     const { result } = renderHook(() =>
@@ -55,7 +52,7 @@ describe("useDashboardStats", () => {
         disabledCodes: new Set(),
         selectedSemester: "1",
         selectedYear: "2023",
-      })
+      }),
     );
 
     expect(result.current.realPresent).toBe(1);
@@ -73,7 +70,7 @@ describe("useDashboardStats", () => {
         disabledCodes: new Set(),
         selectedSemester: "1",
         selectedYear: "2023",
-      })
+      }),
     );
 
     // Initial: 1/2
@@ -95,7 +92,7 @@ describe("useDashboardStats", () => {
         disabledCodes: new Set(["CS101"]),
         selectedSemester: "1",
         selectedYear: "2023",
-      })
+      }),
     );
 
     // CS101 is present (1/1) but disabled.
@@ -127,7 +124,7 @@ describe("useDashboardStats", () => {
         disabledCodes: new Set(),
         selectedSemester: "1",
         selectedYear: "2023",
-      })
+      }),
     );
 
     // Initial: 1/2
@@ -147,7 +144,7 @@ describe("useDashboardStats", () => {
         disabledCodes: new Set(),
         selectedSemester: null,
         selectedYear: null,
-      })
+      }),
     );
 
     expect(result.current.percentage).toBe(0);
@@ -176,7 +173,7 @@ describe("useDashboardStats", () => {
         disabledCodes: new Set(),
         selectedSemester: "1",
         selectedYear: "2023",
-      })
+      }),
     );
 
     // Initial is 1/2 (50%). Orphaned correction must NOT grant free present or alter stats
@@ -225,7 +222,7 @@ describe("useDashboardStats", () => {
         disabledCodes: new Set(),
         selectedSemester: "1",
         selectedYear: "2023",
-      })
+      }),
     );
 
     // Both absents corrected to DL

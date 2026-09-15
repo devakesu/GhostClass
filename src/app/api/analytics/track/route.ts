@@ -95,18 +95,14 @@ const handler = async (
     const sanitizedEvents: GA4Event[] = events.map(
       (event: Record<string, unknown>) => ({
         name: sanitizeGA4Name(String(event.name || "event")),
-        params: (event.params as Record<string, string | number | boolean>) ||
-          {},
+        params:
+          (event.params as Record<string, string | number | boolean>) || {},
       }),
     );
 
     const sanitizedUP = getSanitizedUserProperties(userProperties);
 
-    await trackGA4Event(
-      clientId as string,
-      sanitizedEvents,
-      sanitizedUP,
-    );
+    await trackGA4Event(clientId as string, sanitizedEvents, sanitizedUP);
     return NextResponse.json({ success: true });
   } catch (error) {
     logger.error("[Analytics API] Error:", error);

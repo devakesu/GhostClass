@@ -17,20 +17,24 @@ export async function addCourseAction(
   const courseNameValue = formData.get("courseName");
 
   if (
-    typeof courseCodeValue !== "string" || courseCodeValue.trim() === "" ||
-    typeof courseNameValue !== "string" || courseNameValue.trim() === ""
+    typeof courseCodeValue !== "string" ||
+    courseCodeValue.trim() === "" ||
+    typeof courseNameValue !== "string" ||
+    courseNameValue.trim() === ""
   ) {
     return { error: "Course code and name are required" };
   }
 
   // Strict sanitization: Trim all inputs, capitalize and strip spaces from code, title case the name.
-  const parsed = z.object({
-    courseCode: courseCodeSchema,
-    courseName: courseNameSchema,
-  }).safeParse({
-    courseCode: courseCodeValue,
-    courseName: courseNameValue,
-  });
+  const parsed = z
+    .object({
+      courseCode: courseCodeSchema,
+      courseName: courseNameSchema,
+    })
+    .safeParse({
+      courseCode: courseCodeValue,
+      courseName: courseNameValue,
+    });
 
   if (!parsed.success) {
     return {
@@ -72,13 +76,15 @@ export async function addCourseAction(
     const { user, classId, supabase } = contextRes;
 
     // Insert into class_courses (shared curriculum for the class)
-    const { error: insertError } = await (supabase as {
-      from: (t: string) => {
-        insert: (d: Record<string, unknown>) => Promise<{
-          error: { code: string; message: string } | null;
-        }>;
-      };
-    })
+    const { error: insertError } = await (
+      supabase as {
+        from: (t: string) => {
+          insert: (d: Record<string, unknown>) => Promise<{
+            error: { code: string; message: string } | null;
+          }>;
+        };
+      }
+    )
       .from("class_courses")
       .insert({
         class_id: classId,

@@ -149,13 +149,13 @@ vi.mock("framer-motion", async () => {
   const React = (await import("react")).default;
 
   const MockComponent = (tag: string) => {
-    const Component = React.forwardRef((
-      { children, ...props }: any,
-      ref: any,
-    ) => React.createElement(tag, { ...props, ref }, children));
-    Component.displayName = `Motion${tag.charAt(0).toUpperCase()}${
-      tag.slice(1)
-    }`;
+    const Component = React.forwardRef(
+      ({ children, ...props }: any, ref: any) =>
+        React.createElement(tag, { ...props, ref }, children),
+    );
+    Component.displayName = `Motion${tag.charAt(0).toUpperCase()}${tag.slice(
+      1,
+    )}`;
     return Component;
   };
   return {
@@ -183,14 +183,17 @@ vi.mock("@/components/ui/badge", () => ({
 }));
 
 vi.mock("@/components/ui/alert-dialog", () => ({
-  AlertDialog: (
-    { children, open }: any,
-  ) => (open ? <div>{children}</div> : null),
+  AlertDialog: ({ children, open }: any) =>
+    open ? <div>{children}</div> : null,
   AlertDialogAction: ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>{children}</button>
+    <button onClick={onClick} {...props}>
+      {children}
+    </button>
   ),
   AlertDialogCancel: ({ children, onClick, ...props }: any) => (
-    <button onClick={onClick} {...props}>{children}</button>
+    <button onClick={onClick} {...props}>
+      {children}
+    </button>
   ),
   AlertDialogContent: ({ children }: any) => <div>{children}</div>,
   AlertDialogDescription: ({ children }: any) => <div>{children}</div>,
@@ -229,9 +232,10 @@ vi.mock("lucide-react", () => {
 
 // Mock attendance-reconciliation
 vi.mock("@/lib/logic/attendance-reconciliation", async (importOriginal) => {
-  const actual = await importOriginal<
-    typeof import("@/lib/logic/attendance-reconciliation")
-  >();
+  const actual =
+    await importOriginal<
+      typeof import("@/lib/logic/attendance-reconciliation")
+    >();
   return {
     ...actual,
     getOfficialSessionRaw: vi.fn(
@@ -335,10 +339,13 @@ describe("TrackingClient", () => {
 
     it('should display "records" for count greater than 1 in delete-all dialog and close on confirm', async () => {
       vi.mocked(useTrackingData).mockReturnValue({
-        data: [sampleTrackingItem, {
-          ...sampleTrackingItem,
-          session: "2",
-        }] as any,
+        data: [
+          sampleTrackingItem,
+          {
+            ...sampleTrackingItem,
+            session: "2",
+          },
+        ] as any,
         isLoading: false,
         error: null,
         refetch: vi.fn().mockResolvedValue({
@@ -361,8 +368,9 @@ describe("TrackingClient", () => {
       fireEvent.click(clearBtn);
 
       // Dialog should show "records" (plural)
-      expect(await screen.findByText(/2 tracking records/i))
-        .toBeInTheDocument();
+      expect(
+        await screen.findByText(/2 tracking records/i),
+      ).toBeInTheDocument();
 
       // Dialog confirmation button - using exact match to distinguish from main UI button
       const deleteAllBtn = await screen.findByRole("button", {
@@ -372,8 +380,9 @@ describe("TrackingClient", () => {
 
       // After confirming, dialog should close (setDeleteAllConfirmOpen(false) called)
       await waitFor(() => {
-        expect(screen.queryByText(/2 tracking records/i)).not
-          .toBeInTheDocument();
+        expect(
+          screen.queryByText(/2 tracking records/i),
+        ).not.toBeInTheDocument();
       });
     });
   });
@@ -447,13 +456,12 @@ describe("TrackingClient", () => {
           builder.delete = vi.fn(() => builder);
           builder.eq = vi.fn(() => builder);
           // Minimal thenable so that `await` on the builder yields the Supabase-style response
-          builder.then = vi.fn((
-            onFulfilled: (value: { data: null; error: Error }) => unknown,
-          ) =>
-            Promise.resolve({
-              data: null,
-              error: new Error("Supabase delete failed"),
-            }).then(onFulfilled)
+          builder.then = vi.fn(
+            (onFulfilled: (value: { data: null; error: Error }) => unknown) =>
+              Promise.resolve({
+                data: null,
+                error: new Error("Supabase delete failed"),
+              }).then(onFulfilled),
           );
           return builder;
         }),
@@ -684,7 +692,9 @@ describe("TrackingClient", () => {
         data: records as any,
         isLoading: false,
         error: null,
-        refetch: vi.fn().mockResolvedValue({ data: records, isLoading: false, error: null }),
+        refetch: vi
+          .fn()
+          .mockResolvedValue({ data: records, isLoading: false, error: null }),
       } as any);
       vi.mocked(useTrackingCount).mockReturnValue({
         data: 2,
@@ -778,7 +788,9 @@ describe("TrackingClient", () => {
         data: records as any,
         isLoading: false,
         error: null,
-        refetch: vi.fn().mockResolvedValue({ data: records, isLoading: false, error: null }),
+        refetch: vi
+          .fn()
+          .mockResolvedValue({ data: records, isLoading: false, error: null }),
       } as any);
       vi.mocked(useTrackingCount).mockReturnValue({
         data: 5,
@@ -841,7 +853,9 @@ describe("TrackingClient", () => {
         data: records as any,
         isLoading: false,
         error: null,
-        refetch: vi.fn().mockResolvedValue({ data: records, isLoading: false, error: null }),
+        refetch: vi
+          .fn()
+          .mockResolvedValue({ data: records, isLoading: false, error: null }),
       } as any);
       vi.mocked(useTrackingCount).mockReturnValue({
         data: 3,
@@ -852,7 +866,9 @@ describe("TrackingClient", () => {
       render(<TrackingClient />);
 
       // Wait for items to be rendered
-      expect(await screen.findByText("Newer date earlier session")).toBeInTheDocument();
+      expect(
+        await screen.findByText("Newer date earlier session"),
+      ).toBeInTheDocument();
 
       // Check the DOM order of remarks
       const remarkElements = screen.getAllByText(/Older date|Newer date/);

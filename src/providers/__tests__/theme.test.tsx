@@ -298,9 +298,9 @@ describe("ThemeProvider", () => {
 
 describe("useTheme", () => {
   it("throws when used outside ThemeProvider", () => {
-    const consoleError = vi.spyOn(console, "error").mockImplementation(
-      () => {},
-    );
+    const consoleError = vi
+      .spyOn(console, "error")
+      .mockImplementation(() => {});
     expect(() => render(<ThrowingConsumer />)).toThrow(
       "useTheme must be used within a ThemeProvider",
     );

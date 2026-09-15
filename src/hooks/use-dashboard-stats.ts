@@ -177,11 +177,9 @@ function processOfficialAttendance(
 ) {
   if (!attendanceData?.studentAttendanceData) return;
 
-  for (
-    const [dateStr, dateData] of Object.entries(
-      attendanceData.studentAttendanceData,
-    )
-  ) {
+  for (const [dateStr, dateData] of Object.entries(
+    attendanceData.studentAttendanceData,
+  )) {
     if (!dateData) continue;
     let idx = 0;
     for (const [sessionKey, session] of Object.entries(dateData)) {
@@ -268,7 +266,9 @@ function processSingleTrackItem(
   resolveCode: (id: string) => string,
 ) {
   if (
-    !item || item.semester !== selectedSemester || item.year !== selectedYear ||
+    !item ||
+    item.semester !== selectedSemester ||
+    item.year !== selectedYear ||
     !item.course
   ) {
     return;
@@ -284,11 +284,18 @@ function processSingleTrackItem(
   const trackPos = isPositive(trackAttendanceNum);
   const trackDL = trackAttendanceNum === ATTENDANCE_STATUS.DUTY_LEAVE;
   const offPos = hasOfficialSlot ? isPositive(officialStatus) : false;
-  const offDL = hasOfficialSlot && officialStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
+  const offDL =
+    hasOfficialSlot && officialStatus === ATTENDANCE_STATUS.DUTY_LEAVE;
 
   const cStat = courseStatsMap.get(statsKey);
   if (cStat) {
-    updateCourseStatForTrack(cStat, isTrulyExtra, trackPos, offPos, hasOfficialSlot);
+    updateCourseStatForTrack(
+      cStat,
+      isTrulyExtra,
+      trackPos,
+      offPos,
+      hasOfficialSlot,
+    );
   }
 
   if (!normalizedDisabledCodes.has(statsKey)) {
@@ -396,19 +403,23 @@ export function useDashboardStats({
       modifierStats.savedAbsent,
       officialStats.absent,
     );
-    const finalTotal = officialStats.total +
+    const finalTotal =
+      officialStats.total +
       modifierStats.extraPresent +
       modifierStats.extraAbsent;
-    const rawFinalPresent = officialStats.present +
+    const rawFinalPresent =
+      officialStats.present +
       modifierStats.correctionPresent +
       modifierStats.extraPresent;
     const finalPresent = Math.min(rawFinalPresent, finalTotal);
 
-    const rawPercentage = finalTotal > 0 ? (finalPresent / finalTotal) * 100 : 0;
+    const rawPercentage =
+      finalTotal > 0 ? (finalPresent / finalTotal) * 100 : 0;
     const percentage = Math.min(rawPercentage, 100);
-    const rawOfficialPercentage = officialStats.total > 0
-      ? (officialStats.present / officialStats.total) * 100
-      : 0;
+    const rawOfficialPercentage =
+      officialStats.total > 0
+        ? (officialStats.present / officialStats.total) * 100
+        : 0;
     const officialPercentage = Math.min(rawOfficialPercentage, 100);
 
     const formatPct = (val: number) =>

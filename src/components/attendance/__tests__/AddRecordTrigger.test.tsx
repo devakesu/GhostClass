@@ -36,16 +36,13 @@ vi.mock("@/hooks/users/settings", () => ({
 
 // Mock the Dialog component to avoid rendering its complex interior
 vi.mock("@/components/attendance/AddAttendanceDialog", () => ({
-  AddAttendanceDialog: ({ open, onOpenChange, onSuccess }: any) => (
-    open
-      ? (
-        <div data-testid="attendance-dialog">
-          <button onClick={() => onSuccess()}>Simulate Success</button>
-          <button onClick={() => onOpenChange(false)}>Close</button>
-        </div>
-      )
-      : null
-  ),
+  AddAttendanceDialog: ({ open, onOpenChange, onSuccess }: any) =>
+    open ? (
+      <div data-testid="attendance-dialog">
+        <button onClick={() => onSuccess()}>Simulate Success</button>
+        <button onClick={() => onOpenChange(false)}>Close</button>
+      </div>
+    ) : null,
 }));
 
 describe("AddRecordTrigger", () => {
@@ -64,8 +61,9 @@ describe("AddRecordTrigger", () => {
     render(
       <AddRecordTrigger user={mockUser as any} onSuccess={mockOnSuccess} />,
     );
-    expect(screen.getByRole("button", { name: /Add new record/i }))
-      .toBeInTheDocument();
+    expect(
+      screen.getByRole("button", { name: /Add new record/i }),
+    ).toBeInTheDocument();
   });
 
   it("opens the dialog when clicked", () => {

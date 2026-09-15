@@ -62,18 +62,18 @@ export function OutageProvider({ children }: { children: ReactNode }) {
 
   return (
     <OutageContext.Provider value={value}>
-      {hasOutage
-        ? (
-          <ServiceErrorView
-            messages={errorMessages}
-            error={errorDetails}
-            onRetry={() => {
-              resetOutage();
-              window.location.reload();
-            }}
-          />
-        )
-        : children}
+      {hasOutage ? (
+        <ServiceErrorView
+          messages={errorMessages}
+          error={errorDetails}
+          onRetry={() => {
+            resetOutage();
+            window.location.reload();
+          }}
+        />
+      ) : (
+        children
+      )}
     </OutageContext.Provider>
   );
 }

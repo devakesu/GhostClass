@@ -35,9 +35,9 @@ describe("readPublicPngAsDataUri", () => {
   it("should include the correct base64 content", async () => {
     const { readPublicPngAsDataUri } = await import("@/lib/read-public-icon");
     const result = readPublicPngAsDataUri("icon-192.png");
-    const expected = `data:image/png;base64,${
-      Buffer.from("fake-png-data").toString("base64")
-    }`;
+    const expected = `data:image/png;base64,${Buffer.from(
+      "fake-png-data",
+    ).toString("base64")}`;
     expect(result).toBe(expected);
   });
 

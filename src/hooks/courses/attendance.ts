@@ -78,10 +78,14 @@ async function fetchCourseSummaryWithFallback(
     // Only permanently lock to 'summary' if the failure on '/summery' was specifically
     // a 404 Not Found (meaning the typo route doesn't exist on this backend).
     // Transient failures (502, timeouts, 500, network errors) should NOT permanently bias resolution.
-    const errorObj = err as { response?: { status?: number }; message?: string } | null;
+    const errorObj = err as {
+      response?: { status?: number };
+      message?: string;
+    } | null;
     const is404 =
       errorObj?.response?.status === 404 ||
-      (typeof errorObj?.message === "string" && errorObj.message.includes("404"));
+      (typeof errorObj?.message === "string" &&
+        errorObj.message.includes("404"));
 
     if (is404) {
       workingSummaryEndpoints.set(key, "summary");
@@ -134,7 +138,8 @@ function courseDetailQueryOptions(
     // Key on both courseId and ezygoId to ensure attendance details are cached
     // independently across semesters/enrollments.
     queryKey: ["attendance-report", courseId, ezygoId] as const,
-    queryFn: () => fetchCourseDetail(courseId, ezygoId, courseName, institutionKey),
+    queryFn: () =>
+      fetchCourseDetail(courseId, ezygoId, courseName, institutionKey),
     staleTime: 10 * 60 * 1000, // 10 minutes
     gcTime: 30 * 60 * 1000, // 30 minutes
   };
@@ -171,13 +176,28 @@ export const useCourseDetails = (
   courseId: string,
   ezygoId: number,
   courseName?: string,
-  options: { enabled?: boolean; staleTime?: number; institutionKey?: string | number } = {},
+  options: {
+    enabled?: boolean;
+    staleTime?: number;
+    institutionKey?: string | number;
+  } = {},
 ) => {
   return useQuery<CourseDetail>({
-    ...courseDetailQueryOptions(courseId, ezygoId, courseName, options.institutionKey),
+    ...courseDetailQueryOptions(
+      courseId,
+      ezygoId,
+      courseName,
+      options.institutionKey,
+    ),
     enabled: options.enabled !== false && !!courseId,
-    staleTime: options.staleTime ??
-      courseDetailQueryOptions(courseId, ezygoId, courseName, options.institutionKey).staleTime,
+    staleTime:
+      options.staleTime ??
+      courseDetailQueryOptions(
+        courseId,
+        ezygoId,
+        courseName,
+        options.institutionKey,
+      ).staleTime,
     refetchOnReconnect: true,
     refetchInterval: false,
     retry: retryTwice,
@@ -198,9 +218,8 @@ export const useAllCourseDetails = (
   const { data: defaultSemester } = useFetchSemester();
   const { data: defaultYear } = useFetchAcademicYear();
 
-  const activeSemester = semester !== undefined
-    ? semester
-    : (defaultSemester ?? null);
+  const activeSemester =
+    semester !== undefined ? semester : (defaultSemester ?? null);
   const activeYear = year !== undefined ? year : (defaultYear ?? null);
 
   // Explicitly deduplicate courses by code to prevent redundant batching.
@@ -228,9 +247,13 @@ export const useAllCourseDetails = (
       activeYear,
     ],
     queryFn: async () => {
-      const res = await axios.post("/api/attendance/summary-batch", {
-        courses: uniqueCourses,
-      }, { baseURL: "" });
+      const res = await axios.post(
+        "/api/attendance/summary-batch",
+        {
+          courses: uniqueCourses,
+        },
+        { baseURL: "" },
+      );
       if (!res || !res.data) {
         throw new Error("Failed to fetch batch course details");
       }
@@ -249,16 +272,15 @@ export const useAllCourseDetails = (
           const detail = normalizeCourseDetail(rawDetail);
           Reflect.set(data, code, detail);
 
-          const course = uniqueCourses.find((
-            c: { code: string; id: number; name: string },
-          ) => c.code === code);
+          const course = uniqueCourses.find(
+            (c: { code: string; id: number; name: string }) => c.code === code,
+          );
           if (course) {
             const normalizedCode = normalizeCourseCode(code);
-            queryClient.setQueryData([
-              "attendance-report",
-              normalizedCode,
-              Number(course.id),
-            ], detail);
+            queryClient.setQueryData(
+              ["attendance-report", normalizedCode, Number(course.id)],
+              detail,
+            );
           }
         }
       }

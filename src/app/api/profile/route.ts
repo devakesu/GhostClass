@@ -37,40 +37,54 @@ function validateRequestOrigin(req: NextRequest): NextResponse | null {
     logger.error(
       "[profile GET] Server misconfiguration: NEXT_PUBLIC_APP_DOMAIN missing",
     );
-    return NextResponse.json({ error: "Server misconfiguration" }, {
-      status: 500,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      { error: "Server misconfiguration" },
+      {
+        status: 500,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   }
   const requestHostname = resolveRequestHostname(req);
   const origin = req.headers.get("origin");
   if (!origin) {
     const secFetchSite = req.headers.get("sec-fetch-site")?.toLowerCase();
-    if (
-      !(secFetchSite === "same-origin" && !!requestHostname &&
-        (allowedHosts.has(requestHostname) || isLoopbackHost(requestHostname)))
-    ) {
-      return NextResponse.json({ error: "Origin required" }, {
-        status: 400,
-        headers: { "Cache-Control": "no-store" },
-      });
+    if (!(
+      secFetchSite === "same-origin" &&
+      !!requestHostname &&
+      (allowedHosts.has(requestHostname) || isLoopbackHost(requestHostname))
+    )) {
+      return NextResponse.json(
+        { error: "Origin required" },
+        {
+          status: 400,
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
     }
   } else {
     try {
       const originHostname = new URL(origin).hostname.toLowerCase();
-      const isAllowed = allowedHosts.has(originHostname) ||
+      const isAllowed =
+        allowedHosts.has(originHostname) ||
         (isLoopbackHost(originHostname) && isLoopbackHost(requestHostname));
       if (!isAllowed) {
-        return NextResponse.json({ error: "Forbidden" }, {
-          status: 403,
-          headers: { "Cache-Control": "no-store" },
-        });
+        return NextResponse.json(
+          { error: "Forbidden" },
+          {
+            status: 403,
+            headers: { "Cache-Control": "no-store" },
+          },
+        );
       }
     } catch {
-      return NextResponse.json({ error: "Invalid origin header format" }, {
-        status: 400,
-        headers: { "Cache-Control": "no-store" },
-      });
+      return NextResponse.json(
+        { error: "Invalid origin header format" },
+        {
+          status: 400,
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
     }
   }
   return null;
@@ -92,8 +106,10 @@ async function authenticateUser(
       logger.error("[authenticateUser] Bearer token is missing");
       return { user: null, isUpstreamError: false };
     }
-    const { data: { user: authUser }, error } = await supabaseAdmin.auth
-      .getUser(token);
+    const {
+      data: { user: authUser },
+      error,
+    } = await supabaseAdmin.auth.getUser(token);
     if (error || !authUser) {
       logger.error(
         "[authenticateUser] Supabase auth.getUser error:",
@@ -107,7 +123,10 @@ async function authenticateUser(
     return { user: authUser, isUpstreamError: false };
   }
   const supabase = await createClient();
-  const { data: { user: authUser }, error } = await supabase.auth.getUser();
+  const {
+    data: { user: authUser },
+    error,
+  } = await supabase.auth.getUser();
   if (error || !authUser) {
     logger.error(
       "[authenticateUser] Supabase client auth.getUser error:",
@@ -121,24 +140,28 @@ async function authenticateUser(
   return { user: authUser, isUpstreamError: false };
 }
 
-async function ingestNewProfile(
-  user: { id: string },
-): Promise<NextResponse> {
+async function ingestNewProfile(user: { id: string }): Promise<NextResponse> {
   const token = await getAuthTokenWithFallback(user.id);
   if (!token) {
-    return NextResponse.json({ error: "No token" }, {
-      status: 401,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      { error: "No token" },
+      {
+        status: 401,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   }
 
   try {
     const syncResult = await performProfileSync(token, "", user.id, true);
     const bundle = await getProfileBundle(user.id, syncResult?.academic);
     if (!bundle) {
-      return NextResponse.json({ error: "Profile not found after ingestion" }, {
-        status: 404,
-      });
+      return NextResponse.json(
+        { error: "Profile not found after ingestion" },
+        {
+          status: 404,
+        },
+      );
     }
     return NextResponse.json(bundle);
   } catch (err) {
@@ -226,9 +249,11 @@ async function performSyncAndFetchUser(
       };
     }
 
-    const { data: updatedUser } = await supabaseAdmin.from("users").select(
-      "*, class:classes(id, name, sem, year)",
-    ).eq("auth_id", userId).single();
+    const { data: updatedUser } = await supabaseAdmin
+      .from("users")
+      .select("*, class:classes(id, name, sem, year)")
+      .eq("auth_id", userId)
+      .single();
     return {
       updatedUser: updatedUser ?? existingUser,
       syncResult,
@@ -274,7 +299,7 @@ async function loadExistingUserBundle(
 
   if (!shouldSync && !isDebounced) {
     after(async () => {
-      let syncToken = resolvedToken ?? await getAuthTokenServer();
+      let syncToken = resolvedToken ?? (await getAuthTokenServer());
       if (!syncToken && existingUser.ezygo_token && existingUser.ezygo_iv) {
         try {
           syncToken = decrypt({
@@ -326,9 +351,8 @@ const getHandler = async (req: NextRequest) => {
     );
   }
 
-  const { success, reset, remaining, limit } = await profileRateLimiter.limit(
-    ip,
-  );
+  const { success, reset, remaining, limit } =
+    await profileRateLimiter.limit(ip);
   if (!success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
@@ -355,28 +379,34 @@ const getHandler = async (req: NextRequest) => {
   const { user, isUpstreamError } = await authenticateUser(req, supabaseAdmin);
   if (!user) {
     if (isUpstreamError) {
-      return NextResponse.json({ error: "Upstream auth service unavailable" }, {
-        status: 503,
-        headers: { "Cache-Control": "no-store" },
-      });
+      return NextResponse.json(
+        { error: "Upstream auth service unavailable" },
+        {
+          status: 503,
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
     }
-    return NextResponse.json({ error: "Unauthorized" }, {
-      status: 401,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      {
+        status: 401,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   }
 
-  const { data: existingUserRaw } = await supabaseAdmin.from("users").select(
-    "*, class:classes(id, name, sem, year)",
-  ).eq("auth_id", user.id).maybeSingle();
+  const { data: existingUserRaw } = await supabaseAdmin
+    .from("users")
+    .select("*, class:classes(id, name, sem, year)")
+    .eq("auth_id", user.id)
+    .maybeSingle();
   const searchParams = req.nextUrl.searchParams;
   const shouldSync = searchParams.get("sync") === "true";
   const force = searchParams.get("force") === "true";
   if (existingUserRaw && existingUserRaw.first_name) {
     const lastSyncedAtStr = existingUserRaw.last_synced_at as
-      | string
-      | null
-      | undefined;
+      string | null | undefined;
     const lastSyncedAt = lastSyncedAtStr
       ? new Date(lastSyncedAtStr)
       : new Date(0);
@@ -454,9 +484,8 @@ const patchHandler = async (
     );
   }
 
-  const { success, reset, remaining, limit } = await profileRateLimiter.limit(
-    ip,
-  );
+  const { success, reset, remaining, limit } =
+    await profileRateLimiter.limit(ip);
   if (!success) {
     return NextResponse.json(
       { error: "Too many requests. Please try again later." },
@@ -476,15 +505,21 @@ const patchHandler = async (
   const { user, isUpstreamError } = await authenticateUser(req, supabaseAdmin);
   if (!user) {
     if (isUpstreamError) {
-      return NextResponse.json({ error: "Upstream auth service unavailable" }, {
-        status: 503,
-        headers: { "Cache-Control": "no-store" },
-      });
+      return NextResponse.json(
+        { error: "Upstream auth service unavailable" },
+        {
+          status: 503,
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
     }
-    return NextResponse.json({ error: "Unauthorized" }, {
-      status: 401,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      { error: "Unauthorized" },
+      {
+        status: 401,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   }
 
   let body = decryptedBody;
@@ -492,34 +527,45 @@ const patchHandler = async (
     try {
       body = await req.json();
     } catch {
-      return NextResponse.json({ error: "Invalid or empty JSON body" }, {
-        status: 400,
-        headers: { "Cache-Control": "no-store" },
-      });
+      return NextResponse.json(
+        { error: "Invalid or empty JSON body" },
+        {
+          status: 400,
+          headers: { "Cache-Control": "no-store" },
+        },
+      );
     }
   }
   const parsed = patchSchema.safeParse(body);
   if (!parsed.success) {
-    return NextResponse.json({ error: "Validation failed" }, {
-      status: 422,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      { error: "Validation failed" },
+      {
+        status: 422,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   }
 
   const { up, first_name, last_name, gender, birth_date, class_id } =
     buildUpdatePayload(parsed.data);
 
-  const { error: updateError } = await supabaseAdmin.from("users").update(up)
+  const { error: updateError } = await supabaseAdmin
+    .from("users")
+    .update(up)
     .eq("auth_id", user.id);
   if (updateError) {
     logger.error("[profile PATCH] Database update failed:", updateError);
     Sentry.captureException(updateError, {
       tags: { type: "db_update_error", location: "api/profile/patch" },
     });
-    return NextResponse.json({ error: "Failed to update profile" }, {
-      status: 500,
-      headers: { "Cache-Control": "no-store" },
-    });
+    return NextResponse.json(
+      { error: "Failed to update profile" },
+      {
+        status: 500,
+        headers: { "Cache-Control": "no-store" },
+      },
+    );
   }
   return NextResponse.json({
     first_name,

@@ -234,9 +234,11 @@ function WorkflowHistoryItem({ approver }: { approver: LeaveApprover }) {
   );
 }
 
-function WorkflowHistory(
-  { approvers }: { approvers?: LeaveApprover[] | null },
-) {
+function WorkflowHistory({
+  approvers,
+}: {
+  approvers?: LeaveApprover[] | null;
+}) {
   const validApprovers = useMemo(() => {
     if (!approvers) return [];
     return [...approvers]
@@ -313,9 +315,13 @@ interface LeaveInitialData {
   [key: string]: unknown;
 }
 
-function LeaveCard(
-  { leave, sessions }: { leave: LeaveItem; sessions: LeaveSession[] },
-) {
+function LeaveCard({
+  leave,
+  sessions,
+}: {
+  leave: LeaveItem;
+  sessions: LeaveSession[];
+}) {
   const status = getLeaveStatus(leave.approvers);
   const StatusIcon = status.icon;
 
@@ -325,11 +331,9 @@ function LeaveCard(
     ];
     if (uniqueDates.length === 0) return "N/A";
     if (uniqueDates.length === 1) return formatDate(uniqueDates[0] as string);
-    return `${formatDate(uniqueDates[0] as string)} - ${
-      formatDate(
-        uniqueDates[uniqueDates.length - 1] as string,
-      )
-    }`;
+    return `${formatDate(uniqueDates[0] as string)} - ${formatDate(
+      uniqueDates[uniqueDates.length - 1] as string,
+    )}`;
   }, [sessions]);
 
   return (
@@ -518,29 +522,27 @@ export default function LeaveClient({
         </Card>
       </div>
 
-      {leaves.length === 0
-        ? (
-          <Card className="bg-muted/30 dark:bg-black/20 border border-border/50 dark:border-white/5 rounded-xl p-12 text-center border-dashed">
-            <div className="flex flex-col items-center justify-center space-y-3 text-muted-foreground">
-              <FileText className="h-12 w-12 opacity-20" />
-              <p className="text-lg">No leave applications found.</p>
-              <p className="text-sm opacity-70">
-                You haven&apos;t applied for any leaves through EzyGo yet.
-              </p>
-            </div>
-          </Card>
-        )
-        : (
-          <div className="grid gap-6 md:grid-cols-2">
-            {leaves.map((leave) => (
-              <LeaveCard
-                key={leave.id}
-                leave={leave}
-                sessions={allSessions[leave.id] || []}
-              />
-            ))}
+      {leaves.length === 0 ? (
+        <Card className="bg-muted/30 dark:bg-black/20 border border-border/50 dark:border-white/5 rounded-xl p-12 text-center border-dashed">
+          <div className="flex flex-col items-center justify-center space-y-3 text-muted-foreground">
+            <FileText className="h-12 w-12 opacity-20" />
+            <p className="text-lg">No leave applications found.</p>
+            <p className="text-sm opacity-70">
+              You haven&apos;t applied for any leaves through EzyGo yet.
+            </p>
           </div>
-        )}
+        </Card>
+      ) : (
+        <div className="grid gap-6 md:grid-cols-2">
+          {leaves.map((leave) => (
+            <LeaveCard
+              key={leave.id}
+              leave={leave}
+              sessions={allSessions[leave.id] || []}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }

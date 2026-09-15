@@ -52,9 +52,8 @@ export const RevisionClassEmail = ({
           <Text style={emailStyles.paragraph}>
             Hi <strong>{username}</strong>,<br />
             EzyGo marked one of your self-recorded classes as a{" "}
-            <strong>Revision</strong>{" "}
-            class. Revision classes are not counted toward attendance, so your
-            manual entry has been removed.
+            <strong>Revision</strong> class. Revision classes are not counted
+            toward attendance, so your manual entry has been removed.
           </Text>
 
           <Section style={emailStyles.conflictBox}>
@@ -94,9 +93,8 @@ export const RevisionClassEmail = ({
           </Section>
 
           <Text style={emailStyles.note}>
-            This class will <strong>not</strong>{" "}
-            affect your attendance percentage. Check your dashboard to review
-            your current standing.
+            This class will <strong>not</strong> affect your attendance
+            percentage. Check your dashboard to review your current standing.
           </Text>
 
           <Section style={emailStyles.buttonContainer}>

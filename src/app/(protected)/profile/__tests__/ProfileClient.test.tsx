@@ -124,17 +124,19 @@ describe("ProfileClient", () => {
   });
 
   it("renders loading state when profile is loading", () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: null, isLoading: true } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: null,
+      isLoading: true,
+    } as any);
     render(<ProfileClient />);
     expect(screen.getByTestId("loading")).toBeInTheDocument();
   });
 
   it("renders profile data correctly", () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+    } as any);
     render(<ProfileClient />);
 
     expect(screen.getByText("Test User")).toBeInTheDocument();
@@ -144,9 +146,11 @@ describe("ProfileClient", () => {
   });
 
   it("handles avatar upload successfully", async () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false, refetch: vi.fn() } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as any);
     vi.mocked(uploadUserAvatar).mockResolvedValue(
       "http://example.com/new-avatar.jpg",
     );
@@ -165,9 +169,11 @@ describe("ProfileClient", () => {
   });
 
   it("handles avatar upload failure", async () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false, refetch: vi.fn() } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as any);
     vi.mocked(uploadUserAvatar).mockRejectedValue(new Error("Upload Failed"));
 
     render(<ProfileClient />);
@@ -186,9 +192,10 @@ describe("ProfileClient", () => {
   });
 
   it("switches tabs correctly", () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+    } as any);
     render(<ProfileClient />);
 
     expect(screen.getByText("Personal Information")).toBeInTheDocument();
@@ -202,9 +209,10 @@ describe("ProfileClient", () => {
   });
 
   it("shows error toast when profile ID is missing during upload", () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: { ...mockProfile, id: null }, isLoading: false } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: { ...mockProfile, id: null },
+      isLoading: false,
+    } as any);
     render(<ProfileClient />);
 
     const file = new File(["dummy content"], "test.png", { type: "image/png" });
@@ -217,9 +225,10 @@ describe("ProfileClient", () => {
   });
 
   it("shows error toast for non-image file type", () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+    } as any);
     render(<ProfileClient />);
 
     const file = new File(["dummy content"], "test.txt", {
@@ -232,9 +241,11 @@ describe("ProfileClient", () => {
   });
 
   it("compresses large images before upload", async () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false, refetch: vi.fn() } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as any);
     vi.mocked(uploadUserAvatar).mockResolvedValue(
       "http://example.com/new-avatar.jpg",
     );
@@ -264,9 +275,11 @@ describe("ProfileClient", () => {
   });
 
   it("handles compression error by uploading original and warning user", async () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false, refetch: vi.fn() } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+      refetch: vi.fn(),
+    } as any);
     vi.mocked(uploadUserAvatar).mockResolvedValue(
       "http://example.com/new-avatar.jpg",
     );
@@ -289,20 +302,19 @@ describe("ProfileClient", () => {
   });
 
   it("falls back to username if name is missing", () => {
-    vi.mocked(useProfile).mockReturnValue(
-      {
-        data: { ...mockProfile, first_name: "", last_name: "" },
-        isLoading: false,
-      } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: { ...mockProfile, first_name: "", last_name: "" },
+      isLoading: false,
+    } as any);
     render(<ProfileClient />);
     expect(screen.getByText("testuser")).toBeInTheDocument();
   });
 
   it("handles empty files selection", () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+    } as any);
     render(<ProfileClient />);
     const input = screen.getByLabelText("Upload profile picture");
     fireEvent.change(input, { target: { files: [] } });
@@ -310,9 +322,10 @@ describe("ProfileClient", () => {
   });
 
   it("handles avatar click to trigger input", () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+    } as any);
     render(<ProfileClient />);
     const input = screen.getByLabelText("Upload profile picture");
     const spy = vi.spyOn(input, "click");
@@ -322,9 +335,10 @@ describe("ProfileClient", () => {
   });
 
   it("renders phone and class information correctly", () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+    } as any);
     render(<ProfileClient />);
 
     fireEvent.click(screen.getByText("EzyGo"));
@@ -348,9 +362,10 @@ describe("ProfileClient", () => {
   });
 
   it("handles avatar keyboard interaction", () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+    } as any);
     render(<ProfileClient />);
     const input = screen.getByLabelText("Upload profile picture");
     const spy = vi.spyOn(input, "click");
@@ -364,9 +379,10 @@ describe("ProfileClient", () => {
   });
 
   it("renders loading overlay during upload", async () => {
-    vi.mocked(useProfile).mockReturnValue(
-      { data: mockProfile, isLoading: false } as any,
-    );
+    vi.mocked(useProfile).mockReturnValue({
+      data: mockProfile,
+      isLoading: false,
+    } as any);
     vi.mocked(uploadUserAvatar).mockReturnValue(
       new Promise((resolve) => setTimeout(() => resolve("url"), 100)),
     );

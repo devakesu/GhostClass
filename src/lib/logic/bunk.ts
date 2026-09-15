@@ -84,8 +84,6 @@ export function calculateAttendance(
     requiredToAttend: 0,
     targetPercentage: safeTarget,
     isExact: false,
-    isBorderline: bunkableExact > 0 &&
-      bunkableExact < 0.9 &&
-      bunkable === 0,
+    isBorderline: bunkableExact > 0 && bunkableExact < 0.9 && bunkable === 0,
   };
 }

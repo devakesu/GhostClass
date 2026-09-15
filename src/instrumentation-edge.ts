@@ -10,7 +10,8 @@ function scrubGaApiSecret(url: string): string {
     const hostname = parsed.hostname;
 
     // Only scrub GA Measurement Protocol URLs on google-analytics.com and its subdomains
-    const isGoogleAnalyticsHost = hostname === "google-analytics.com" ||
+    const isGoogleAnalyticsHost =
+      hostname === "google-analytics.com" ||
       hostname === "www.google-analytics.com" ||
       hostname.endsWith(".google-analytics.com");
 
@@ -85,7 +86,8 @@ Sentry.init({
     if (Array.isArray(event.spans)) {
       for (const span of event.spans) {
         if (
-          span.data?.["http.url"] && typeof span.data["http.url"] === "string"
+          span.data?.["http.url"] &&
+          typeof span.data["http.url"] === "string"
         ) {
           span.data["http.url"] = scrubGaApiSecret(span.data["http.url"]);
         }
