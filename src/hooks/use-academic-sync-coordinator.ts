@@ -100,9 +100,13 @@ async function executeRolloverTransition(
   }
 
   try {
-    await axios.get("/profile?sync=true", {
-      headers: { "Cache-Control": "no-cache", Pragma: "no-cache" },
-      params: { _t: Date.now() },
+    await axios.get("/api/profile", {
+      baseURL: "",
+      headers: {
+        "Cache-Control": "no-cache, no-store, must-revalidate",
+        Pragma: "no-cache",
+      },
+      params: { sync: "true", force: "true", _t: Date.now() },
     });
   } catch (syncErr) {
     logger.warn(
