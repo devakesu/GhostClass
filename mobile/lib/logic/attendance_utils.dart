@@ -119,7 +119,9 @@ String canonicalSemester(String? s) {
 String canonicalAcademicYear(String? y) {
   if (y == null) return '';
   final trimmed = y.trim();
-  final nums = RegExp(r'\d+').allMatches(trimmed).map((m) => m.group(0)!).toList();
+  final nums = RegExp(
+    r'\d+',
+  ).allMatches(trimmed).map((m) => m.group(0)!).toList();
   if (nums.length >= 2) {
     var startNum = int.tryParse(nums[0]) ?? 0;
     if (startNum > 0 && startNum < 100) {
@@ -151,8 +153,12 @@ bool yearsDiffer(String? y1, String? y2) {
   final s2 = canonicalAcademicYear(y2);
   if (s1 == s2) return false;
 
-  final nums1 = RegExp(r'\d+').allMatches(y1.trim()).map((m) => m.group(0)!).toList();
-  final nums2 = RegExp(r'\d+').allMatches(y2.trim()).map((m) => m.group(0)!).toList();
+  final nums1 = RegExp(
+    r'\d+',
+  ).allMatches(y1.trim()).map((m) => m.group(0)!).toList();
+  final nums2 = RegExp(
+    r'\d+',
+  ).allMatches(y2.trim()).map((m) => m.group(0)!).toList();
 
   if (nums1.isNotEmpty && nums1.length == nums2.length) {
     var allMatch = true;

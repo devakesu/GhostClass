@@ -81,47 +81,50 @@ void main() {
       expect(result.hasChanges, false);
     });
 
-    test('hasChanges returns true when deletions > 0, updates > 0, or conflicts > 0', () {
-      const onlyUpdates = CronSyncResult(
-        success: true,
-        processed: 5,
-        deletions: 0,
-        conflicts: 2,
-        updates: 1,
-        errors: 0,
-      );
-      expect(onlyUpdates.hasChanges, true);
+    test(
+      'hasChanges returns true when deletions > 0, updates > 0, or conflicts > 0',
+      () {
+        const onlyUpdates = CronSyncResult(
+          success: true,
+          processed: 5,
+          deletions: 0,
+          conflicts: 2,
+          updates: 1,
+          errors: 0,
+        );
+        expect(onlyUpdates.hasChanges, true);
 
-      const onlyDeletions = CronSyncResult(
-        success: true,
-        processed: 5,
-        deletions: 1,
-        conflicts: 0,
-        updates: 0,
-        errors: 0,
-      );
-      expect(onlyDeletions.hasChanges, true);
+        const onlyDeletions = CronSyncResult(
+          success: true,
+          processed: 5,
+          deletions: 1,
+          conflicts: 0,
+          updates: 0,
+          errors: 0,
+        );
+        expect(onlyDeletions.hasChanges, true);
 
-      const onlyConflicts = CronSyncResult(
-        success: false,
-        processed: 5,
-        deletions: 0,
-        conflicts: 4,
-        updates: 0,
-        errors: 1,
-      );
-      expect(onlyConflicts.hasChanges, true);
+        const onlyConflicts = CronSyncResult(
+          success: false,
+          processed: 5,
+          deletions: 0,
+          conflicts: 4,
+          updates: 0,
+          errors: 1,
+        );
+        expect(onlyConflicts.hasChanges, true);
 
-      const zeroChanges = CronSyncResult(
-        success: true,
-        processed: 5,
-        deletions: 0,
-        conflicts: 0,
-        updates: 0,
-        errors: 0,
-      );
-      expect(zeroChanges.hasChanges, false);
-    });
+        const zeroChanges = CronSyncResult(
+          success: true,
+          processed: 5,
+          deletions: 0,
+          conflicts: 0,
+          updates: 0,
+          errors: 0,
+        );
+        expect(zeroChanges.hasChanges, false);
+      },
+    );
 
     test(
       'ApiService.parseSyncResult parses map and returns null for invalid data',
@@ -400,9 +403,11 @@ void main() {
         expect(user?.profile?.currentSemester, 'odd');
         expect(user?.profile?.currentYear, '2024-25');
 
-        // Verify screen providers and academicProvider were invalidated
+        // Verify dashboard screen provider was invalidated
         expect(observer.disposedProviders.contains(dashboardProvider), true);
-        expect(observer.disposedProviders.contains(academicProvider), true);
+        // academicProvider is updated via updateState (not re-invalidated) to avoid
+        // a double-rebuild that caused stale tracking data bugs. The correct value
+        // is already verified at lines 394-397 above.
       },
     );
 

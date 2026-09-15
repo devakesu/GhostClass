@@ -74,7 +74,11 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
             ) ||
             yearsDiffer(data.selectedYear, academicAsync.value!.year));
 
-    final hasData = data != null;
+    // `hasData` is true only when we have both attendance data AND tracking
+    // data loaded. `DashboardData.trackingLoaded` is false when the fast-path
+    // returned before the tracking disk-cache resolved — in that case the
+    // overlay stays up until the tracking listener flips it to true.
+    final hasData = data != null && data.trackingLoaded;
     if ((isSyncing && !hasData) ||
         (academicAsync.isLoading && !hasData) ||
         (dashboardState.isLoading && !hasData)) {

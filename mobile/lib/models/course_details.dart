@@ -13,10 +13,7 @@ class CourseDetails {
     String? userGroupName;
     final usersubgroup = json['usersubgroup'];
     if (usersubgroup is Map<dynamic, dynamic>) {
-      final usergroup = usersubgroup['usergroup'];
-      if (usergroup is Map<dynamic, dynamic>) {
-        userGroupName = usergroup['name']?.toString();
-      }
+      userGroupName = usersubgroup['name']?.toString();
     }
 
     final rawInstitutionUsers =
@@ -28,7 +25,11 @@ class CourseDetails {
       code: json['code'] as String?,
       academicYear: json['academic_year'] as String?,
       academicSemester: json['academic_semester'] as String?,
-      userGroupName: userGroupName ?? json['user_group_name'] as String?,
+      userGroupName:
+          userGroupName ??
+          json['usersubgroup_name'] as String? ??
+          json['user_subgroup_name'] as String? ??
+          json['user_group_name'] as String?,
       institutionUsers: rawInstitutionUsers
           .whereType<Map<dynamic, dynamic>>()
           .map(
@@ -46,6 +47,8 @@ class CourseDetails {
   final String? userGroupName;
   final List<CourseInstitutionUser> institutionUsers;
 
+  String? get userSubgroupName => userGroupName;
+
   String get safeId =>
       (code != null && code!.trim().isNotEmpty) ? code!.trim() : id.toString();
 
@@ -56,6 +59,7 @@ class CourseDetails {
     'academic_year': academicYear,
     'academic_semester': academicSemester,
     'user_group_name': userGroupName,
+    'usersubgroup_name': userGroupName,
   };
 }
 

@@ -241,27 +241,12 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
 
   Future<void> setAcademicPeriod(String semester, String year) async {
     final nextAcademic = AcademicState.canonical(semester, year);
-    final storage = ref.read(secureStorageProvider);
 
-    // 1. Immediately update state so UI renders cached data in <15ms
-    state = AsyncValue.data(nextAcademic);
-
-    // 2. Persist chosen academic state immediately
-    AppLogger.safeUnawait(
-      storage.saveAcademicState(nextAcademic).catchError((
-        Object e,
-        StackTrace st,
-      ) {
-        AppLogger.e(
-          'AcademicNotifier: saveAcademicState on period switch failed',
-          e,
-          st,
-        );
-      }),
-      'AcademicNotifier: saveAcademicState on period switch',
-    );
-
-    // 3. Update EzyGo settings in background without blocking UI
+    // updateAcademicContext(optimistic: true) handles the full flow:
+    //   1. Update EzyGo server settings (semester / year sequentially)
+    //   2. Persist updated academic state and settings in secure storage
+    //   3. api.clearCaches() — so pending fetches see a clean slate
+    //   4. updateState(nextAcademic) — sets academic state AFTER EzyGo is updated.
     try {
       await ref
           .read(authProvider.notifier)
@@ -272,10 +257,11 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
           );
     } on Object catch (e, st) {
       AppLogger.e(
-        'AcademicNotifier: Background updateAcademicContext failed',
+        'AcademicNotifier: updateAcademicContext failed',
         e,
         st,
       );
+      rethrow;
     }
   }
 

@@ -386,5 +386,45 @@ void main() {
         );
       },
     );
+
+    test(
+      'never caches default_semester or default_academic_year endpoints',
+      () async {
+        final fetcher = createFetcher();
+        final resSem = Response<dynamic>(
+          requestOptions: RequestOptions(
+            path: '/user/setting/default_semester',
+          ),
+          statusCode: 200,
+          data: {'default_semester': 'odd'},
+        );
+
+        when(
+          () => mockDio.request<dynamic>(
+            '/user/setting/default_semester',
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).thenAnswer((_) async => resSem);
+
+        await fetcher.fetch(
+          path: '/user/setting/default_semester',
+          token: 'token',
+        );
+        await fetcher.fetch(
+          path: '/user/setting/default_semester',
+          token: 'token',
+        );
+
+        // Verify called twice because TTL is 0 (never cached)
+        verify(
+          () => mockDio.request<dynamic>(
+            '/user/setting/default_semester',
+            data: any(named: 'data'),
+            options: any(named: 'options'),
+          ),
+        ).called(2);
+      },
+    );
   });
 }

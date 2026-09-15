@@ -207,7 +207,6 @@ class ProfileHydrationService extends Notifier<void> {
     }
   }
 
-
   Future<void> runBackgroundStartupHydration(
     AuthenticatedUser cachedUser, {
     bool silent = false,

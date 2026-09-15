@@ -69,9 +69,12 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       ]);
     }
 
-    final academic = academicAsync.value;
+    // Re-read resolved values after any suspension — the captured AsyncValue
+    // snapshots above reflect the loading-era state and may have null .value.
+    final resolvedAuth = ref.read(authProvider).value ?? authState.value;
+    final academic = ref.read(academicProvider).value ?? academicAsync.value;
 
-    if (authState.value == null || academic == null) {
+    if (resolvedAuth == null || academic == null) {
       return TrackingState(
         groupedByCourse: {},
         totalCount: 0,
@@ -81,15 +84,15 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     }
 
     final storage = ref.read(secureStorageProvider);
-    final user = authState.value!;
-    final cacheKeySuffix =
-        '${user.supabaseUserId}_${academic.cacheKeySuffix}';
+    final user = resolvedAuth;
+    final cacheKeySuffix = '${user.supabaseUserId}_${academic.cacheKeySuffix}';
 
     // 1. Try disk cache first for instant boot (<15ms)
     try {
       Future<dynamic> readWithFallback(String prefix) async {
-        final canonicalData =
-            await storage.getCachedData('${prefix}_$cacheKeySuffix');
+        final canonicalData = await storage.getCachedData(
+          '${prefix}_$cacheKeySuffix',
+        );
         if (canonicalData != null) return canonicalData;
         final legacyKey =
             '${prefix}_${user.supabaseUserId}_${academic.semester}_${academic.year}';
@@ -242,8 +245,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
       grouped[course]!.sort(utils.compareTrackingRecords);
     }
 
-    final cacheKeySuffix =
-        '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
+    final cacheKeySuffix = '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
     AppLogger.safeUnawait(
       storage.saveCachedData(
         'tracking_report_$cacheKeySuffix',
@@ -395,12 +397,15 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         );
 
         final allRecords = newGrouped.values.expand((e) => e).toList();
-        final cacheKeySuffix = '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
+        final cacheKeySuffix =
+            '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
         AppLogger.safeUnawait(
-          ref.read(secureStorageProvider).saveCachedData(
-            'tracking_records_$cacheKeySuffix',
-            allRecords.map((r) => r.toJson()).toList(),
-          ),
+          ref
+              .read(secureStorageProvider)
+              .saveCachedData(
+                'tracking_records_$cacheKeySuffix',
+                allRecords.map((r) => r.toJson()).toList(),
+              ),
           'TrackingNotifier: persist cache on insert',
         );
 
@@ -467,10 +472,12 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
             final cacheKeySuffix =
                 '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
             AppLogger.safeUnawait(
-              ref.read(secureStorageProvider).saveCachedData(
-                'tracking_records_$cacheKeySuffix',
-                allRecords.map((r) => r.toJson()).toList(),
-              ),
+              ref
+                  .read(secureStorageProvider)
+                  .saveCachedData(
+                    'tracking_records_$cacheKeySuffix',
+                    allRecords.map((r) => r.toJson()).toList(),
+                  ),
               'TrackingNotifier: persist cache on delete',
             );
           }
@@ -535,10 +542,12 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         final cacheKeySuffix =
             '${auth.supabaseUserId}_${academic.cacheKeySuffix}';
         AppLogger.safeUnawait(
-          ref.read(secureStorageProvider).saveCachedData(
-            'tracking_records_$cacheKeySuffix',
-            <dynamic>[],
-          ),
+          ref
+              .read(secureStorageProvider)
+              .saveCachedData(
+                'tracking_records_$cacheKeySuffix',
+                <dynamic>[],
+              ),
           'TrackingNotifier: clear cache on clearRecords',
         );
       }

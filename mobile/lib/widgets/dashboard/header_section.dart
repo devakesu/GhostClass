@@ -95,8 +95,8 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
                 ),
               ),
               child: Text(
-                (profile?.classField?.name ??
-                        widget.data.className ??
+                (widget.data.className ??
+                        profile?.classField?.name ??
                         'Unassigned')
                     .toUpperCase(),
                 style: GoogleFonts.manrope(

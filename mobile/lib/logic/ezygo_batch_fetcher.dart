@@ -70,6 +70,16 @@ class EzygoBatchFetcher {
     return sha256.convert(bytes).toString();
   }
 
+  static Duration _getTtlForEndpoint(String path) {
+    final clean = path.replaceAll(RegExp('^/+'), '');
+    if (clean.contains('default_semester') ||
+        clean.contains('default_academic_year') ||
+        clean.contains('user/setting')) {
+      return Duration.zero;
+    }
+    return _cacheTtl;
+  }
+
   /// Executes an authenticated request with deduplication and caching.
   ///
   /// [path] The full URL or relative path.
@@ -144,16 +154,19 @@ class EzygoBatchFetcher {
     }
 
     // 1. Check local cache (LRU-lite)
-    final cached = _cache[cacheKey];
-    if (cached != null) {
-      if (DateTime.now().isBefore(cached.expiry)) {
-        AppLogger.d(
-          'EzygoBatchFetcher: CACHE HIT for $path ${cached.response.statusCode != 200 ? "(NEGATIVE)" : ""}',
-        );
-        return cached.response;
-      } else {
-        // Purge expired entry
-        _cache.remove(cacheKey);
+    final ttl = _getTtlForEndpoint(path);
+    if (ttl > Duration.zero) {
+      final cached = _cache[cacheKey];
+      if (cached != null) {
+        if (DateTime.now().isBefore(cached.expiry)) {
+          AppLogger.d(
+            'EzygoBatchFetcher: CACHE HIT for $path ${cached.response.statusCode != 200 ? "(NEGATIVE)" : ""}',
+          );
+          return cached.response;
+        } else {
+          // Purge expired entry
+          _cache.remove(cacheKey);
+        }
       }
     }
 
@@ -213,13 +226,14 @@ class EzygoBatchFetcher {
 
         // 5. Cache the result
         if (_generation == startGeneration) {
-          if (response.statusCode == 200) {
+          final ttl = _getTtlForEndpoint(path);
+          if (response.statusCode == 200 && ttl > Duration.zero) {
             // Success cache (Longer)
             _putCache(
               cacheKey,
               _CacheEntry(
                 response: response,
-                expiry: DateTime.now().add(_cacheTtl),
+                expiry: DateTime.now().add(ttl),
               ),
             );
           } else if (response.statusCode != null &&

@@ -29,6 +29,7 @@ class DashboardData {
     this.instructors = const [],
     this.className,
     this.disabledCodes = const {},
+    this.trackingLoaded = true,
   });
   final List<CourseDetails> courses;
   final AttendanceReportDetailed attendance;
@@ -39,6 +40,10 @@ class DashboardData {
   final List<CourseInstructor> instructors;
   final String? className;
   final Set<String> disabledCodes;
+
+  /// False when the fast-path returned before tracking disk-cache resolved.
+  /// The loading overlay should stay visible until this flips to true.
+  final bool trackingLoaded;
 }
 
 class DashboardNotifier extends AsyncNotifier<DashboardData> {
@@ -58,6 +63,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
   // loading state (e.g. during pull-to-refresh). Applied immediately after
   // the build/refresh completes to avoid the "tracking appears then goes" bug.
   TrackingState? _pendingTrackingFromListener;
+  // The academic context at the time _pendingTrackingFromListener was captured.
+  // Used to discard stale cross-academic-boundary buffered updates.
+  AcademicState? _pendingTrackingAcademic;
 
   @override
   FutureOr<DashboardData> build() async {
@@ -77,8 +85,10 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       ]);
     }
 
-    final user = userAsync.value;
-    final academic = academicAsync.value;
+    // Re-read resolved values after any suspension — the captured AsyncValue
+    // snapshots above reflect the loading-era state and may have null .value.
+    final user = ref.read(authProvider).value ?? userAsync.value;
+    final academic = ref.read(academicProvider).value ?? academicAsync.value;
 
     if (user == null || academic == null) {
       _cachedCourses = null;
@@ -118,19 +128,22 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       _cachedAttendance = null;
       _cachedInstructors = null;
       _needsRevalidate = true;
+      // Discard any buffered tracking update from the previous academic period
+      // so it is never mistakenly applied to the incoming (new) semester's data.
+      _pendingTrackingFromListener = null;
     }
     _lastAcademic = academic;
 
     // Load Disk Cache (Secure Storage) if in-memory cache is empty
     final storage = ref.read(secureStorageProvider);
-    final cacheKeySuffix =
-        '${user.supabaseUserId}_${academic.cacheKeySuffix}';
+    final cacheKeySuffix = '${user.supabaseUserId}_${academic.cacheKeySuffix}';
     List<TrackingRecord>? cachedTrackingRecords;
     if (_cachedCourses == null || _cachedAttendance == null) {
       try {
         Future<dynamic> readWithFallback(String prefix) async {
-          final canonicalData =
-              await storage.getCachedData('${prefix}_$cacheKeySuffix');
+          final canonicalData = await storage.getCachedData(
+            '${prefix}_$cacheKeySuffix',
+          );
           if (canonicalData != null) return canonicalData;
           final legacyKey =
               '${prefix}_${user.supabaseUserId}_${academic.semester}_${academic.year}';
@@ -195,14 +208,18 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final nextTracking = next.value;
       if (nextTracking == null) return;
       final currentAcademic = ref.read(academicProvider).value;
-      if (currentAcademic != _lastAcademic) return;
+      // Guard: only apply tracking updates for the current academic period.
+      // If the academic context has changed (e.g. mid-semester-switch), discard.
+      if (currentAcademic == null || currentAcademic != _lastAcademic) return;
 
       final courses = _cachedCourses;
       final attendance = _cachedAttendance;
 
       if (courses == null || attendance == null || !state.hasValue) {
         // Buffer the update so build() applies it once courses and attendance exist.
+        // Tag with the current academic so we can validate it on application.
         _pendingTrackingFromListener = nextTracking;
+        _pendingTrackingAcademic = currentAcademic;
         return;
       }
 
@@ -226,7 +243,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       final user = ref.read(authProvider).value;
       if (user != null) {
         final trackingKeySuffix =
-            '${user.supabaseUserId}_${currentAcademic?.cacheKeySuffix ?? _lastAcademic!.cacheKeySuffix}';
+            '${user.supabaseUserId}_${currentAcademic.cacheKeySuffix}';
         AppLogger.safeUnawait(
           storage.saveCachedData(
             'tracking_records_$trackingKeySuffix',
@@ -248,9 +265,26 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       if (activeTracking?.officialReport != null) {
         _cachedAttendance = activeTracking!.officialReport;
       }
-      final trackingList = activeTracking != null
-          ? activeTracking.groupedByCourse.values.expand((e) => e).toList()
-          : (cachedTrackingRecords ?? <TrackingRecord>[]);
+
+      // Determine if we have tracking data from any source
+      List<TrackingRecord> trackingList;
+      bool trackingLoaded;
+      if (activeTracking != null && activeTracking.groupedByCourse.isNotEmpty) {
+        // Live tracking state is ready — use it
+        trackingList = activeTracking.groupedByCourse.values
+            .expand((e) => e)
+            .toList();
+        trackingLoaded = true;
+      } else if (cachedTrackingRecords != null) {
+        // Disk cache was available — use it
+        trackingList = cachedTrackingRecords;
+        trackingLoaded = true;
+      } else {
+        // No tracking data yet (disk cache miss, live not ready)
+        // Return with trackingLoaded=false so the overlay stays up.
+        trackingList = <TrackingRecord>[];
+        trackingLoaded = false;
+      }
 
       if (_needsRevalidate) {
         _needsRevalidate = false;
@@ -276,11 +310,13 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         trackingList,
         academic,
         _cachedInstructors ?? [],
+        trackingLoaded: trackingLoaded,
       );
     }
 
     _needsRevalidate = false;
     _pendingTrackingFromListener = null;
+    _pendingTrackingAcademic = null;
 
     // Cold-start slow path: no disk cache for dashboard.
     // Truly parallelize: fetch courses (EzyGo) AND wait for tracking to resolve.
@@ -295,27 +331,42 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       parallelTrackingFuture: trackingFuture,
     );
 
-    // Apply any tracking update that arrived during or prior to _fetchAndProcess.
-    final pendingTracking =
-        _pendingTrackingFromListener ?? ref.read(trackingProvider).value;
-    if (pendingTracking != null &&
-        !_isDisposed &&
-        _cachedCourses != null &&
-        _cachedAttendance != null) {
-      _pendingTrackingFromListener = null;
-      if (pendingTracking.officialReport != null) {
-        _cachedAttendance = pendingTracking.officialReport;
+    // Apply any tracking update that arrived during _fetchAndProcess, but ONLY
+    // if it belongs to the same academic period as this build. Cross-academic
+    // updates must be discarded to prevent zeros on semester/year switches.
+    if (!_isDisposed && _cachedCourses != null && _cachedAttendance != null) {
+      final pendingTracking = _pendingTrackingFromListener;
+      final pendingAcademic = _pendingTrackingAcademic;
+      final liveTracking = ref.read(trackingProvider).value;
+
+      // Prefer the buffered update if it's for the current academic; otherwise
+      // fall back to live tracking state if it also matches.
+      TrackingState? toApply;
+      if (pendingTracking != null && pendingAcademic == academic) {
+        toApply = pendingTracking;
+      } else if (liveTracking != null &&
+          ref.read(academicProvider).value == academic) {
+        toApply = liveTracking;
       }
-      final trackingList = pendingTracking.groupedByCourse.values
-          .expand((e) => e)
-          .toList();
-      return _processData(
-        _cachedCourses!,
-        _cachedAttendance!,
-        trackingList,
-        academic,
-        _cachedInstructors ?? [],
-      );
+
+      _pendingTrackingFromListener = null;
+      _pendingTrackingAcademic = null;
+
+      if (toApply != null) {
+        if (toApply.officialReport != null) {
+          _cachedAttendance = toApply.officialReport;
+        }
+        final trackingList = toApply.groupedByCourse.values
+            .expand((e) => e)
+            .toList();
+        return _processData(
+          _cachedCourses!,
+          _cachedAttendance!,
+          trackingList,
+          academic,
+          _cachedInstructors ?? [],
+        );
+      }
     }
 
     return result;
@@ -555,8 +606,9 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     AttendanceReportDetailed attendance,
     List<TrackingRecord> tracking,
     AcademicState academic,
-    List<CourseInstructor> instructors,
-  ) {
+    List<CourseInstructor> instructors, {
+    bool trackingLoaded = true,
+  }) {
     final auth = ref.read(authProvider).value;
     final disabledMap = auth?.settings.disabledCourses ?? {};
     final semKey = '${academic.year}-${academic.semester}';
@@ -576,27 +628,27 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     );
 
     // --- CLASS NAME EXTRACTION ---
-    // We prioritize the explicit class name from the user's profile.
-    // If not available, we fall back to deriving it from the courses' userGroupName.
-    final profileClassName = auth?.profile?.classField?.name;
-    var finalClassName =
-        (profileClassName != null && profileClassName.trim().isNotEmpty)
-        ? profileClassName
-        : null;
+    // Extract the class name from the active term's courses' userGroupName.
+    // If unavailable (e.g. no courses yet or empty group name), fall back to profile class.
+    String? finalClassName;
+    final groupCounts = <String, int>{};
+    for (final c in courses) {
+      if (c.userGroupName != null && c.userGroupName!.trim().isNotEmpty) {
+        final gName = c.userGroupName!.trim();
+        groupCounts[gName] = (groupCounts[gName] ?? 0) + 1;
+      }
+    }
+    if (groupCounts.isNotEmpty) {
+      finalClassName = groupCounts.entries
+          .reduce((a, b) => a.value > b.value ? a : b)
+          .key;
+    }
 
-    if (finalClassName == null) {
-      final groupCounts = <String, int>{};
-      for (final c in courses) {
-        if (c.userGroupName != null && c.userGroupName!.isNotEmpty) {
-          groupCounts[c.userGroupName!] =
-              (groupCounts[c.userGroupName!] ?? 0) + 1;
-        }
-      }
-      if (groupCounts.isNotEmpty) {
-        finalClassName = groupCounts.entries
-            .reduce((a, b) => a.value > b.value ? a : b)
-            .key;
-      }
+    final profileClassName = auth?.profile?.classField?.name;
+    if ((finalClassName == null || finalClassName.isEmpty) &&
+        profileClassName != null &&
+        profileClassName.trim().isNotEmpty) {
+      finalClassName = profileClassName.trim();
     }
 
     // --- SORTING LOGIC (WEBSITE PARITY) ---
@@ -660,6 +712,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
       instructors: instructors,
       className: finalClassName,
       disabledCodes: disabledCodes,
+      trackingLoaded: trackingLoaded,
     );
   }
 
@@ -819,8 +872,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     final academic = ref.read(academicProvider).value;
     if (user != null && academic != null) {
       final storage = ref.read(secureStorageProvider);
-      final suffix =
-          '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+      // Use canonical cache key suffix — matches what all cache writes use.
+      final suffix = '${user.supabaseUserId}_${academic.cacheKeySuffix}';
       await storage.deleteCachedData('dashboard_courses_$suffix');
     }
     _cachedCourses = null;
@@ -859,8 +912,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
 
     // 2. Persist to disk cache
     final storage = ref.read(secureStorageProvider);
-    final cacheKeySuffix =
-        '${user.supabaseUserId}_${academic.semester}_${academic.year}';
+    // Use canonical cache key suffix — matches what all cache reads/writes use.
+    final cacheKeySuffix = '${user.supabaseUserId}_${academic.cacheKeySuffix}';
     await storage.saveCachedData(
       'dashboard_instructors_$cacheKeySuffix',
       updatedList.map((i) => i.toJson()).toList(),

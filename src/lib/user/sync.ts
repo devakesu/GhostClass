@@ -174,13 +174,13 @@ function resolveAcademicContext(
   };
 }
 
-function triggerAcademicSelfHeal(
+async function triggerAcademicSelfHeal(
   token: string,
   authId: string,
   ezygoAcademicSemester: string | null,
   ezygoAcademicYear: string | null,
   currentAcademic: { current_semester: string; current_year: string },
-): Promise<unknown> | void {
+): Promise<void> {
   const needsSemesterUpdate = !ezygoAcademicSemester ||
     ezygoAcademicSemester !== currentAcademic.current_semester;
   const needsYearUpdate = !ezygoAcademicYear ||
@@ -194,35 +194,34 @@ function triggerAcademicSelfHeal(
     }: Setting EzyGo to ${currentAcademic.current_semester} ${currentAcademic.current_year} (current EzyGo: ${ezygoAcademicSemester} ${ezygoAcademicYear})`,
   );
 
-  const pushPromises: Promise<unknown>[] = [];
-  if (needsSemesterUpdate) {
-    pushPromises.push(egressFetch("user/setting/default_semester", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        default_semester: currentAcademic.current_semester,
-      }),
-    }));
+  try {
+    if (needsYearUpdate) {
+      await egressFetch("user/setting/default_academic_year", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          default_academic_year: currentAcademic.current_year,
+        }),
+      });
+    }
+    if (needsSemesterUpdate) {
+      await egressFetch("user/setting/default_semester", {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          default_semester: currentAcademic.current_semester,
+        }),
+      });
+    }
+  } catch (err) {
+    logger.warn("[sync] Academic self-heal push failed", err);
   }
-  if (needsYearUpdate) {
-    pushPromises.push(egressFetch("user/setting/default_academic_year", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${token}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        default_academic_year: currentAcademic.current_year,
-      }),
-    }));
-  }
-
-  return Promise.all(pushPromises).catch((err) =>
-    logger.warn("[sync] Academic self-heal push failed", err)
-  );
 }
 
 function cleanClassName(input: string): string {

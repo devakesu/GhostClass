@@ -238,10 +238,11 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       );
     }
 
+    // Fire both in parallel immediately — do NOT delay tracking by a frame.
+    // The loading overlay must stay until tracking disk-cache resolves, so
+    // tracking must start as early as possible alongside the dashboard.
     prewarm(dashboardFuture, 'dashboard');
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      prewarm(trackingFuture, 'tracking');
-    });
+    prewarm(trackingFuture, 'tracking');
   }
 
   @override

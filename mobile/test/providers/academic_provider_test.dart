@@ -1,3 +1,4 @@
+import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/models/user.dart';
@@ -95,6 +96,44 @@ void main() {
         verifyNever(() => mockApi.fetchSemester(mockStorage));
         verifyNever(() => mockApi.fetchAcademicYear(mockStorage));
         verifyNever(mockStorage.getAcademicState);
+      },
+    );
+
+    test(
+      'setAcademicPeriod rethrows when updateAcademicContext fails',
+      () async {
+        final mockApi = MockApiService();
+        final mockStorage = MockSecureStorageService();
+        final user = createMockUser();
+
+        when(
+          mockStorage.getAcademicState,
+        ).thenAnswer((_) async => null);
+
+        when(
+          () => mockApi.updateAcademicYear(any(), mockStorage),
+        ).thenAnswer(
+          (_) async => Response<dynamic>(
+            requestOptions: RequestOptions(path: '/year'),
+            statusCode: 500,
+          ),
+        );
+
+        final container = ProviderContainer(
+          overrides: [
+            authProvider.overrideWith(() => MockAuthNotifier(user)),
+            apiServiceProvider.overrideWithValue(mockApi),
+            secureStorageProvider.overrideWithValue(mockStorage),
+          ],
+        );
+        addTearDown(container.dispose);
+
+        await expectLater(
+          container
+              .read(academicProvider.notifier)
+              .setAcademicPeriod('even', '2025-26'),
+          throwsA(isA<Exception>()),
+        );
       },
     );
   });

@@ -124,9 +124,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
     required AcademicState? academic,
   }) async {
     final storage = ref.read(secureStorageProvider);
-    final semSuffix = academic != null
-        ? '_${academic.cacheKeySuffix}'
-        : '';
+    final semSuffix = academic != null ? '_${academic.cacheKeySuffix}' : '';
     final examsCacheKey = 'scores_exams_${user.supabaseUserId}$semSuffix';
 
     try {
@@ -259,9 +257,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       final examsJson = examsRes.data as List<dynamic>;
 
       // Cache raw exams list for future offline/instant hydration per-academic and general
-      final semSuffix = academic != null
-          ? '_${academic.cacheKeySuffix}'
-          : '';
+      final semSuffix = academic != null ? '_${academic.cacheKeySuffix}' : '';
       AppLogger.safeUnawait(
         Future.wait([
           storage.saveCachedData(
