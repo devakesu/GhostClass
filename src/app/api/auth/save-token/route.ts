@@ -387,7 +387,8 @@ const handler = async (
 ) => {
   const headerList = await headers();
   const cookieStore = await cookies();
-  const isAppCheck = authType === "app-check";
+  const isAppCheck =
+    authType === "app-check" || !headerList.has("sec-fetch-site");
   const headerErr = await validateRequestHeaders(headerList, isAppCheck);
   if (headerErr) return headerErr;
 
@@ -492,7 +493,8 @@ const handler = async (
       current_year: syncRes?.academic?.current_year ?? info.current_year,
     };
 
-    if (authType !== "app-check") {
+    const isMobileClient = isAppCheck || !!fcm_token;
+    if (!isMobileClient) {
       await setAuthCookie(token);
 
       return NextResponse.json(response);
