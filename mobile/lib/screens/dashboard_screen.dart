@@ -107,11 +107,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         body: ServiceErrorView(
           error: dashboardState.error,
           onRetry: () async {
+            if (!mounted) return;
             ref.read(apiServiceProvider).clearCaches();
             ref
               ..invalidate(dashboardProvider)
               ..invalidate(institutionsProvider);
             try {
+              if (!mounted) return;
               await ref
                   .read(dashboardProvider.future)
                   .timeout(AppConfig.defaultTimeout);

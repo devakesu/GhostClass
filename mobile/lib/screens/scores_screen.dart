@@ -45,8 +45,11 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
         body: ServiceErrorView(
           error: scoreState.error,
           onRetry: () async {
-            ref.read(apiServiceProvider).clearCaches();
-            await ref.read(scoreProvider.notifier).refresh();
+            if (!mounted) return;
+            final api = ref.read(apiServiceProvider);
+            final notifier = ref.read(scoreProvider.notifier);
+            api.clearCaches();
+            await notifier.refresh();
           },
         ),
       );
@@ -103,10 +106,14 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
               final supabaseClient = ref.read(supabaseClientProvider);
               final apiService = ref.read(apiServiceProvider);
               final scoreNotifier = ref.read(scoreProvider.notifier);
+              final hydrationNotifier = ref.read(
+                profileHydrationServiceProvider.notifier,
+              );
               try {
                 await runUnifiedPullToRefresh(
-                  invalidateNotifications: () =>
-                      ref.invalidate(notificationsProvider),
+                  invalidateNotifications: () {
+                    if (mounted) ref.invalidate(notificationsProvider);
+                  },
                   logLabel: 'ScoresScreen',
                   refreshProfile: () =>
                       authNotifier.refreshProfile(force: true),
@@ -121,9 +128,7 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                   },
                   onSyncResult: (result) {
                     if (result is CronSyncResult && result.hasChanges) {
-                      ref
-                          .read(profileHydrationServiceProvider.notifier)
-                          .handleCronSyncResult(result);
+                      hydrationNotifier.handleCronSyncResult(result);
                     }
                   },
                   refreshData: scoreNotifier.refresh,
@@ -241,8 +246,11 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                     child: ServiceErrorView(
                       error: err,
                       onRetry: () async {
-                        ref.read(apiServiceProvider).clearCaches();
-                        await ref.read(scoreProvider.notifier).refresh();
+                        if (!mounted) return;
+                        final api = ref.read(apiServiceProvider);
+                        final notifier = ref.read(scoreProvider.notifier);
+                        api.clearCaches();
+                        await notifier.refresh();
                       },
                     ),
                   ),
@@ -432,24 +440,27 @@ class _CourseGroupWidget extends ConsumerWidget {
     WidgetRef ref,
     Exam exam,
   ) async {
-    ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    await showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      isScrollControlled: true,
-      useRootNavigator: true, // Use root to ensure it covers if needed
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) => _ExamDetailSheet(
-        exam: exam,
-        questions: questions[exam.id] ?? [],
-        answers: answers[exam.id] ?? [],
-        resolved: resolvedScores[exam.id],
-        formatDate: formatDate,
-      ),
-    );
-    ref.read(uiModalOpenProvider.notifier).setOpen(false);
+    final modalNotifier = ref.read(uiModalOpenProvider.notifier)..setOpen(true);
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        isScrollControlled: true,
+        useRootNavigator: true, // Use root to ensure it covers if needed
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        builder: (context) => _ExamDetailSheet(
+          exam: exam,
+          questions: questions[exam.id] ?? [],
+          answers: answers[exam.id] ?? [],
+          resolved: resolvedScores[exam.id],
+          formatDate: formatDate,
+        ),
+      );
+    } finally {
+      modalNotifier.setOpen(false);
+    }
   }
 }
 

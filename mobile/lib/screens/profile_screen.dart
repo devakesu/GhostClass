@@ -216,9 +216,11 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen>
         error: (err, _) => ServiceErrorView(
           error: err,
           onRetry: () async {
+            if (!mounted) return;
             ref.read(apiServiceProvider).clearCaches();
             ref.invalidate(authProvider);
             try {
+              if (!mounted) return;
               await ref
                   .read(authProvider.future)
                   .timeout(AppConfig.defaultTimeout);

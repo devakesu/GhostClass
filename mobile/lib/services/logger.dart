@@ -96,14 +96,16 @@ class AppLogger {
 
   /// Safely attach a top-level catcher to a fire-and-forget future.
   /// Use this instead of calling `unawaited(...)` directly to ensure
-  /// exceptions are logged and do not get silently dropped.
+  /// exceptions are logged and do not get silently dropped or throw
+  /// typed catchError return mismatches.
   static void safeUnawait(Future<dynamic> future, [String? context]) {
-    unawaited(
-      future.catchError((Object e, StackTrace st) {
+    unawaited(() async {
+      try {
+        await future;
+      } on Object catch (e, st) {
         AppLogger.e('SafeUnawait${context != null ? ': $context' : ''}', e, st);
-        return null;
-      }),
-    );
+      }
+    }());
   }
 
   /// Logs an information message.

@@ -114,10 +114,8 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
                 })
                 .catchError((Object e, StackTrace st) {
                   if (ref.mounted) {
-                    AppLogger.e(
-                      'NotificationsNotifier: Background SWR revalidation failed',
-                      e,
-                      st,
+                    AppLogger.w(
+                      'NotificationsNotifier: Background SWR revalidation failed: $e',
                     );
                   }
                 }),
@@ -202,24 +200,49 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     String? cacheKey,
   }) async {
     final supabase = Supabase.instance.client;
+    final session = supabase.auth.currentSession;
+    if (session == null) {
+      return NotificationsState.empty();
+    }
+    if (session.isExpired) {
+      try {
+        await supabase.auth.refreshSession();
+      } on Object catch (e) {
+        AppLogger.w(
+          'NotificationsNotifier: Session refresh failed before fetch: $e',
+        );
+        return NotificationsState.empty();
+      }
+    }
 
     // 1. Fetch ALL Unread Notifications (both conflicts and regular)
     // This ensures the unread count matches the visible unread items.
-    final results = await Future.wait([
-      supabase
-          .from('notification')
-          .select()
-          .eq('auth_user_id', userId)
-          .eq('is_read', false)
-          .order('created_at', ascending: false),
-      // 2. Fetch first page of General Feed for "EARLIER" section
-      supabase
-          .from('notification')
-          .select()
-          .eq('auth_user_id', userId)
-          .order('created_at', ascending: false)
-          .range(0, _pageSize - 1),
-    ]);
+    List<dynamic> results;
+    try {
+      results = await Future.wait([
+        supabase
+            .from('notification')
+            .select()
+            .eq('auth_user_id', userId)
+            .eq('is_read', false)
+            .order('created_at', ascending: false),
+        // 2. Fetch first page of General Feed for "EARLIER" section
+        supabase
+            .from('notification')
+            .select()
+            .eq('auth_user_id', userId)
+            .order('created_at', ascending: false)
+            .range(0, _pageSize - 1),
+      ]);
+    } on PostgrestException catch (e) {
+      if (e.code == '42501') {
+        AppLogger.w(
+          'NotificationsNotifier: RLS permission denied for notification table (session unauthorized/expired)',
+        );
+        return NotificationsState.empty();
+      }
+      rethrow;
+    }
 
     final allUnread = (results[0] as List)
         .map((n) => AppNotification.fromJson(n as Map<String, dynamic>))
@@ -268,7 +291,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
           Object e,
           StackTrace st,
         ) {
-          AppLogger.e('NotificationsNotifier: Failed to save cache', e, st);
+          AppLogger.w('NotificationsNotifier: Failed to save cache: $e');
         }),
         'NotificationsNotifier: saveCachedData',
       );
@@ -279,18 +302,33 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
 
   Future<NotificationsState> _fetchNextPage({required int page}) async {
     final supabase = Supabase.instance.client;
+    final session = supabase.auth.currentSession;
+    if (session == null || session.isExpired) {
+      return state.value ?? NotificationsState.empty();
+    }
     final userId = supabase.auth.currentUser?.id;
     if (userId == null) return state.value ?? NotificationsState.empty();
 
     final from = page * _pageSize;
     final to = from + _pageSize - 1;
 
-    final response = await supabase
-        .from('notification')
-        .select()
-        .eq('auth_user_id', userId)
-        .order('created_at', ascending: false)
-        .range(from, to);
+    final dynamic response;
+    try {
+      response = await supabase
+          .from('notification')
+          .select()
+          .eq('auth_user_id', userId)
+          .order('created_at', ascending: false)
+          .range(from, to);
+    } on PostgrestException catch (e) {
+      if (e.code == '42501') {
+        AppLogger.w(
+          'NotificationsNotifier: RLS permission denied in fetchNextPage',
+        );
+        return state.value ?? NotificationsState.empty();
+      }
+      rethrow;
+    }
 
     final newFeedItems = (response as List)
         .map((n) => AppNotification.fromJson(n as Map<String, dynamic>))

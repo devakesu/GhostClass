@@ -313,15 +313,13 @@ class SecurityService {
                 source: 'BackgroundAttestation',
               );
         } else {
-          AppLogger.e(
-            'SecurityService: Background attestation non-genuine failure (connection/quota/rate-limit). Ignored.',
-            e,
+          AppLogger.w(
+            'SecurityService: Background attestation non-genuine failure (connection/quota/rate-limit). Ignored: $e',
           );
         }
       } else {
-        AppLogger.e(
-          'SecurityService: Background check AppException ignored',
-          e,
+        AppLogger.w(
+          'SecurityService: Background check AppException ignored: $e',
         );
       }
     } on Object catch (e) {

@@ -155,7 +155,7 @@ class _AddAttendanceDialogState extends ConsumerState<AddAttendanceDialog> {
         }
       });
     }
-    if (best != null) {
+    if (best != null && data.courses.isNotEmpty) {
       final c = data.courses.firstWhere(
         (c) => c.id.toString() == best || c.code == best || c.safeId == best,
         orElse: () => data.courses.first,

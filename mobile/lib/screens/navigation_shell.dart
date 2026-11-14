@@ -351,47 +351,50 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   }
 
   Future<void> _showTrackingOverlay() async {
-    ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) => const TrackingScreen(),
-    );
-    if (mounted) {
-      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+    final modalNotifier = ref.read(uiModalOpenProvider.notifier)..setOpen(true);
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        builder: (context) => const TrackingScreen(),
+      );
+    } finally {
+      modalNotifier.setOpen(false);
     }
   }
 
   Future<void> _showNotificationsOverlay() async {
-    ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) => const NotificationsScreen(),
-    );
-    if (mounted) {
-      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+    final modalNotifier = ref.read(uiModalOpenProvider.notifier)..setOpen(true);
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        builder: (context) => const NotificationsScreen(),
+      );
+    } finally {
+      modalNotifier.setOpen(false);
     }
   }
 
   Future<void> _showAddAttendanceDialog() async {
-    ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    await showDialog<void>(
-      context: context,
-      builder: (context) => const AddAttendanceDialog(),
-    );
-    if (mounted) {
-      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+    final modalNotifier = ref.read(uiModalOpenProvider.notifier)..setOpen(true);
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => const AddAttendanceDialog(),
+      );
+    } finally {
+      modalNotifier.setOpen(false);
     }
   }
 
@@ -810,6 +813,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   child: ServiceErrorView(
                     error: dashboardError ?? trackingError,
                     onRetry: () async {
+                      if (!mounted) return;
                       ref.read(apiServiceProvider).clearCaches();
                       ref
                         ..invalidate(dashboardProvider)
@@ -822,6 +826,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                         'NavigationShell: Starting outage recovery retry...',
                       );
                       try {
+                        if (!mounted) return;
                         await Future.wait([
                           ref.read(dashboardProvider.future),
                           ref.read(trackingProvider.future),

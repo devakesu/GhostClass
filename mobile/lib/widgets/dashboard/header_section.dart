@@ -167,6 +167,8 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
       _academicPeriodChangeLocked = true;
     });
 
+    final academicNotifier = ref.read(academicProvider.notifier);
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (dialogContext) => AlertDialog(
@@ -197,9 +199,10 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
     }
 
     try {
-      await ref
-          .read(academicProvider.notifier)
-          .setAcademicPeriod(targetPeriod.semester, targetPeriod.year);
+      await academicNotifier.setAcademicPeriod(
+        targetPeriod.semester,
+        targetPeriod.year,
+      );
     } on Object catch (e, st) {
       AppLogger.e('HeaderSection: Failed to update academic period', e, st);
       if (mounted) {

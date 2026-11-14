@@ -184,7 +184,7 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
               details: [
                 'Verifies the application signature matches the official developer key.',
                 'Ensures the app package has not been repackaged or "cloned".',
-                'Application ID: ${_data!['appId']?.toString().split(':').last ?? 'Verified'}',
+                'Application ID: ${_data!['appId']?.toString().split(':').lastOrNull ?? 'Verified'}',
                 if (_data!['appCheckError'] != null)
                   'Diagnostic: ${_data!['appCheckError']}',
               ],

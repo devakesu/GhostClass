@@ -353,7 +353,7 @@ class _DisableDialogContentState extends State<DisableDialogContent> {
   @override
   void initState() {
     super.initState();
-    selectedReason = widget.reasons.first;
+    selectedReason = widget.reasons.isNotEmpty ? widget.reasons.first : '';
     customController = TextEditingController();
   }
 

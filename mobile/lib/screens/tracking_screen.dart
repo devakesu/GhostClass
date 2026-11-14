@@ -67,9 +67,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         body: ServiceErrorView(
           error: trackingState.error,
           onRetry: () async {
+            if (!mounted) return;
             ref.read(apiServiceProvider).clearCaches();
             ref.invalidate(trackingProvider);
             try {
+              if (!mounted) return;
               await ref
                   .read(trackingProvider.future)
                   .timeout(AppConfig.defaultTimeout);

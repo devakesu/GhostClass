@@ -223,12 +223,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     required Future<dynamic> trackingFuture,
   }) {
     void prewarm(Future<dynamic> future, String label) {
-      AppLogger.safeUnawait(
-        future.catchError((Object e, StackTrace st) {
-          AppLogger.e('SplashScreen: $label prewarm failed', e, st);
-        }),
-        'SplashScreen: $label prewarm',
-      );
+      AppLogger.safeUnawait(future, 'SplashScreen: $label prewarm');
     }
 
     // Fire both in parallel immediately — do NOT delay tracking by a frame.
@@ -599,12 +594,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     // 2. Prewarm deferred screen queries
     void prewarm(Future<dynamic> future, String label) {
-      AppLogger.safeUnawait(
-        future.catchError((Object e, StackTrace st) {
-          AppLogger.e('SplashScreen: $label prewarm failed', e, st);
-        }),
-        'SplashScreen: $label prewarm',
-      );
+      AppLogger.safeUnawait(future, 'SplashScreen: $label prewarm');
     }
 
     prewarm(container.read(leaveProvider.future), 'leave');

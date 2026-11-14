@@ -325,12 +325,12 @@ class PushNotificationService {
                   );
                 } on Object catch (_) {}
               } else {
-                AppLogger.e(
+                AppLogger.w(
                   'FCM registration on auth event returned ${response.statusCode}',
                 );
               }
             } on Object catch (e) {
-              AppLogger.e('FCM deferred registration failed', e);
+              AppLogger.w('FCM deferred registration failed: $e');
             } finally {
               await _deferredAuthSub?.cancel();
               _deferredAuthSub = null;
@@ -351,7 +351,22 @@ class PushNotificationService {
         return;
       }
 
-      final accessToken = currentSession.accessToken;
+      var session = currentSession;
+      if (session.isExpired) {
+        try {
+          final refreshRes = await supabase.auth.refreshSession();
+          if (refreshRes.session != null) {
+            session = refreshRes.session!;
+          }
+        } on Object catch (e) {
+          AppLogger.w(
+            'PushNotificationService: Session refresh failed before FCM sync: $e',
+          );
+          return;
+        }
+      }
+
+      final accessToken = session.accessToken;
       final response = await _registerTokenHttp(token, accessToken);
 
       if (response.statusCode == 200) {
@@ -376,7 +391,7 @@ class PushNotificationService {
           );
         } on Object catch (_) {}
       } else {
-        AppLogger.e(
+        AppLogger.w(
           'Backend token registration returned non-success code: ${response.statusCode}',
         );
         try {
@@ -398,7 +413,7 @@ class PushNotificationService {
         } on Object catch (_) {}
       }
     } on Object catch (e) {
-      AppLogger.e('FCM backend token attestation/handshake failure', e);
+      AppLogger.w('FCM backend token attestation/handshake failure: $e');
       try {
         AppLogger.safeUnawait(
           AnalyticsService.instance

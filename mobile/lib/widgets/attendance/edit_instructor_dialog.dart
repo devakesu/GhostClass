@@ -62,6 +62,8 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       final supabaseToken = client.auth.currentSession?.accessToken;
       if (supabaseToken == null) throw Exception('Not authenticated');
 
+      final dashboardNotifier = ref.read(dashboardProvider.notifier);
+
       await apiService.upsertInstructor(
         courseCode: widget.courseCode,
         instructorName: name,
@@ -70,9 +72,7 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       );
 
       // Update dashboard locally to show new name without full refresh
-      await ref
-          .read(dashboardProvider.notifier)
-          .updateLocalInstructor(widget.courseCode, name);
+      await dashboardNotifier.updateLocalInstructor(widget.courseCode, name);
 
       if (mounted) Navigator.pop(context);
     } on Object catch (e, st) {
