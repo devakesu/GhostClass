@@ -160,9 +160,9 @@ dependencies. All overrides are documented below with their security rationale:
 - **Scope**: Dev-only (used by Vite/Vitest for bundling)
 - **Status**: ✅ Up-to-date
 
-#### glob: ^13.0.6
+#### glob: ^14.0.6
 
-- **Reason**: Performance improvements and security hardening in v13+
+- **Reason**: Performance improvements and security hardening in v14+
 - **Scope**: Dev-only (used by build tools: Sentry, Serwist)
 - **Status**: ✅ Up-to-date
 
@@ -172,7 +172,7 @@ dependencies. All overrides are documented below with their security rationale:
 - **Scope**: Dev-only (used by Vite/Terser for sourcemap generation)
 - **Status**: ✅ Up-to-date
 
-#### minimatch: ^10.2.5
+#### minimatch: ^11.0.1
 
 - **Reason**: ReDoS vulnerability in versions <3.0.5
 - **CVEs**: GHSA-3ppc-4f35-3m26
@@ -217,6 +217,12 @@ dependencies. All overrides are documented below with their security rationale:
 - **Scope**: Dev-only & build toolchain
 - **Status**: ✅ Up-to-date
 
+#### zod: ^4.6.7
+
+- **Reason**: Schema validation hardening, type inference performance, and consistent ecosystem resolution across form handlers
+- **Scope**: Production & transitive dependency
+- **Status**: ✅ Up-to-date
+
 ### Egress Worker Overrides (workers/package.json)
 
 #### undici: ^8.4.2
@@ -249,7 +255,7 @@ All previously tracked issues have been resolved:
 | Issue                                                       | Resolution                                                 |
 | ----------------------------------------------------------- | ---------------------------------------------------------- |
 | `ajv <8.18.0` ReDoS (GHSA-2g4f-4pwh-qvx6) in ESLint         | Advisory resolved — no longer flagged by `npm audit`.      |
-| `minimatch` ReDoS (GHSA-3ppc-4f35-3m26) in `@sentry/nextjs` | Fixed via `minimatch: ^10.2.5` override in `package.json`. |
+| `minimatch` ReDoS (GHSA-3ppc-4f35-3m26) in `@sentry/nextjs` | Fixed via `minimatch: ^11.0.1` override in `package.json`. |
 
 See [Dependency Security Overrides](#dependency-security-overrides) for the
 current override list.

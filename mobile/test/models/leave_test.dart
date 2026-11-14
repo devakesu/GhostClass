@@ -21,15 +21,9 @@ void main() {
               'updated_at': '2026-05-14T12:00:00Z',
               'action_type': 'approved',
               'action_at': '2026-05-14T12:00:00Z',
-              'action_by_user': {
-                'first_name': 'Prof',
-                'last_name': 'Smith',
-              },
+              'action_by_user': {'first_name': 'Prof', 'last_name': 'Smith'},
             },
-            {
-              'id': '2',
-              'updated_at': '2026-05-14T13:00:00Z',
-            },
+            {'id': '2', 'updated_at': '2026-05-14T13:00:00Z'},
           ],
           'files': [
             {'id': 10, 'file_name': 'doctor-note.pdf', 'size_byte': '512'},
@@ -175,19 +169,13 @@ void main() {
       });
 
       test('defaults missing file_name to "file"', () {
-        final file = LeaveFile.fromJson({
-          'id': 26,
-          'size_byte': 1024,
-        });
+        final file = LeaveFile.fromJson({'id': 26, 'size_byte': 1024});
 
         expect(file.fileName, 'file');
       });
 
       test('defaults missing size_byte to 0', () {
-        final file = LeaveFile.fromJson({
-          'id': 27,
-          'file_name': 'doc.txt',
-        });
+        final file = LeaveFile.fromJson({'id': 27, 'file_name': 'doc.txt'});
 
         expect(file.sizeByte, 0);
       });
@@ -216,10 +204,7 @@ void main() {
 
     group('AttendanceType Model', () {
       test('parses attendance type data', () {
-        final type = AttendanceType.fromJson({
-          'id': 100,
-          'name': 'Vacation',
-        });
+        final type = AttendanceType.fromJson({'id': 100, 'name': 'Vacation'});
 
         expect(type.id, 100);
         expect(type.name, 'Vacation');
@@ -252,10 +237,7 @@ void main() {
 
     group('Event Model', () {
       test('parses event data', () {
-        final event = Event.fromJson({
-          'id': 200,
-          'name': 'Wedding',
-        });
+        final event = Event.fromJson({'id': 200, 'name': 'Wedding'});
 
         expect(event.id, 200);
         expect(event.name, 'Wedding');
@@ -268,19 +250,13 @@ void main() {
       });
 
       test('converts string id to int', () {
-        final event = Event.fromJson({
-          'id': '202',
-          'name': 'Graduation',
-        });
+        final event = Event.fromJson({'id': '202', 'name': 'Graduation'});
 
         expect(event.id, 202);
       });
 
       test('handles large numeric id values', () {
-        final event = Event.fromJson({
-          'id': 888888,
-          'name': 'Conference',
-        });
+        final event = Event.fromJson({'id': 888888, 'name': 'Conference'});
 
         expect(event.id, 888888);
       });
@@ -302,10 +278,7 @@ void main() {
       });
 
       test('tolerates missing optional data', () {
-        final session = LeaveSession.fromJson({
-          'id': 8,
-          'date': '2026-05-16',
-        });
+        final session = LeaveSession.fromJson({'id': 8, 'date': '2026-05-16'});
 
         expect(session.id, 8);
         expect(session.date, '2026-05-16');
@@ -334,10 +307,7 @@ void main() {
           'updated_at': '2026-05-14T12:00:00Z',
           'action_type': 'approved',
           'action_at': '2026-05-14T12:00:00Z',
-          'action_by_user': {
-            'first_name': 'Prof',
-            'last_name': 'Smith',
-          },
+          'action_by_user': {'first_name': 'Prof', 'last_name': 'Smith'},
         });
 
         expect(approver.id, 50);

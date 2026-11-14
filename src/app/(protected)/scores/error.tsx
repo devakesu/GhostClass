@@ -13,11 +13,26 @@ export default function ScoresError({
   reset: () => void;
 }) {
   useEffect(() => {
-    logger.error("[scores] Render error:", error.message, error.digest);
-    Sentry.captureException(error, {
+    let errToCapture: Error;
+    if (error instanceof Error) {
+      errToCapture = error;
+    } else if (
+      typeof error === "object" &&
+      error !== null &&
+      "message" in error
+    ) {
+      errToCapture = new Error(
+        String((error as { message?: unknown }).message),
+      );
+    } else {
+      errToCapture = new Error(String(error));
+    }
+
+    logger.error("[scores] Render error:", errToCapture.message, error?.digest);
+    Sentry.captureException(errToCapture, {
       tags: {
         location: "scores",
-        digest: error.digest,
+        digest: error?.digest,
       },
     });
   }, [error]);

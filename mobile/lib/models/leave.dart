@@ -188,10 +188,7 @@ class Session {
 class Course {
   Course({this.name, this.code});
   factory Course.fromJson(Map<String, dynamic> json) {
-    return Course(
-      name: json['name'] as String?,
-      code: json['code'] as String?,
-    );
+    return Course(name: json['name'] as String?, code: json['code'] as String?);
   }
   final String? name;
   final String? code;

@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
@@ -15,6 +14,7 @@ import 'package:ghostclass/services/security_service.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -141,9 +141,7 @@ void main() {
             body: Center(
               child: Column(
                 mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('ui-smoke'),
-                ],
+                children: [Text('ui-smoke')],
               ),
             ),
           ),

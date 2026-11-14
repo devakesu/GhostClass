@@ -94,7 +94,7 @@ class LeaveNotifier extends AsyncNotifier<LeaveState> {
       AppLogger.e('LeaveNotifier: Error loading disk cache', e);
     }
 
-    return _fetchAndProcess(
+    return await _fetchAndProcess(
       user: user,
       storage: storage,
       cacheKey: cacheKey,

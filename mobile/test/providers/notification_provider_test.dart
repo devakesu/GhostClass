@@ -6,8 +6,12 @@ import 'package:ghostclass/logic/encrypted_value.dart';
 import 'package:ghostclass/models/user.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/notification_provider.dart';
+import 'package:ghostclass/services/secure_storage.dart';
+import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
+
+class MockSecureStorageService extends Mock implements SecureStorageService {}
 
 class DummyAuthNotifier extends AuthNotifier {
   @override
@@ -34,9 +38,16 @@ void main() {
   });
 
   ProviderContainer buildContainer() {
+    final mockStorage = MockSecureStorageService();
+    when(() => mockStorage.getCachedData(any())).thenAnswer((_) async => null);
+    when(
+      () => mockStorage.saveCachedData(any(), any<dynamic>()),
+    ).thenAnswer((_) async {});
+
     return ProviderContainer(
       overrides: [
         authProvider.overrideWith(DummyAuthNotifier.new),
+        secureStorageProvider.overrideWith((ref) => mockStorage),
       ],
     );
   }
@@ -49,6 +60,7 @@ void main() {
         addTearDown(container.dispose);
 
         final notifier = container.read(notificationsProvider.notifier);
+        await container.read(notificationsProvider.future);
 
         final initialSnapshot = NotificationsState(
           actionNotifications: [
@@ -76,10 +88,7 @@ void main() {
         notifier.state = AsyncValue.data(initialSnapshot);
 
         // markAllAsRead will attempt DB call to placeholder domain, which must throw
-        await expectLater(
-          notifier.markAllAsRead(),
-          throwsA(anything),
-        );
+        await expectLater(notifier.markAllAsRead(), throwsA(anything));
 
         // Verify that it reverted back to initialSnapshot exactly
         final finalState = container.read(notificationsProvider).value;
@@ -98,6 +107,7 @@ void main() {
         addTearDown(container.dispose);
 
         final notifier = container.read(notificationsProvider.notifier);
+        await container.read(notificationsProvider.future);
 
         final initialSnapshot = NotificationsState(
           actionNotifications: [

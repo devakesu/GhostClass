@@ -1,10 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   testWidgets('ServiceErrorView renders default elements properly', (
@@ -12,11 +12,7 @@ void main() {
   ) async {
     await tester.pumpWidget(
       const ProviderScope(
-        child: MaterialApp(
-          home: Scaffold(
-            body: ServiceErrorView(),
-          ),
-        ),
+        child: MaterialApp(home: Scaffold(body: ServiceErrorView())),
       ),
     );
     await tester.pumpAndSettle();

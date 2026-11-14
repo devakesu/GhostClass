@@ -355,10 +355,7 @@ void main() {
           (_) async => Response<dynamic>(
             requestOptions: RequestOptions(path: '/profile'),
             statusCode: 200,
-            data: {
-              'current_semester': 'odd',
-              'current_year': '2024-25',
-            },
+            data: {'current_semester': 'odd', 'current_year': '2024-25'},
           ),
         );
 

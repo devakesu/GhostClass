@@ -54,10 +54,7 @@ void main() {
           semester: 'even',
           year: '2025-2026',
         );
-        const freshAcademic = AcademicState(
-          semester: 'odd',
-          year: '2025-2026',
-        );
+        const freshAcademic = AcademicState(semester: 'odd', year: '2025-2026');
         final user = createMockUser().copyWith(
           profile: const UserProfile(
             currentSemester: 'odd',
@@ -106,13 +103,9 @@ void main() {
         final mockStorage = MockSecureStorageService();
         final user = createMockUser();
 
-        when(
-          mockStorage.getAcademicState,
-        ).thenAnswer((_) async => null);
+        when(mockStorage.getAcademicState).thenAnswer((_) async => null);
 
-        when(
-          () => mockApi.updateAcademicYear(any(), mockStorage),
-        ).thenAnswer(
+        when(() => mockApi.updateAcademicYear(any(), mockStorage)).thenAnswer(
           (_) async => Response<dynamic>(
             requestOptions: RequestOptions(path: '/year'),
             statusCode: 500,

@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
@@ -10,14 +10,11 @@ import 'package:ghostclass/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LegalScreen extends StatefulWidget {
-  const LegalScreen({
-    required this.title,
-    required this.body,
-    super.key,
-  });
+  const LegalScreen({required this.title, required this.body, super.key});
   final String title;
   final String body;
 
@@ -204,15 +201,16 @@ class _LegalScreenState extends State<LegalScreen> {
                               onTapLink: (text, href, title) {
                                 if (href != null) {
                                   AppLogger.safeUnawait(
-                                    _launchUrl(href).catchError(
-                                      (Object e, StackTrace st) {
-                                        AppLogger.e(
-                                          'LegalScreen: launchUrl failed',
-                                          e,
-                                          st,
-                                        );
-                                      },
-                                    ),
+                                    _launchUrl(href).catchError((
+                                      Object e,
+                                      StackTrace st,
+                                    ) {
+                                      AppLogger.e(
+                                        'LegalScreen: launchUrl failed',
+                                        e,
+                                        st,
+                                      );
+                                    }),
                                     'LegalScreen: launchUrl',
                                   );
                                 }
@@ -357,11 +355,7 @@ class _ActionCard extends StatelessWidget {
                 color: theme.colorScheme.primary.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                icon,
-                size: 20,
-                color: theme.colorScheme.primary,
-              ),
+              child: Icon(icon, size: 20, color: theme.colorScheme.primary),
             ),
             const SizedBox(width: 16),
             Expanded(

@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
@@ -28,6 +27,7 @@ import 'package:ghostclass/widgets/tracking/tracking_header_widgets.dart';
 import 'package:ghostclass/widgets/tracking/tracking_subject_picker.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class TrackingScreen extends ConsumerStatefulWidget {
   const TrackingScreen({super.key});
@@ -67,9 +67,11 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
         body: ServiceErrorView(
           error: trackingState.error,
           onRetry: () async {
+            if (!mounted) return;
             ref.read(apiServiceProvider).clearCaches();
             ref.invalidate(trackingProvider);
             try {
+              if (!mounted) return;
               await ref
                   .read(trackingProvider.future)
                   .timeout(AppConfig.defaultTimeout);
@@ -162,7 +164,7 @@ class _TrackingScreenState extends ConsumerState<TrackingScreen>
               final supabaseToken =
                   supabaseClient.auth.currentSession?.accessToken;
               if (supabaseToken == null) return null;
-              return apiService.runCronSync(supabaseToken, force: true);
+              return await apiService.runCronSync(supabaseToken, force: true);
             },
             onSyncResult: (result) {
               if (result is CronSyncResult && result.hasChanges) {
@@ -799,10 +801,7 @@ class _ModalHeaderDelegate extends SliverPersistentHeaderDelegate {
 }
 
 class _DutyLeaveFilterChip extends StatelessWidget {
-  const _DutyLeaveFilterChip({
-    required this.isActive,
-    required this.onTap,
-  });
+  const _DutyLeaveFilterChip({required this.isActive, required this.onTap});
   final bool isActive;
   final VoidCallback onTap;
 

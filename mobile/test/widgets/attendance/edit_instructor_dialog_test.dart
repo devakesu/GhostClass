@@ -1,5 +1,4 @@
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/logic/encrypted_value.dart';
@@ -9,6 +8,7 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
 import 'package:ghostclass/widgets/attendance/edit_instructor_dialog.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart' as supabase;
 
@@ -70,10 +70,7 @@ void main() {
         ),
       );
 
-      const mockAcademicVal = AcademicState(
-        semester: 'odd',
-        year: '2024-2025',
-      );
+      const mockAcademicVal = AcademicState(semester: 'odd', year: '2024-2025');
 
       when(
         () => mockApi.upsertInstructor(
@@ -91,9 +88,7 @@ void main() {
       );
 
       final overrides = [
-        authProvider.overrideWith(
-          () => MockAuthNotifier(mockUserVal),
-        ),
+        authProvider.overrideWith(() => MockAuthNotifier(mockUserVal)),
         academicProvider.overrideWith(
           () => MockAcademicNotifier(mockAcademicVal),
         ),

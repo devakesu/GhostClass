@@ -1,8 +1,8 @@
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ProfileHeader extends StatelessWidget {
   const ProfileHeader({
@@ -53,9 +53,7 @@ class ProfileHeader extends StatelessWidget {
                                 avatarUrl!,
                                 maxWidth: 240,
                                 maxHeight: 240,
-                                headers: {
-                                  'Origin': AppConfig.supabaseOrigin,
-                                },
+                                headers: {'Origin': AppConfig.supabaseOrigin},
                               ),
                               fit: BoxFit.cover,
                             )

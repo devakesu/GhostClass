@@ -1,10 +1,11 @@
 import 'dart:io';
 import 'dart:ui';
+
 import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/material.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/support_helper.dart';
 import 'package:ghostclass/widgets/security_error_dialog.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// SecurityUtils
 /// -------------

@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/models/score.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   group('Exam', () {
@@ -23,11 +23,7 @@ void main() {
             },
           ],
           'course': [
-            {
-              'id': 3,
-              'name': 'Physics',
-              'code': 'PHY101',
-            },
+            {'id': 3, 'name': 'Physics', 'code': 'PHY101'},
           ],
         });
 
@@ -91,11 +87,7 @@ void main() {
     );
 
     test('courseName falls back when course list is empty', () {
-      final exam = Exam(
-        id: 1,
-        name: 'Quiz',
-        activityType: 'assessment',
-      );
+      final exam = Exam(id: 1, name: 'Quiz', activityType: 'assessment');
 
       expect(exam.courseName, 'Unknown Course');
     });
@@ -135,27 +127,15 @@ void main() {
         Colors.grey,
       );
       expect(
-        ResolvedScore(
-          score: 80,
-          maxMark: 100,
-          isMarked: true,
-        ).color,
+        ResolvedScore(score: 80, maxMark: 100, isMarked: true).color,
         const Color(0xFF10B981),
       );
       expect(
-        ResolvedScore(
-          score: 50,
-          maxMark: 100,
-          isMarked: true,
-        ).color,
+        ResolvedScore(score: 50, maxMark: 100, isMarked: true).color,
         const Color(0xFFF59E0B),
       );
       expect(
-        ResolvedScore(
-          score: 40,
-          maxMark: 100,
-          isMarked: true,
-        ).color,
+        ResolvedScore(score: 40, maxMark: 100, isMarked: true).color,
         const Color(0xFFEF4444),
       );
       expect(

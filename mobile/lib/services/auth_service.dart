@@ -50,6 +50,8 @@ class AuthService {
     try {
       fcmToken = await _ref
           .read(firebaseMessagingProvider)
+          // FCM getToken is retained for initial token acquisition.
+          // ignore: deprecated_member_use
           ?.getToken()
           .timeout(const Duration(seconds: 2));
     } on Object catch (_) {}
@@ -66,10 +68,7 @@ class AuthService {
     );
     final bridgeData = bridgeResponse.data;
     if (bridgeData is Map<String, dynamic>) {
-      bridgeResponse.data = {
-        ...bridgeData,
-        'ezygo_token': ezygoToken.trim(),
-      };
+      bridgeResponse.data = {...bridgeData, 'ezygo_token': ezygoToken.trim()};
     }
 
     return bridgeResponse;
@@ -101,12 +100,12 @@ class AuthService {
         st,
       );
       await Future<void>.delayed(_provisionRetryBackoff);
-      return provisionGhostClassSession(ezygoToken, fcmToken: fcmToken);
+      return await provisionGhostClassSession(ezygoToken, fcmToken: fcmToken);
     }
   }
 
   Future<Response<dynamic>> loginEzygo(String username, String password) async {
-    return _dio.post(
+    return await _dio.post(
       _ezygoAuthUrl,
       data: {
         'username': username.trim(),
@@ -132,7 +131,7 @@ class AuthService {
       if (fcmToken != null && fcmToken.trim().isNotEmpty)
         'fcm_token': fcmToken.trim(),
     };
-    return _dio.post(
+    return await _dio.post(
       '$_ghostclassBaseUrl/auth/save-token',
       data: payload,
       options: Options(
@@ -155,7 +154,7 @@ class AuthService {
     if (sync) params['sync'] = 'true';
     if (force) params['force'] = 'true';
 
-    return _dio.get(
+    return await _dio.get(
       '$_ghostclassBaseUrl/profile',
       queryParameters: params.isNotEmpty ? params : null,
       options: Options(
@@ -166,7 +165,7 @@ class AuthService {
   }
 
   Future<Response<dynamic>> syncMobileAuth(String supabaseToken) async {
-    return _dio.post(
+    return await _dio.post(
       '$_ghostclassBaseUrl/auth/sync',
       options: Options(
         headers: {'Authorization': 'Bearer $supabaseToken'},
@@ -180,7 +179,7 @@ class AuthService {
     String supabaseToken,
     Map<String, dynamic> data,
   ) async {
-    return _dio.patch(
+    return await _dio.patch(
       '$_ghostclassBaseUrl/profile',
       data: data,
       options: Options(
@@ -194,7 +193,7 @@ class AuthService {
     String supabaseToken,
     String version,
   ) async {
-    return _dio.post(
+    return await _dio.post(
       '$_ghostclassBaseUrl/user/accept-terms',
       data: {'version': version},
       options: Options(
@@ -229,7 +228,7 @@ class AuthService {
     }
     _lastContactSubmission = now;
 
-    return _dio.post(
+    return await _dio.post(
       '$_ghostclassBaseUrl/contact',
       data: {
         'name': name,
@@ -249,8 +248,8 @@ class AuthService {
   Future<Response<dynamic>> getUser(SecureStorageService storage) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '${AppConfig.ezygoApiRoot}/user';
-    if (token == null) return _dio.get(path);
-    return _dio.get(
+    if (token == null) return await _dio.get(path);
+    return await _dio.get(
       path,
       options: Options(headers: {'Authorization': 'Bearer $token'}),
     );

@@ -129,10 +129,7 @@ void main() {
     });
 
     test('User Profile Operations', () async {
-      const profile = UserProfile(
-        firstName: 'Joe',
-        lastName: 'Doe',
-      );
+      const profile = UserProfile(firstName: 'Joe', lastName: 'Doe');
       final jsonStr = jsonEncode(profile.toJson());
 
       when(

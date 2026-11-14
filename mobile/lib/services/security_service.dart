@@ -313,15 +313,13 @@ class SecurityService {
                 source: 'BackgroundAttestation',
               );
         } else {
-          AppLogger.e(
-            'SecurityService: Background attestation non-genuine failure (connection/quota/rate-limit). Ignored.',
-            e,
+          AppLogger.w(
+            'SecurityService: Background attestation non-genuine failure (connection/quota/rate-limit). Ignored: $e',
           );
         }
       } else {
-        AppLogger.e(
-          'SecurityService: Background check AppException ignored',
-          e,
+        AppLogger.w(
+          'SecurityService: Background check AppException ignored: $e',
         );
       }
     } on Object catch (e) {
@@ -350,7 +348,10 @@ class SecurityService {
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        if (data['verified'] != true) {
+        final isEnforced = data['enforced'] == true;
+        final isVerified = data['verified'] == true;
+
+        if (!isVerified && isEnforced) {
           final reason =
               (data['reason'] as String?) ??
               (data['appCheckError'] as String?) ??
@@ -377,6 +378,12 @@ class SecurityService {
               'criticalRisk': criticalRisk,
               'appCheckError': appCheckError,
             },
+          );
+        }
+
+        if (!isVerified) {
+          AppLogger.w(
+            'SecurityService: Attestation unverified but server is fail-open (enforced: false). Continuing.',
           );
         }
 
@@ -457,7 +464,7 @@ class SecurityService {
   Future<Response<dynamic>> fetchAttestationDetails([
     String? supabaseToken,
   ]) async {
-    return _dio.get<dynamic>(
+    return await _dio.get<dynamic>(
       '$_ghostclassBaseUrl/security/attestation',
       options: Options(
         headers: {

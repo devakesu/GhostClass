@@ -1,10 +1,10 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/security_utils.dart';
 import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/router/app_router.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/security_guard.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// SecurityLockdownListener
 /// ------------------------

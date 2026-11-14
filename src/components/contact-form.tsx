@@ -229,15 +229,9 @@ export function ContactForm({ userDetails }: ContactFormProps) {
               setCaptchaError(false);
             }}
             onError={(err) => {
-              logger.error("Turnstile Error:", err);
+              logger.warn("Turnstile Error:", err);
               setCaptchaError(true);
               toast.error("Security check failed. Please refresh.");
-              Sentry.captureException(err, {
-                tags: {
-                  type: "turnstile_client_error",
-                  location: "ContactForm/Turnstile",
-                },
-              });
             }}
             onExpire={() => setToken("")}
             theme="auto"

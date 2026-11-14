@@ -18,7 +18,6 @@ class EzygoBatchFetcher {
   EzygoBatchFetcher(
     this._dio, {
     required bool Function() getOutage,
-    // ignore: avoid_positional_boolean_parameters -- Matches StateNotifier/Provider signatures
     required void Function(bool) setOutage,
     required bool Function() isBackendUnauthorized,
   }) : _getOutage = getOutage,
@@ -26,7 +25,6 @@ class EzygoBatchFetcher {
        _isBackendUnauthorized = isBackendUnauthorized;
   final Dio _dio;
   final bool Function() _getOutage;
-  // ignore: avoid_positional_boolean_parameters -- Matches StateNotifier/Provider signatures
   final void Function(bool) _setOutage;
   final bool Function() _isBackendUnauthorized;
 
@@ -176,7 +174,7 @@ class EzygoBatchFetcher {
       AppLogger.d(
         'EzygoBatchFetcher: DEDUPLICATING in-flight request for $path',
       );
-      return inFlight;
+      return await inFlight;
     }
 
     // 3. Rate Limiting: Wait for an available slot.
@@ -231,10 +229,7 @@ class EzygoBatchFetcher {
             // Success cache (Longer)
             _putCache(
               cacheKey,
-              _CacheEntry(
-                response: response,
-                expiry: DateTime.now().add(ttl),
-              ),
+              _CacheEntry(response: response, expiry: DateTime.now().add(ttl)),
             );
           } else if (response.statusCode != null &&
               response.statusCode! >= 500) {
@@ -294,7 +289,7 @@ class EzygoBatchFetcher {
     }
     final completer = Completer<void>();
     _queue.add(completer);
-    return completer.future;
+    return await completer.future;
   }
 
   void _releaseSlot() {

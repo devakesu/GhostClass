@@ -1,7 +1,7 @@
 import 'dart:async';
 import 'dart:io';
+
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -19,6 +19,7 @@ import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends ConsumerStatefulWidget {
@@ -183,9 +184,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
       }
       AppLogger.safeUnawait(
         AnalyticsService.instance
-            .logCustom('login_failed', {
-              'reason': e.message,
-            })
+            .logCustom('login_failed', {'reason': e.message})
             .catchError(
               (Object e, StackTrace st) => AppLogger.e(
                 'LoginScreen: Analytics login_failed failed',
@@ -207,11 +206,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
         AnalyticsService.instance
             .logError(e.toString())
             .catchError(
-              (Object e, StackTrace st) => AppLogger.e(
-                'LoginScreen: Analytics logError failed',
-                e,
-                st,
-              ),
+              (Object e, StackTrace st) =>
+                  AppLogger.e('LoginScreen: Analytics logError failed', e, st),
             ),
         'LoginScreen: analytics logError',
       );
@@ -246,10 +242,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen>
             bottom: -60,
             left: -100,
             child: RepaintBoundary(
-              child: _GlowBlob(
-                color: amber.withValues(alpha: 0.08),
-                size: 280,
-              ),
+              child: _GlowBlob(color: amber.withValues(alpha: 0.08), size: 280),
             ),
           ),
           Positioned(
@@ -589,9 +582,7 @@ class _GlowBlob extends StatelessWidget {
       decoration: BoxDecoration(
         shape: BoxShape.circle,
         color: color,
-        boxShadow: [
-          BoxShadow(color: color, blurRadius: 100, spreadRadius: 40),
-        ],
+        boxShadow: [BoxShadow(color: color, blurRadius: 100, spreadRadius: 40)],
       ),
     );
   }

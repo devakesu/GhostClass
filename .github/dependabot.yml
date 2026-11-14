@@ -27,6 +27,7 @@ updates:
       - dependency-name: "@eslint/js"
         update-types: ["version-update:semver-major"]
     multi-ecosystem-group: "all-dependencies"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "docker"
     directory: "/"
@@ -35,6 +36,7 @@ updates:
     patterns:
       - "*"
     multi-ecosystem-group: "all-dependencies"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "github-actions"
     directory: "/"
@@ -43,6 +45,7 @@ updates:
     patterns:
       - "*"
     multi-ecosystem-group: "all-dependencies"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "pub"
     directory: "/mobile"
@@ -51,10 +54,10 @@ updates:
     patterns:
       - "*"
     multi-ecosystem-group: "all-dependencies"
+    open-pull-requests-limit: 0
 
   - package-ecosystem: "pip"
     directory: "/.github"
     schedule:
       interval: "weekly"
     open-pull-requests-limit: 0
-

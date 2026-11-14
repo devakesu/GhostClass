@@ -3,7 +3,6 @@ import 'dart:io';
 import 'dart:ui';
 
 import 'package:cached_network_image/cached_network_image.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -31,6 +30,7 @@ import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class NavigationShell extends ConsumerStatefulWidget {
   const NavigationShell({required this.child, super.key});
@@ -167,15 +167,13 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   ref.read(appUpdateProvider.notifier).dismissDialog();
                 }
               })
-              .catchError(
-                (Object e, StackTrace st) {
-                  AppLogger.e(
-                    'NavigationShell: Failed to show update dialog',
-                    e,
-                    st,
-                  );
-                },
-              ),
+              .catchError((Object e, StackTrace st) {
+                AppLogger.e(
+                  'NavigationShell: Failed to show update dialog',
+                  e,
+                  st,
+                );
+              }),
           'NavigationShell: show update dialog',
         );
       }
@@ -237,15 +235,9 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
               .then((_) {
                 _checkAndPrewarmDeferredPages();
               })
-              .catchError(
-                (Object e, StackTrace st) {
-                  AppLogger.e(
-                    'NavigationShell: Prewarm calendar failed',
-                    e,
-                    st,
-                  );
-                },
-              ),
+              .catchError((Object e, StackTrace st) {
+                AppLogger.e('NavigationShell: Prewarm calendar failed', e, st);
+              }),
           'NavigationShell: prewarm calendar',
         );
       }),
@@ -259,15 +251,12 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
             previous?.criticalRisk != true) {
           _criticalSecurityLogoutStarted = true;
           AppLogger.safeUnawait(
-            ref.read(authProvider.notifier).logout(force: true).catchError(
-              (Object e, StackTrace st) {
-                AppLogger.e(
-                  'NavigationShell: Forced logout failed',
-                  e,
-                  st,
-                );
-              },
-            ),
+            ref.read(authProvider.notifier).logout(force: true).catchError((
+              Object e,
+              StackTrace st,
+            ) {
+              AppLogger.e('NavigationShell: Forced logout failed', e, st);
+            }),
             'NavigationShell: forced logout',
           );
         }
@@ -362,47 +351,50 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
   }
 
   Future<void> _showTrackingOverlay() async {
-    ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) => const TrackingScreen(),
-    );
-    if (mounted) {
-      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+    final modalNotifier = ref.read(uiModalOpenProvider.notifier)..setOpen(true);
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        builder: (context) => const TrackingScreen(),
+      );
+    } finally {
+      modalNotifier.setOpen(false);
     }
   }
 
   Future<void> _showNotificationsOverlay() async {
-    ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    await showModalBottomSheet<void>(
-      context: context,
-      isScrollControlled: true,
-      useSafeArea: true,
-      backgroundColor: Theme.of(context).scaffoldBackgroundColor,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
-      ),
-      builder: (context) => const NotificationsScreen(),
-    );
-    if (mounted) {
-      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+    final modalNotifier = ref.read(uiModalOpenProvider.notifier)..setOpen(true);
+    try {
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        backgroundColor: Theme.of(context).scaffoldBackgroundColor,
+        shape: const RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(32)),
+        ),
+        builder: (context) => const NotificationsScreen(),
+      );
+    } finally {
+      modalNotifier.setOpen(false);
     }
   }
 
   Future<void> _showAddAttendanceDialog() async {
-    ref.read(uiModalOpenProvider.notifier).setOpen(true);
-    await showDialog<void>(
-      context: context,
-      builder: (context) => const AddAttendanceDialog(),
-    );
-    if (mounted) {
-      ref.read(uiModalOpenProvider.notifier).setOpen(false);
+    final modalNotifier = ref.read(uiModalOpenProvider.notifier)..setOpen(true);
+    try {
+      await showDialog<void>(
+        context: context,
+        builder: (context) => const AddAttendanceDialog(),
+      );
+    } finally {
+      modalNotifier.setOpen(false);
     }
   }
 
@@ -757,10 +749,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
       child: Stack(
         alignment: Alignment.bottomCenter,
         children: [
-          ExcludeSemantics(
-            excluding: showSecurityBarrier,
-            child: mainScaffold,
-          ),
+          ExcludeSemantics(excluding: showSecurityBarrier, child: mainScaffold),
           // The Semicircle Button (Positioned at bottom center, above everything)
           Positioned(
             bottom: 75 + bottomPadding, // Account for bottom safe area/notch
@@ -824,6 +813,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                   child: ServiceErrorView(
                     error: dashboardError ?? trackingError,
                     onRetry: () async {
+                      if (!mounted) return;
                       ref.read(apiServiceProvider).clearCaches();
                       ref
                         ..invalidate(dashboardProvider)
@@ -836,6 +826,7 @@ class _NavigationShellState extends ConsumerState<NavigationShell> {
                         'NavigationShell: Starting outage recovery retry...',
                       );
                       try {
+                        if (!mounted) return;
                         await Future.wait([
                           ref.read(dashboardProvider.future),
                           ref.read(trackingProvider.future),

@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/models/attendance.dart';
@@ -8,6 +7,8 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/widgets/dashboard/header_section.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
+
 import '../coverage_helper.dart';
 
 void main() {
@@ -47,9 +48,7 @@ void main() {
         child: MaterialApp(
           home: Scaffold(
             body: CustomScrollView(
-              slivers: [
-                HeaderSection(data: mockDashboard),
-              ],
+              slivers: [HeaderSection(data: mockDashboard)],
             ),
           ),
         ),
@@ -102,9 +101,7 @@ void main() {
         child: MaterialApp(
           home: Scaffold(
             body: CustomScrollView(
-              slivers: [
-                HeaderSection(data: mockDashboard),
-              ],
+              slivers: [HeaderSection(data: mockDashboard)],
             ),
           ),
         ),
@@ -168,9 +165,7 @@ void main() {
           child: MaterialApp(
             home: Scaffold(
               body: CustomScrollView(
-                slivers: [
-                  HeaderSection(data: mockDashboard),
-                ],
+                slivers: [HeaderSection(data: mockDashboard)],
               ),
             ),
           ),

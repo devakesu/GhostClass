@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
@@ -9,6 +9,7 @@ import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AcceptTermsScreen extends ConsumerStatefulWidget {
   const AcceptTermsScreen({super.key});
@@ -56,9 +57,7 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
       try {
         AppLogger.safeUnawait(
           AnalyticsService.instance
-              .logCustom('accept_terms_tap', {
-                'version': _termsVersion,
-              })
+              .logCustom('accept_terms_tap', {'version': _termsVersion})
               .catchError(
                 (Object e, StackTrace st) => AppLogger.e(
                   'AcceptTermsScreen: analytics accept_terms_tap failed',
@@ -79,10 +78,7 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
         'AcceptTermsScreen: Accept terms failed',
         error: e,
         stackTrace: st,
-        tags: {
-          'feature': 'legal',
-          'action': 'accept_terms',
-        },
+        tags: {'feature': 'legal', 'action': 'accept_terms'},
       );
       if (mounted) {
         LoadingOverlay.hide(context);
@@ -214,9 +210,7 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                                 text: 'Use at Your Own Risk: ',
                                 style: TextStyle(fontWeight: FontWeight.bold),
                               ),
-                              TextSpan(
-                                text: 'The creators are ',
-                              ),
+                              TextSpan(text: 'The creators are '),
                               TextSpan(
                                 text:
                                     'not affiliated with, endorsed by, or connected to EzyGo',
@@ -379,12 +373,9 @@ class _AcceptTermsScreenState extends ConsumerState<AcceptTermsScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: primary,
                     foregroundColor: Colors.white,
-                    disabledBackgroundColor: Theme.of(context)
-                        .colorScheme
-                        .onSurface
-                        .withValues(
-                          alpha: 0.05,
-                        ),
+                    disabledBackgroundColor: Theme.of(
+                      context,
+                    ).colorScheme.onSurface.withValues(alpha: 0.05),
                     disabledForegroundColor: Theme.of(
                       context,
                     ).colorScheme.onSurface.withValues(alpha: 0.25),

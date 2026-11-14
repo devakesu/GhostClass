@@ -60,9 +60,7 @@ void main() {
     test(
       'verifyIntegrity refreshes stale cached attestation before returning',
       () async {
-        when(
-          () => mockSecureStorage.getAttestationResult(),
-        ).thenAnswer(
+        when(() => mockSecureStorage.getAttestationResult()).thenAnswer(
           (_) async => jsonEncode({
             'latestVersion': AppConfig.appVersion,
             'minVersion': AppConfig.appVersion,
@@ -108,10 +106,7 @@ void main() {
           response: Response(
             requestOptions: options,
             statusCode: 403,
-            data: {
-              'error': 'Forbidden',
-              'type': 'security',
-            },
+            data: {'error': 'Forbidden', 'type': 'security'},
           ),
           type: DioExceptionType.badResponse,
         );
@@ -298,6 +293,7 @@ void main() {
             statusCode: 200,
             data: {
               'verified': false,
+              'enforced': true,
               'reason': 'Custom verification failed',
               'action': 'Use official store version',
               'criticalRisk': true,
@@ -327,10 +323,7 @@ void main() {
         when(
           () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
         ).thenAnswer(
-          (_) async => Response(
-            requestOptions: options,
-            statusCode: 500,
-          ),
+          (_) async => Response(requestOptions: options, statusCode: 500),
         );
 
         expect(
@@ -344,8 +337,12 @@ void main() {
       'verifyIntegrity clamps latestVersion to minVersion when latestVersion is older than minVersion',
       () async {
         final options = RequestOptions(path: '/api/security/attestation');
-        const minVersion = '4.7.0';
-        const olderLatestVersion = '4.2.9';
+        final currentParts = AppConfig.appVersion
+            .split('.')
+            .map(int.parse)
+            .toList();
+        final minVersion = '${currentParts[0] + 1}.0.0';
+        const olderLatestVersion = '1.0.0';
 
         when(
           () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
@@ -371,7 +368,7 @@ void main() {
         expect(
           result.hasUpdate,
           isTrue,
-        ); // Should be true since currentVersion (4.2.9) < latestVersion (4.7.0)
+        ); // Should be true since currentVersion < latestVersion (clamped to minVersion)
         expect(result.isForceUpdate, isTrue);
       },
     );

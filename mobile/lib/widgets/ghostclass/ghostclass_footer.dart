@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:material_ui/material_ui.dart';
 
 class GhostClassVersionFooter extends StatelessWidget {
   const GhostClassVersionFooter({super.key});
@@ -10,11 +10,7 @@ class GhostClassVersionFooter extends StatelessWidget {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-      child: const Column(
-        children: [
-          _VersionText(),
-        ],
-      ),
+      child: const Column(children: [_VersionText()]),
     );
   }
 }

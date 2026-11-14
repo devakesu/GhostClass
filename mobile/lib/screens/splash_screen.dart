@@ -3,9 +3,7 @@ import 'dart:io';
 
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
@@ -34,12 +32,10 @@ import 'package:ghostclass/services/startup_flow_service.dart';
 import 'package:ghostclass/widgets/app_update_dialog.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 
 class _StartupSnapshot {
-  const _StartupSnapshot({
-    required this.user,
-    required this.versionResult,
-  });
+  const _StartupSnapshot({required this.user, required this.versionResult});
 
   final AuthenticatedUser? user;
   final AppVersionCheckResult? versionResult;
@@ -143,10 +139,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
           });
 
       AppLogger.i('SplashScreen: Awaiting Future.wait...');
-      await Future.wait<dynamic>([
-        integrityTask,
-        authTask,
-      ]);
+      await Future.wait<dynamic>([integrityTask, authTask]);
       AppLogger.i('SplashScreen: Future.wait completed');
 
       if (integrityError != null) {
@@ -230,12 +223,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     required Future<dynamic> trackingFuture,
   }) {
     void prewarm(Future<dynamic> future, String label) {
-      AppLogger.safeUnawait(
-        future.catchError((Object e, StackTrace st) {
-          AppLogger.e('SplashScreen: $label prewarm failed', e, st);
-        }),
-        'SplashScreen: $label prewarm',
-      );
+      AppLogger.safeUnawait(future, 'SplashScreen: $label prewarm');
     }
 
     // Fire both in parallel immediately — do NOT delay tracking by a frame.
@@ -253,9 +241,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
     });
   }
 
-  void _startPostNavigationPreloads({
-    required ApiService apiService,
-  }) {
+  void _startPostNavigationPreloads({required ApiService apiService}) {
     AppLogger.safeUnawait(
       apiService.preWarm().catchError((Object e, StackTrace st) {
         AppLogger.e('SplashScreen: post-nav API pre-warm failed', e, st);
@@ -302,21 +288,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             'SplashScreen: Firebase & App Check initialization completed.',
           );
         } on Object catch (initErr) {
-          AppLogger.e(
-            'SplashScreen: Firebase & App Check initialization failed',
-            initErr,
-          );
-          throw AppException(
-            message: 'Security subsystem initialization failed.',
-            type: AppExceptionType.unauthorized,
-            details: {
-              'type': 'security',
-              'reason': 'Device security verification setup failed.',
-              'action':
-                  'Please ensure Google Play Services are enabled and update the app.',
-              'criticalRisk': true,
-              'appCheckError': initErr.toString(),
-            },
+          AppLogger.w(
+            'SplashScreen: Firebase & App Check initialization failed (fail-open mode: continuing startup): $initErr',
           );
         }
       }
@@ -355,9 +328,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               finalUser.profile!.avatarUrl!,
               maxWidth: 240,
               maxHeight: 240,
-              headers: {
-                'Origin': AppConfig.supabaseOrigin,
-              },
+              headers: {'Origin': AppConfig.supabaseOrigin},
             ),
             context,
           );
@@ -557,9 +528,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
               apiService: apiService,
               token: token,
             );
-            _startPostNavigationPreloads(
-              apiService: apiService,
-            );
+            _startPostNavigationPreloads(apiService: apiService);
           }).catchError((Object e, StackTrace st) {
             AppLogger.e('SplashScreen: post-dashboard preloads failed', e, st);
           }),
@@ -570,9 +539,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
         context.go('/accept-terms');
         AppLogger.safeUnawait(
           Future<void>.microtask(() async {
-            _startPostNavigationPreloads(
-              apiService: apiService,
-            );
+            _startPostNavigationPreloads(apiService: apiService);
           }).catchError((Object e, StackTrace st) {
             AppLogger.e(
               'SplashScreen: post-accept-terms preloads failed',
@@ -587,9 +554,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
       context.go('/login');
       AppLogger.safeUnawait(
         Future<void>.microtask(() async {
-          _startPostNavigationPreloads(
-            apiService: apiService,
-          );
+          _startPostNavigationPreloads(apiService: apiService);
         }).catchError((Object e, StackTrace st) {
           AppLogger.e('SplashScreen: post-login preloads failed', e, st);
         }),
@@ -629,12 +594,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
 
     // 2. Prewarm deferred screen queries
     void prewarm(Future<dynamic> future, String label) {
-      AppLogger.safeUnawait(
-        future.catchError((Object e, StackTrace st) {
-          AppLogger.e('SplashScreen: $label prewarm failed', e, st);
-        }),
-        'SplashScreen: $label prewarm',
-      );
+      AppLogger.safeUnawait(future, 'SplashScreen: $label prewarm');
     }
 
     prewarm(container.read(leaveProvider.future), 'leave');
@@ -658,10 +618,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             )
             .then() // Chain effects after the entrance
             .animate(
-              onPlay: (controller) => controller.repeat(
-                reverse: true,
-                period: 1200.ms,
-              ),
+              onPlay: (controller) =>
+                  controller.repeat(reverse: true, period: 1200.ms),
             )
             .scale(
               begin: const Offset(1, 1),

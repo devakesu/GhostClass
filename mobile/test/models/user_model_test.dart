@@ -18,10 +18,7 @@ void main() {
           'current_year': '3',
           'created_at': '2023-01-01T00:00:00.000Z',
           'ezygo_created_at': '2023-01-01T00:00:00.000Z',
-          'class': {
-            'id': 'class001',
-            'name': 'Engineering - CSE',
-          },
+          'class': {'id': 'class001', 'name': 'Engineering - CSE'},
         };
 
         final profile = UserProfile.fromJson(json);
@@ -101,10 +98,7 @@ void main() {
       });
 
       test('handles missing class field', () {
-        final json = {
-          'first_name': 'Alice',
-          'email': 'alice@example.com',
-        };
+        final json = {'first_name': 'Alice', 'email': 'alice@example.com'};
 
         final profile = UserProfile.fromJson(json);
 
@@ -136,26 +130,19 @@ void main() {
 
     group('fullName getter', () {
       test('returns combined first and last name', () {
-        const profile = UserProfile(
-          firstName: 'John',
-          lastName: 'Doe',
-        );
+        const profile = UserProfile(firstName: 'John', lastName: 'Doe');
 
         expect(profile.fullName, 'John Doe');
       });
 
       test('returns only first name when last name is null', () {
-        const profile = UserProfile(
-          firstName: 'John',
-        );
+        const profile = UserProfile(firstName: 'John');
 
         expect(profile.fullName, 'John');
       });
 
       test('returns only last name when first name is null', () {
-        const profile = UserProfile(
-          lastName: 'Doe',
-        );
+        const profile = UserProfile(lastName: 'Doe');
 
         expect(profile.fullName, 'Doe');
       });
@@ -167,9 +154,7 @@ void main() {
       });
 
       test('trims extra whitespace', () {
-        const profile = UserProfile(
-          firstName: 'John',
-        );
+        const profile = UserProfile(firstName: 'John');
 
         expect(profile.fullName, 'John');
       });
@@ -286,10 +271,7 @@ void main() {
     });
 
     test('can be created from JSON', () {
-      final json = {
-        'id': 'class002',
-        'name': 'Science - Physics',
-      };
+      final json = {'id': 'class002', 'name': 'Science - Physics'};
 
       final userClass = UserClass.fromJson(json);
 

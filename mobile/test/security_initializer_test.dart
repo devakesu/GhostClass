@@ -33,9 +33,7 @@ void main() {
       capturedApple = providerApple;
     }
 
-    await SecurityInitializer.initialize(
-      activateOverride: fakeActivate,
-    );
+    await SecurityInitializer.initialize(activateOverride: fakeActivate);
 
     expect(called, isTrue);
     expect(capturedAndroid, isA<AndroidDebugProvider>());

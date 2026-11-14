@@ -60,58 +60,53 @@ void main() {
       expect(isValid, false);
     });
 
-    test(
-      'evaluates wildcard certificate prefix and suffix matching safely',
-      () {
-        // Hits startsWith('*.') and substring extraction logic
+    test('evaluates wildcard certificate prefix and suffix matching safely', () {
+      // Hits startsWith('*.') and substring extraction logic
+      when(() => mockCert.subject).thenReturn('cn=*.localhost,O=TestWildcard');
+      final isValid = NetworkUtils.validateCertificateHostname(
+        mockCert,
+        'localhost',
+        8080,
+      );
+      expect(isValid, false); // 'localhost' does not end with '.localhost'
+
+      // Also test Quoted strings handling in CN extraction
+      when(() => mockCert.subject).thenReturn('CN="*.other.com",O=Quoted');
+      final isOtherValid = NetworkUtils.validateCertificateHostname(
+        mockCert,
+        'localhost',
+        8080,
+      );
+      expect(isOtherValid, false);
+
+      // Test valid single-label wildcard match for expected host
+      final expectedHost = Uri.parse(AppConfig.ghostclassApiUrl).host;
+      final parts = expectedHost.split('.');
+      if (parts.length > 2) {
+        final domainSuffix = parts.sublist(1).join('.');
         when(
           () => mockCert.subject,
-        ).thenReturn('cn=*.localhost,O=TestWildcard');
-        final isValid = NetworkUtils.validateCertificateHostname(
+        ).thenReturn('CN=*.$domainSuffix,O=ValidWildcard');
+        final isWildcardValid = NetworkUtils.validateCertificateHostname(
           mockCert,
-          'localhost',
+          expectedHost,
           8080,
         );
-        expect(isValid, false); // 'localhost' does not end with '.localhost'
+        expect(isWildcardValid, true);
 
-        // Also test Quoted strings handling in CN extraction
-        when(() => mockCert.subject).thenReturn('CN="*.other.com",O=Quoted');
-        final isOtherValid = NetworkUtils.validateCertificateHostname(
+        // Subdomain spanning multiple labels should be rejected under RFC 6125
+        when(
+          () => mockCert.subject,
+        ).thenReturn('CN=*.$domainSuffix,O=MultiLabel');
+        // If expected host is a single level, test that a deeper domain does not match
+        when(() => mockCert.subject).thenReturn('CN=*.com,O=TldWildcard');
+        final isTldValid = NetworkUtils.validateCertificateHostname(
           mockCert,
-          'localhost',
+          expectedHost,
           8080,
         );
-        expect(isOtherValid, false);
-
-        // Test valid single-label wildcard match for expected host
-        final expectedHost = Uri.parse(AppConfig.ghostclassApiUrl).host;
-        final parts = expectedHost.split('.');
-        if (parts.length > 2) {
-          final domainSuffix = parts.sublist(1).join('.');
-          when(
-            () => mockCert.subject,
-          ).thenReturn('CN=*.$domainSuffix,O=ValidWildcard');
-          final isWildcardValid = NetworkUtils.validateCertificateHostname(
-            mockCert,
-            expectedHost,
-            8080,
-          );
-          expect(isWildcardValid, true);
-
-          // Subdomain spanning multiple labels should be rejected under RFC 6125
-          when(
-            () => mockCert.subject,
-          ).thenReturn('CN=*.$domainSuffix,O=MultiLabel');
-          // If expected host is a single level, test that a deeper domain does not match
-          when(() => mockCert.subject).thenReturn('CN=*.com,O=TldWildcard');
-          final isTldValid = NetworkUtils.validateCertificateHostname(
-            mockCert,
-            expectedHost,
-            8080,
-          );
-          expect(isTldValid, false);
-        }
-      },
-    );
+        expect(isTldValid, false);
+      }
+    });
   });
 }

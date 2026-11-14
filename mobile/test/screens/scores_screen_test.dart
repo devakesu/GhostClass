@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
@@ -10,15 +9,14 @@ import 'package:ghostclass/screens/scores_screen.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../coverage_helper.dart';
 
 void main() {
   testWidgets(
     'ScoresScreen shows LoadingOverlay while initial data is loading',
-    (
-      tester,
-    ) async {
+    (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -49,9 +47,7 @@ void main() {
 
   testWidgets(
     'ScoresScreen shows ServiceErrorView when scoreProvider has error',
-    (
-      tester,
-    ) async {
+    (tester) async {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
@@ -115,7 +111,7 @@ class _LoadingScoreNotifier extends ScoreNotifier {
     state = const AsyncValue.loading();
     // Complete with completer that never finishes in test
     final completer = Completer<ScoreState>();
-    return completer.future;
+    return await completer.future;
   }
 }
 

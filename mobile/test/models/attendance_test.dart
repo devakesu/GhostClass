@@ -74,9 +74,7 @@ void main() {
       () {
         final json = {
           'courses': 'invalid',
-          'student_attendance_data': {
-            '2026-05-11': 'malformed_session_list',
-          },
+          'student_attendance_data': {'2026-05-11': 'malformed_session_list'},
           'attendance_dates': {'2026-05-11': true},
         };
 

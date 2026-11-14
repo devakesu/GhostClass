@@ -13,9 +13,7 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 final academicContextServiceProvider =
-    NotifierProvider<AcademicContextService, void>(
-      AcademicContextService.new,
-    );
+    NotifierProvider<AcademicContextService, void>(AcademicContextService.new);
 
 class AcademicContextService extends Notifier<void> {
   @override

@@ -1,5 +1,4 @@
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
@@ -14,6 +13,7 @@ import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:permission_handler/permission_handler.dart';
 
 // The exact Riverpod 3.x auto-dispose future provider type is an internal
@@ -196,7 +196,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
                         final supabaseToken =
                             supabaseClient.auth.currentSession?.accessToken;
                         if (supabaseToken == null) return null;
-                        return apiService.runCronSync(
+                        return await apiService.runCronSync(
                           supabaseToken,
                           force: true,
                         );
@@ -302,9 +302,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         ..add(
           SliverToBoxAdapter(
             child: Padding(
-              padding: EdgeInsets.only(
-                top: slivers.isEmpty ? 16 : 0,
-              ),
+              padding: EdgeInsets.only(top: slivers.isEmpty ? 16 : 0),
               child: _buildSectionHeader(context, title, color),
             ),
           ),
@@ -312,18 +310,15 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         ..add(const SliverToBoxAdapter(child: SizedBox(height: 12)))
         ..add(
           SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                final notification = items[index];
-                return _NotificationCard(
-                  notification: notification,
-                  key: ValueKey(
-                    'notif_${notification.id}_${notification.isRead}',
-                  ),
-                );
-              },
-              childCount: items.length,
-            ),
+            delegate: SliverChildBuilderDelegate((context, index) {
+              final notification = items[index];
+              return _NotificationCard(
+                notification: notification,
+                key: ValueKey(
+                  'notif_${notification.id}_${notification.isRead}',
+                ),
+              );
+            }, childCount: items.length),
           ),
         )
         ..add(const SliverToBoxAdapter(child: SizedBox(height: 24)));
@@ -338,9 +333,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen>
         const SliverToBoxAdapter(
           child: Padding(
             padding: EdgeInsets.symmetric(vertical: 24),
-            child: Center(
-              child: CircularProgressIndicator(strokeWidth: 2),
-            ),
+            child: Center(child: CircularProgressIndicator(strokeWidth: 2)),
           ),
         ),
       );
@@ -414,9 +407,7 @@ class _PermissionBanner extends StatelessWidget {
           decoration: BoxDecoration(
             color: Colors.amber.withValues(alpha: 0.08),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(
-              color: Colors.amber.withValues(alpha: 0.25),
-            ),
+            border: Border.all(color: Colors.amber.withValues(alpha: 0.25)),
           ),
           child: Row(
             children: [
@@ -595,9 +586,7 @@ class _NotificationCard extends ConsumerWidget {
                       style: GoogleFonts.manrope(
                         fontSize: 13,
                         color: Theme.of(context).colorScheme.onSurface
-                            .withValues(
-                              alpha: isRead ? 0.4 : 0.6,
-                            ),
+                            .withValues(alpha: isRead ? 0.4 : 0.6),
                         height: 1.4,
                       ),
                     ),

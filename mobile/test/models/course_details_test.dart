@@ -10,9 +10,7 @@ void main() {
         'code': 'CS201',
         'academic_year': '2026',
         'academic_semester': 'S3',
-        'usersubgroup': {
-          'name': 'GroupA',
-        },
+        'usersubgroup': {'name': 'GroupA'},
         'institution_users': [
           {
             'first_name': 'Prof',
@@ -68,9 +66,7 @@ void main() {
       final json = {
         'id': 20,
         'name': 'OOP',
-        'usersubgroup': {
-          'name': 'Lecture B',
-        },
+        'usersubgroup': {'name': 'Lecture B'},
       };
       final course = CourseDetails.fromJson(json);
       expect(course.userGroupName, 'Lecture B');
@@ -91,11 +87,7 @@ void main() {
     );
 
     test('handles malformed usersubgroup gracefully', () {
-      final json = {
-        'id': 40,
-        'name': 'Networks',
-        'usersubgroup': 'not_a_map',
-      };
+      final json = {'id': 40, 'name': 'Networks', 'usersubgroup': 'not_a_map'};
       final course = CourseDetails.fromJson(json);
       expect(course.userGroupName, isNull);
     });
@@ -131,10 +123,7 @@ void main() {
     });
 
     test('handles missing institution_users field', () {
-      final json = {
-        'id': 70,
-        'name': 'Graphics',
-      };
+      final json = {'id': 70, 'name': 'Graphics'};
       final course = CourseDetails.fromJson(json);
       expect(course.institutionUsers, isEmpty);
     });
@@ -180,10 +169,7 @@ void main() {
     });
 
     test('handles missing pivot gracefully', () {
-      final json = {
-        'first_name': 'Assist',
-        'last_name': 'Johnson',
-      };
+      final json = {'first_name': 'Assist', 'last_name': 'Johnson'};
       final user = CourseInstitutionUser.fromJson(json);
       expect(user.firstName, 'Assist');
       expect(user.lastName, 'Johnson');
@@ -191,11 +177,7 @@ void main() {
     });
 
     test('handles null pivot gracefully', () {
-      final json = {
-        'first_name': 'TA',
-        'last_name': 'Wilson',
-        'pivot': null,
-      };
+      final json = {'first_name': 'TA', 'last_name': 'Wilson', 'pivot': null};
       final user = CourseInstitutionUser.fromJson(json);
       expect(user.firstName, 'TA');
       expect(user.lastName, 'Wilson');

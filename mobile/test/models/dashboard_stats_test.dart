@@ -41,10 +41,7 @@ AttendanceReportDetailed _buildAttendanceReport() {
         ),
       },
     },
-    attendanceDates: {
-      '2026-05-10': true,
-      '2026-05-11': true,
-    },
+    attendanceDates: {'2026-05-10': true, '2026-05-11': true},
   );
 }
 
@@ -247,9 +244,7 @@ void main() {
         trackingRecords: const [],
         selectedSemester: 'S1',
         selectedYear: '2026',
-        allCourses: const [
-          CourseDetails(id: 1, name: 'Math', code: 'MATH101'),
-        ],
+        allCourses: const [CourseDetails(id: 1, name: 'Math', code: 'MATH101')],
       );
 
       expect(stats.officialPresent, 0);
@@ -352,9 +347,7 @@ void main() {
         trackingRecords: const [],
         selectedSemester: 'S1',
         selectedYear: '2026',
-        allCourses: [
-          const CourseDetails(id: 1, name: 'Course1', code: 'C101'),
-        ],
+        allCourses: [const CourseDetails(id: 1, name: 'Course1', code: 'C101')],
       );
 
       expect(stats.dlCount, greaterThanOrEqualTo(0));

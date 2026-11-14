@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/attendance_utils.dart';
@@ -17,6 +16,7 @@ import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:ghostclass/widgets/service_error_view.dart';
 import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
+import 'package:material_ui/material_ui.dart';
 
 class DashboardScreen extends ConsumerStatefulWidget {
   const DashboardScreen({super.key});
@@ -107,11 +107,13 @@ class _DashboardScreenState extends ConsumerState<DashboardScreen> {
         body: ServiceErrorView(
           error: dashboardState.error,
           onRetry: () async {
+            if (!mounted) return;
             ref.read(apiServiceProvider).clearCaches();
             ref
               ..invalidate(dashboardProvider)
               ..invalidate(institutionsProvider);
             try {
+              if (!mounted) return;
               await ref
                   .read(dashboardProvider.future)
                   .timeout(AppConfig.defaultTimeout);
@@ -183,9 +185,7 @@ class _DashboardContent extends ConsumerWidget {
             className: data.className,
           ),
           SliverToBoxAdapter(
-            child: SizedBox(
-              height: MediaQuery.of(context).padding.bottom + 90,
-            ),
+            child: SizedBox(height: MediaQuery.of(context).padding.bottom + 90),
           ),
         ],
       ),

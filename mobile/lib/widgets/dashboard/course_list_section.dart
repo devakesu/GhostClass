@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/models/course_details.dart';
@@ -9,6 +8,7 @@ import 'package:ghostclass/widgets/attendance/add_course_dialog.dart';
 import 'package:ghostclass/widgets/dashboard/disable_aware_course_card.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class CourseLineupHeader extends StatelessWidget {
   const CourseLineupHeader({super.key});
@@ -82,44 +82,38 @@ class CourseListSection extends StatelessWidget {
     return SliverPadding(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 20),
       sliver: SliverList(
-        delegate: SliverChildBuilderDelegate(
-          (context, index) {
-            // Add Course Card at the end
-            if (index == courses.length) {
-              return _AddCourseCard(
-                semester: selectedSemester,
-                academicYear: selectedYear,
-                className: className,
-              );
-            }
-
-            final course = courses[index];
-            final stat =
-                stats.courseStats[course.safeId] ??
-                CourseStat(
-                  id: course.safeId,
-                  code: course.code ?? course.safeId,
-                );
-            return Padding(
-              padding: const EdgeInsets.only(bottom: 16),
-              child: DisableAwareCourseCard(
-                course: course,
-                stat: stat,
-                bunkResult: utils.calculateAttendance(
-                  stat.finalPresent,
-                  stat.finalTotal,
-                  targetPercentage: targetPercentage,
-                ),
-                bunkEnabled: bunkEnabled,
-                selectedSemester: selectedSemester,
-                selectedYear: selectedYear,
-                instructors: instructors,
-                className: className,
-              ),
+        delegate: SliverChildBuilderDelegate((context, index) {
+          // Add Course Card at the end
+          if (index == courses.length) {
+            return _AddCourseCard(
+              semester: selectedSemester,
+              academicYear: selectedYear,
+              className: className,
             );
-          },
-          childCount: courses.length + 1,
-        ),
+          }
+
+          final course = courses[index];
+          final stat =
+              stats.courseStats[course.safeId] ??
+              CourseStat(id: course.safeId, code: course.code ?? course.safeId);
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: DisableAwareCourseCard(
+              course: course,
+              stat: stat,
+              bunkResult: utils.calculateAttendance(
+                stat.finalPresent,
+                stat.finalTotal,
+                targetPercentage: targetPercentage,
+              ),
+              bunkEnabled: bunkEnabled,
+              selectedSemester: selectedSemester,
+              selectedYear: selectedYear,
+              instructors: instructors,
+              className: className,
+            ),
+          );
+        }, childCount: courses.length + 1),
       ),
     );
   }
@@ -259,12 +253,8 @@ class _AddCourseCard extends ConsumerWidget {
                                 style: GoogleFonts.manrope(
                                   fontSize: 13,
                                   fontWeight: FontWeight.w600,
-                                  color:
-                                      Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withValues(
-                                        alpha: 0.5,
-                                      ),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.5),
                                   height: 1.3,
                                 ),
                               ),

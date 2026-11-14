@@ -316,17 +316,30 @@ export function isUpstreamAuthNetworkError(error: unknown): boolean {
   if (!error) return false;
   if (typeof error === "object") {
     const errObj = error as Record<string, unknown>;
-    if (errObj.status === 0) return true;
-    if (errObj.name === "AuthRetryableFetchError") return true;
+    const status = Number(errObj.status);
     if (
-      typeof errObj.message === "string" &&
-      (errObj.message.includes("fetch failed") ||
-        errObj.message.includes("network") ||
-        errObj.message.includes("timeout") ||
-        errObj.message.includes("ECONNRESET") ||
-        errObj.message.includes("ENOTFOUND"))
+      status === 0 ||
+      status === 500 ||
+      status === 502 ||
+      status === 503 ||
+      status === 504
     ) {
       return true;
+    }
+    if (errObj.name === "AuthRetryableFetchError") return true;
+    if (typeof errObj.message === "string") {
+      const msg = errObj.message;
+      if (
+        msg.includes("fetch failed") ||
+        msg.includes("network") ||
+        msg.includes("timeout") ||
+        msg.includes("ECONNRESET") ||
+        msg.includes("ENOTFOUND") ||
+        msg.includes("Internal server error") ||
+        msg.includes("<!DOCTYPE html>")
+      ) {
+        return true;
+      }
     }
   }
   return false;

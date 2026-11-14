@@ -644,7 +644,7 @@ export default function DashboardClient({
       const classChanged = prev
         ? (prev.classId != null &&
             newClassId != null &&
-            prev.classId !== newClassId) ||
+            String(prev.classId) !== String(newClassId)) ||
           (prev.className != null &&
             newClassName != null &&
             prev.className !== newClassName)
@@ -770,13 +770,16 @@ export default function DashboardClient({
   const isSyncSettled = !profile?.username || syncSettled;
   useDashboardSyncFailureToast(syncSettled, syncFailed);
 
+  const hasProfile = Boolean(profile);
+  const classId = profile?.class?.id;
+
   useEffect(() => {
-    const shouldOpen = !!(isSyncSettled && profile && !profile.class?.id);
+    const shouldOpen = Boolean(isSyncSettled && hasProfile && !classId);
     const timer = setTimeout(() => {
-      setIsSelectClassOpen(shouldOpen);
+      setIsSelectClassOpen((prev) => (prev !== shouldOpen ? shouldOpen : prev));
     }, 0);
     return () => clearTimeout(timer);
-  }, [isSyncSettled, profile]);
+  }, [isSyncSettled, hasProfile, classId]);
 
   const { isInitialDataValid, isAttendanceStale } = useMemo(
     () =>

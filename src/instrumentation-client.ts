@@ -36,8 +36,22 @@ Sentry.init({
   // Setting this option to true will print useful information to the console while you're setting up Sentry.
   debug: false,
 
-  // Security: Handle PII carefully
-  sendDefaultPii: false,
+  ignoreErrors: [
+    // Client-side transient network drops / offline state
+    "Network Error",
+    /NetworkError/,
+    /Failed to fetch/,
+    /Load failed/,
+    /timeout of \d+ms exceeded/,
+    // Ad-blockers or network filters blocking Cloudflare Turnstile verification script
+    "Failed to load Turnstile",
+    "600010",
+    "110200",
+    // Browser extensions injecting scripts blocked by CSP unsafe-eval
+    /Refused to evaluate a string as JavaScript because 'unsafe-eval'/,
+    // Next.js App Router RSC cache header parse error from malformed client navigations
+    "The router state header was sent but could not be parsed",
+  ],
 });
 
 /**

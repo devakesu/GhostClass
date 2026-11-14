@@ -1,8 +1,37 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
-# dependencies
+# ==========================================
+# 1. Compiled Binaries & Build Artifacts
+# ==========================================
+# Binaries for programs and plugins
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+bin/
+dist/
+build/
+out/
+
+# Test binaries, profiles, & coverage
+*.test
+*.out
+profile.out
+coverage.out
+coverage.txt
+coverage.html
+coverage/
+.coverage
+htmlcov/
+.nyc_output/
+
+# ==========================================
+# 2. Node, Next.js & Web Dependencies
+# ==========================================
 node_modules/
-/workers/node_modules
+workers/node_modules/
+.npm/
 /.pnp
 .pnp.*
 .yarn/*
@@ -11,114 +40,255 @@ node_modules/
 !.yarn/releases
 !.yarn/versions
 
-# testing
-/coverage
-/playwright-report/
-/test-results/
-/.playwright/
+# Next.js, Turbo, & Vercel
+.next/
+.turbo/
+.vercel/
 
-# next.js
-/.next/
-/out/
-/.turbo/
+# TypeScript & Linters
+*.tsbuildinfo
+next-env.d.ts
+.eslintcache
+.stylelintcache
 
-# production
-/build
-/dist
-
-# service worker (generated at build time)
+# Service worker (generated at build time)
 /public/sw.js
 /public/sw.js.map
 
-# misc
-.DS_Store
-*.pem
-*.local
-.eslintcache
-.stylelintcache
-/Temp
-*.ps1:*
-temp_cmd_logs/
+# ==========================================
+# 3. IDEs and Code Editors
+# ==========================================
+# Visual Studio Code
+.vscode/
+!.vscode/extensions.json
+*.code-workspace
 
-# debug
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-.pnpm-debug.log*
+# Android Studio / IntelliJ / PyCharm / GoLand
+.idea/
+*.iml
+*.ipr
+*.iws
 
-# env files (can opt-in for committing if needed)
-.env*
-!.example.env
-
-# vercel
-.vercel
-
-# typescript
-*.tsbuildinfo
-next-env.d.ts
-
-# Sentry Config File
-.env.sentry-build-plugin
-
-# certificates
-certificates/
-
-# IDEs
-/.vscode/
-/.idea/
+# Emacs / Vim / Other Editors
+*~
 *.swp
 *.swo
+.history/
+.atom/
+.swiftpm/
 
-# Flutter (Mobile)
-/mobile/.dart_tool/
-/mobile/.flutter-plugins
-/mobile/.flutter-plugins-dependencies
-/mobile/.packages
-/mobile/.pub-cache/
-/mobile/.pub/
-/mobile/.kotlin/
-/mobile/build/
-/mobile/ios/Flutter/.last_build_id
-/mobile/ios/Flutter/Generated.xcconfig
-/mobile/ios/Flutter/flutter_export_environment.sh
-/mobile/android/local.properties
-/mobile/android/key.properties
-/mobile/android/.kotlin
-/mobile/android/app/src/main/res/raw/app_config.json
-/mobile/android/app/debug/
-/mobile/android/app/profile/
-/mobile/android/app/release/
-/mobile/*.iml
-/mobile/${workspaceFolder}*/
-/mobile/$*
-/mobile/scratch/
-
-# Android Additional
-/mobile/android/**/*.jks
-/mobile/android/**/*.keystore
-/mobile/android/**/*.p12
-/mobile/android/app/google-services.json
-/mobile/google-services.json
-
-# iOS Additional
-/mobile/ios/Pods/
-/mobile/ios/.symlinks/
-/mobile/ios/Flutter/Flutter.framework
-/mobile/ios/Flutter/Flutter.podspec
-/mobile/ios/Flutter/App.framework
-/mobile/ios/Runner/GoogleService-Info.plist
-
-# App Secrets
-/mobile/lib/config/app_secrets.dart
-/mobile/firebase.json
+# ==========================================
+# 4. Environment Variables & Secrets (CRITICAL)
+# ==========================================
+.env
+.env.local
+.env.*
+*.env
+!.example.env
+.env.sentry-build-plugin
+*.envrc*
+!.envrc.example
+secrets.json
+*.pem
+*.key
+*.cer
+*.crt
+certificates/
+.certificates/
 
 # Database Backups & Encryption Keys
 *.dump
 *.dump.zst*
 *.age
-*.key
 *age.identity
 *-pq*.txt
 
-# Local CLI configuration
+# ==========================================
+# 5. Database & Local Storage Caches / Supabase
+# ==========================================
+*.db
+*.sqlite3
+*.sqlite
+instance/
+.webassets-cache
+
+# Supabase Local
+supabase/.temp/
+supabase/.branches/
+.env.keys
+
+# ==========================================
+# 6. Testing & Test Reports
+# ==========================================
+playwright-report/
+test-results/
+.playwright/
+
+# ==========================================
+# 7. OS Generated & Temp Files
+# ==========================================
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.ps1:*
+
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Linux
+*~
+.fuse_hidden*
+.directory
+
+# Temp & logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+temp/
+tmp/
+/Temp
+temp_cmd_logs/
+sample/
+*.local
+
+# ==========================================
+# 8. Project Specific Overrides & AI Workspaces
+# ==========================================
 .infisical.json
+.github/prompts
+.github/skills*
+.github/agents/
+.github/hooks/
+.agents/
+skills-lock.json
+
+# AI Assistant & IDE State
+.claude
+.codebuddy
+.codex
+.continue
+.cursor
+.gemini
+.kris
+.mem
+.aider
+.aiderignore
+.cursorignore
+.trae
+.opencode
+.qoder
+.roo
+.windsurf
+.kiro
+
+# impeccable-ignore-start
+# Ephemeral output, runtime state, and per-dev overrides.
+# Unanchored: .impeccable may sit at the repo root or under a nested
+# workspace (apps/web/.impeccable/...); anchored patterns would miss it.
+# Shared artifacts stay tracked: config.json, live/config.json,
+# design.json, critique/*.md.
+.impeccable/config.local.json
+.impeccable/hook.cache.json
+.impeccable/hook.pending.json
+.impeccable/*.png
+.impeccable/live/server.json
+.impeccable/live/sessions/
+.impeccable/live/previews/
+.impeccable/live/annotations/
+.impeccable/live/cache/
+.impeccable/live/manual-edit-apply-transaction.json
+.impeccable/live/manual-edit-events.jsonl
+.impeccable/live/manual-edit-evidence/
+.impeccable/live/pending-manual-edits.json
+.impeccable/live/deferred-svelte-component-accepts.json
+.impeccable/live/*.png
+# impeccable-ignore-end
+
+# ==========================================
+# 9. Flutter & Client Architecture (mobile)
+# ==========================================
+# Flutter / Dart tooling artifacts (Root and subprojects)
+.dart_tool/
+.flutter-plugins
+.flutter-plugins-dependencies
+.packages
+.pub-cache/
+.pub/
+build/
+scratch/
+.widget_preview/
+migrate_working_dir/
+**/doc/api/
+
+# Mobile subproject specific patterns
+mobile/.dart_tool/
+mobile/.flutter-plugins
+mobile/.flutter-plugins-dependencies
+mobile/.packages
+mobile/.pub-cache/
+mobile/.pub/
+mobile/.kotlin/
+mobile/build/
+mobile/*.iml
+mobile/${workspaceFolder}*/
+mobile/$*
+mobile/scratch/
+
+# Core Application Configuration & Secrets
+**/app_secrets.dart
+**/firebase.json
+**/google-services.json
+**/GoogleService-Info.plist
+
+# Symbolication & Obfuscation
+app.*.symbols
+app.*.map.json
+
+# Android native tooling overrides
+.gradle/
+local.properties
+key.properties
+.kotlin/
+**/android/.gradle/
+**/android/local.properties
+**/android/key.properties
+**/android/app/Flutter/Generated.xcconfig
+**/android/app/src/main/res/values/strings.xml
+**/android/app/src/main/res/raw/app_config.json
+**/android/app/debug/
+**/android/app/profile/
+**/android/app/release/
+**/android/**/*.jks
+**/android/**/*.keystore
+**/android/**/*.p12
+
+# iOS & macOS native tooling overrides
+**/ios/.symlinks/
+**/ios/Flutter/App.framework
+**/ios/Flutter/Flutter.framework
+**/ios/Flutter/Flutter.podspec
+**/ios/Flutter/Generated.xcconfig
+**/ios/Flutter/flutter_export_environment.sh
+**/ios/Flutter/.last_build_id
+**/ios/Pods/
+**/ios/Runner/GeneratedPluginRegistrant.*
+**/ios/DerivedData/
+**/macos/Flutter/ephemeral/
+**/macos/Pods/
+
+# Linux & Windows native ephemeral builds
+**/linux/flutter/ephemeral/
+**/windows/flutter/ephemeral/
+
+# Xcode user state
+*.moved-aside
+*.pbxuser
+*.mode1v3
+*.mode2v3
+*.perspectivev3

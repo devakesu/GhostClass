@@ -52,9 +52,7 @@ void main() {
     when(() => mockDioService.dio).thenReturn(mockDio);
 
     container = ProviderContainer(
-      overrides: [
-        dioServiceProvider.overrideWith((ref) => mockDioService),
-      ],
+      overrides: [dioServiceProvider.overrideWith((ref) => mockDioService)],
     );
 
     authService = container.read(authServiceProvider);
@@ -73,17 +71,15 @@ void main() {
           data: any(named: 'data'),
           options: any(named: 'options'),
         ),
-      ).thenAnswer(
-        (invocation) async {
-          capturedData =
-              invocation.namedArguments[#data] as Map<String, dynamic>?;
-          return Response<dynamic>(
-            requestOptions: RequestOptions(path: '/auth'),
-            statusCode: 200,
-            data: {'token': 'ezygo_token'},
-          );
-        },
-      );
+      ).thenAnswer((invocation) async {
+        capturedData =
+            invocation.namedArguments[#data] as Map<String, dynamic>?;
+        return Response<dynamic>(
+          requestOptions: RequestOptions(path: '/auth'),
+          statusCode: 200,
+          data: {'token': 'ezygo_token'},
+        );
+      });
 
       final resp = await authService.loginEzygo('username', 'password');
       expect(resp.statusCode, 200);

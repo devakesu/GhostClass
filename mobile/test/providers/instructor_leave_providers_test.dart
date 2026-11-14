@@ -130,9 +130,7 @@ void main() {
       }
 
       final containerError = ProviderContainer(
-        overrides: [
-          dashboardProvider.overrideWith(ErrorDashboardNotifier.new),
-        ],
+        overrides: [dashboardProvider.overrideWith(ErrorDashboardNotifier.new)],
       );
 
       final resError = containerError.read(instructorProvider('CS101'));
@@ -242,11 +240,7 @@ void main() {
                 },
               ],
               'invalid_key': [
-                {
-                  'id': 1002,
-                  'student_leave_id': 100,
-                  'date': '2025-05-16',
-                },
+                {'id': 1002, 'student_leave_id': 100, 'date': '2025-05-16'},
               ],
             },
           },

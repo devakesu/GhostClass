@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class TransparencyBadge extends StatelessWidget {
   const TransparencyBadge({super.key, this.onTap, this.expanded = false});

@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/logic/error_utils.dart';
@@ -11,6 +10,7 @@ import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/dashboard/course_card.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:material_ui/material_ui.dart';
 
 class DisableAwareCourseCard extends ConsumerStatefulWidget {
   const DisableAwareCourseCard({
@@ -353,7 +353,7 @@ class _DisableDialogContentState extends State<DisableDialogContent> {
   @override
   void initState() {
     super.initState();
-    selectedReason = widget.reasons.first;
+    selectedReason = widget.reasons.isNotEmpty ? widget.reasons.first : '';
     customController = TextEditingController();
   }
 

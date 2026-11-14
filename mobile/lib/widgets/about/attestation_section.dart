@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/services/api_service.dart';
@@ -6,6 +5,7 @@ import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/about/about_widgets.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AttestationSection extends ConsumerStatefulWidget {
   const AttestationSection({
@@ -88,12 +88,7 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
           });
           ref
               .read(aboutAttestationProvider.notifier)
-              .update(
-                AboutAttestationState(
-                  data: data,
-                  lastVerifiedAt: now,
-                ),
-              );
+              .update(AboutAttestationState(data: data, lastVerifiedAt: now));
         }
       } else {
         if (mounted) {
@@ -189,7 +184,7 @@ class _AttestationSectionState extends ConsumerState<AttestationSection> {
               details: [
                 'Verifies the application signature matches the official developer key.',
                 'Ensures the app package has not been repackaged or "cloned".',
-                'Application ID: ${_data!['appId']?.toString().split(':').last ?? 'Verified'}',
+                'Application ID: ${_data!['appId']?.toString().split(':').lastOrNull ?? 'Verified'}',
                 if (_data!['appCheckError'] != null)
                   'Diagnostic: ${_data!['appCheckError']}',
               ],

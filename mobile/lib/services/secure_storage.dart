@@ -66,10 +66,7 @@ class SecureStorageService {
 
     final randomKey = enc.Key.fromSecureRandom(32);
     try {
-      await _safeWrite(
-        key: _Keys.cacheEncryptionKey,
-        value: randomKey.base64,
-      );
+      await _safeWrite(key: _Keys.cacheEncryptionKey, value: randomKey.base64);
     } on Object catch (e) {
       AppLogger.w('SecureStorage: Could not persist cache encryption key: $e');
     }
@@ -299,10 +296,7 @@ class SecureStorageService {
     Duration ttl = const Duration(hours: 24),
   }) async {
     final expiry = DateTime.now().add(ttl).millisecondsSinceEpoch;
-    final payload = {
-      'data': data,
-      'expiry': expiry,
-    };
+    final payload = {'data': data, 'expiry': expiry};
     try {
       final keyBytes = await _getOrCreateCacheKey();
       final iv = enc.IV.fromSecureRandom(12); // Standard 96-bit AES-GCM IV

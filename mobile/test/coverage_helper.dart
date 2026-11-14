@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:ghostclass/logic/encrypted_value.dart';
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
@@ -15,6 +14,7 @@ import 'package:ghostclass/providers/outage_provider.dart';
 import 'package:ghostclass/providers/score_provider.dart';
 import 'package:ghostclass/providers/security_provider.dart';
 import 'package:ghostclass/providers/tracking_provider.dart';
+import 'package:material_ui/material_ui.dart';
 
 class MockDashboardNotifier extends DashboardNotifier {
   MockDashboardNotifier(this.data);
@@ -110,11 +110,7 @@ DashboardData createMockDashboardData() {
       },
     },
     courses: {
-      'TEST101': AttendanceCourse(
-        id: 1,
-        name: 'Test Course',
-        code: 'TEST101',
-      ),
+      'TEST101': AttendanceCourse(id: 1, name: 'Test Course', code: 'TEST101'),
     },
     attendanceDates: {
       '2025-05-16': ['TEST101'],
@@ -159,8 +155,5 @@ ScoreState createMockScoreState() {
 }
 
 LeaveState createMockLeaveState() {
-  return LeaveState(
-    leaves: [],
-    sessions: {},
-  );
+  return LeaveState(leaves: [], sessions: {});
 }

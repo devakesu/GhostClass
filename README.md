@@ -13,13 +13,13 @@
 
 <!-- markdownlint-disable MD033 -->
 <p align="center">
-  <img src="https://img.shields.io/badge/Next.js-16.3.3-black?style=for-the-badge&logo=next.js" alt="Next.js" />
+  <img src="https://img.shields.io/badge/Next.js-16.4.6-black?style=for-the-badge&logo=next.js" alt="Next.js" />
   <img src="https://img.shields.io/badge/React-19.2.8-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React" />
-  <img src="https://img.shields.io/badge/Tailwind-CSS%204.3.3-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind" />
-  <img src="https://img.shields.io/badge/TypeScript-6.0.3-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
+  <img src="https://img.shields.io/badge/Tailwind-CSS%204.3.5-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white" alt="Tailwind" />
+  <img src="https://img.shields.io/badge/TypeScript-7.0.2-3178C6?style=for-the-badge&logo=typescript&logoColor=white" alt="TypeScript" />
 </p>
 <p align="center">
-  <img src="https://img.shields.io/badge/Flutter-3.47.4-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
+  <img src="https://img.shields.io/badge/Flutter-3.50.0-02569B?style=for-the-badge&logo=flutter&logoColor=white" alt="Flutter" />
   <img src="https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black" alt="Android" />
   <img src="https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white" alt="iOS" />
 </p>
@@ -91,14 +91,14 @@ insights!
 
 ### Core Framework
 
-- **Next.js 16.3.3** - React 19 with App Router
-- **TypeScript 6.0.3** - Strict mode for type safety
-- **Flutter 3.47.4** - Cross-platform native mobile application
-- **Node.js** - v24.20.0+
+- **Next.js 16.4.6** - React 19 with App Router
+- **TypeScript 7.0.2** - Native compiler (@typescript/native) with TS 6.0.2 for linting compatibility
+- **Flutter 3.50.0** - Cross-platform native mobile application
+- **Node.js** - v26.13.1+
 
 ### Styling & UI
 
-- **Tailwind CSS 4.3.3** - Utility-first styling with custom design system
+- **Tailwind CSS 4.3.5** - Utility-first styling with custom design system
 - **Radix UI** - Accessible, unstyled component primitives
 - **Shadcn UI** - Beautiful pre-styled components
 - **Framer Motion** - Smooth animations and transitions
@@ -179,18 +179,18 @@ pseudocode, see **[ALGORITHM.md](docs/ALGORITHM.md)**.
 
 ### Prerequisites
 
-- **Docker Desktop** (with WSL2 backend enabled)
-- **WSL2** (Linux distribution such as Ubuntu/Debian)
-- **VS Code or Antigravity IDE/any IDE with WSL/Docker Support**
+- **Docker Desktop** (with WSL2 backend enabled on Windows, or Docker Desktop / Engine on macOS and Linux)
+- **VS Code or Antigravity IDE** with the **Dev Containers** extension (or any devcontainer-compatible IDE)
+- _(Optional - for Windows)_ **WSL2** (Ubuntu/Debian) for optimal host integration and SSH relay
 
 ## 🐳 Dev Container Environment Setup (Recommended)
 
-GhostClass provides an isolated, reproducible Dev Container
-(`.devcontainer/Dockerfile`) equipped with Node 24, Flutter SDK,
-Playwright, Supabase, Firebase, Infisical CLI tools, and automatic IDE extension
-syncing.
+GhostClass provides an automated, reproducible Dev Container
+(`.devcontainer/devcontainer.json` & `.devcontainer/Dockerfile`) equipped with Node 26 LTS, Flutter 3.50.0 SDK,
+Android SDK tools (API 36/35/34), OpenJDK 21, Playwright, Supabase, Firebase, Infisical CLI tools,
+automatic IDE extension syncing, and cross-platform ADB host bridging.
 
-### 1. Initialize and Configure WSL2 (Windows Host)
+### 1. Initialize and Configure WSL2 (Windows Host - Optional)
 
 To ensure optimal networking, memory utilization, and loopback connectivity,
 configure WSL2 on the Windows host.
@@ -229,7 +229,7 @@ command in Windows PowerShell:
 wsl --shutdown
 ```
 
-### 2. Enable Windows SSH Agent (Host)
+### 2. Enable Windows SSH Agent (Host - Optional)
 
 Run PowerShell as Administrator or user to enable the OpenSSH agent service and
 load your SSH/signing keys:
@@ -240,7 +240,7 @@ Start-Service ssh-agent
 ssh-add $env:USERPROFILE\.ssh\id_ed25519
 ```
 
-### 3. Bridge SSH Agent to WSL2
+### 3. Bridge SSH Agent to WSL2 (Optional)
 
 In WSL2, install `socat`, download `npiperelay`, and bridge the Windows SSH pipe
 to Linux:
@@ -280,76 +280,89 @@ rm -rf ~/.ssh/agent.sock
 source ~/.bashrc
 ```
 
-### 4. Clone Repository in WSL2
+_(Note for macOS & Linux hosts: Docker Desktop or Docker Engine runs natively without WSL2)._
 
-Clone the repository in your WSL2 home or projects directory:
+### 4. Clone Repository
+
+Clone the repository to your local machine (or inside WSL2):
 
 ```bash
 git clone https://github.com/devakesu/GhostClass.git
 cd GhostClass
 ```
 
-### 5. Launch Dev Environment via Setup Launcher
+### 5. Launch Dev Container
 
-Run the automated launcher script from the repository root in WSL:
+#### Option A: One-Click Launch in VS Code / Antigravity IDE (Recommended)
+
+1. Open the cloned `GhostClass` directory in **VS Code** or **Antigravity IDE**.
+2. When prompted: **"Folder contains a Dev Container configuration file. Reopen in Container?"**, click **Reopen in Container**.
+   _(Alternatively, press `Ctrl+Shift+P` / `Cmd+Shift+P` and choose **Dev Containers: Reopen in Container**)._
+3. The Dev Container builds and starts automatically:
+   - Configures persistent caches (`ghostclass-pub-cache`, `ghostclass-gradle-cache`, `ghostclass-npm-cache`, `ghostclass-playwright-cache`).
+   - Shadows `mobile/.dart_tool` and `mobile/build` volumes for host filesystem performance.
+   - Forwards ports: Web (`3000`), Dart DevTools (`8181`), Supabase (`54321`-`54323`), and Firebase (`4000`, `5001`, `8080`, `9099`).
+   - Executes `postCreateCommand` (`/home/vscode/init_workspace.sh`) automatically in `/workspaces/GhostClass` to install npm and flutter dependencies, set git safe directories, start the ADB forward bridge daemon, and initialize UI/UX tooling.
+
+#### Option B: Standalone Terminal Launcher (`setup-dev-hub.sh`)
+
+If running from a terminal without the GUI prompt:
 
 ```bash
 chmod +x .devcontainer/setup-dev-hub.sh
 ./.devcontainer/setup-dev-hub.sh
 ```
 
-This single command will:
+- If the `devcontainer` CLI is installed, it runs `devcontainer up --workspace-folder .`.
+- Otherwise, it falls back to building `ghostclass-devhub:latest` from `.devcontainer/Dockerfile`, starting `GhostClass_Sandbox`, mounting docker socket and cache volumes, and executing `init_workspace.sh`.
+- Connect to an interactive shell anytime via:
 
-1. Validate your Docker environment and socket permissions.
-2. Initialize the shared Global Dev Hub (`~/dev-hub`) with CLI tools (Supabase, Infisical, Firebase, GitHub CLI) and SDKs (Android, Flutter).
-3. Build the `ghostclass-sandbox` Docker image.
-4. Clean up any existing container and launch `GhostClass_Sandbox` with all required port mappings and shared volume mounts.
+  ```bash
+  docker exec -it -u vscode GhostClass_Sandbox bash
+  ```
 
-### 6. Attach IDE & Initialize Workspace
+### 6. Workspace Initialization & Maintenance
 
-1. Open VS Code or Antigravity IDE.
-2. Open Command Palette (`Ctrl+Shift+P` / `Cmd+Shift+P`) → select **Attach to
-   Running Container** → `GhostClass_Sandbox`.
-3. Open directory `/ghostclass` inside the container.
-4. Run workspace initialization script in the integrated terminal:
+Initialization occurs automatically during container creation. If you ever need to re-verify volume permissions, reinstall npm/flutter packages, or restart background bridge daemons, execute:
 
-   ```bash
-   ~/init_workspace.sh
-   ```
+```bash
+bash /home/vscode/init_workspace.sh
+```
 
-   _(Enter Git Name and Email when prompted to configure local commit signing
-   and SSH identity)._
+### 7. Android Emulator & Physical Device Debugging (Host ADB Bridge)
 
-5. Run **Developer: Reload Window** in VS Code / Antigravity to refresh
-   environment variables and extension integrations.
+To debug the Flutter mobile app on an Android Emulator or Physical Device running on your host machine:
 
-### 7. Android Emulator Setup & Subsequent Development Startups
+#### Windows Host
 
-To run and debug the mobile app on an Android Emulator or Physical Device:
-
-#### Android Emulator Setup
-
-Create an Android Virtual Device (AVD) named `Medium_Phone_API_36.1` in Android
-Studio's AVD Manager. _(Note: If using a different AVD name, edit the `-avd`
-target in `.devcontainer/Start.ps1`)_.
-
-#### Subsequent Starts via `Start.ps1` (Windows Host)
-
-On subsequent development startups (after initial `docker run`), execute the
-startup script from a Windows PowerShell terminal on the host:
+Run from a PowerShell terminal on the Windows host:
 
 ```powershell
 .\.devcontainer\Start.ps1
 ```
 
-Select `[1] Emulator` (or pass `-Mode Emulator`).
+#### macOS / Linux Host
 
-The script automatically ensures `GhostClass_Sandbox` container is running,
-launches the host Android emulator (`Medium_Phone_API_36.1`), bridges Windows
-ADB (`5555`) to Docker network (`host.docker.internal:5555`).
+Run from a terminal on the macOS or Linux host:
 
-Press **ENTER** in the PowerShell terminal when finished to gracefully shut down
-the emulator and clean up portproxy rules.
+```bash
+chmod +x .devcontainer/start.sh
+./.devcontainer/start.sh
+```
+
+#### Target Selection & Dynamic AVD Detection
+
+Both bridge scripts provide an interactive menu:
+
+- `[1] Android Emulator (Host Accelerated)`: Dynamically detects installed AVDs using `emulator -list-avds` (e.g. `Pixel_10_Pro_XL`), launches the emulator with host hardware acceleration, binds host ADB with `-a` (all interfaces), and connects container ADB to `host.docker.internal:5555`.
+- `[2] Physical Device (Wi-Fi / USB)`: Auto-detects device Wi-Fi IP (or prompts for it), switches ADB to TCP mode (`5555`), and connects the container directly to the device.
+- `[3] Skip ADB (Container Only)`: Bypasses ADB setup when developing web or backend services only.
+
+#### In-Container Port Forward Bridge (`scripts/adb_forward_bridge.py`)
+
+During workspace initialization, `scripts/adb_forward_bridge.py` runs as a background daemon inside the container. It monitors `adb forward --list` and automatically bridges container `127.0.0.1:<PORT>` to `host.docker.internal:<PORT>`. This ensures the Flutter CLI, Dart VM Service (`8181`), and DevTools connect seamlessly without `Connection refused` errors.
+
+Press **ENTER** in the host terminal running `Start.ps1` or `start.sh` when done to gracefully shut down the ADB bridge and emulator.
 
 ### 🔐 Secret Management & Database Initialization
 

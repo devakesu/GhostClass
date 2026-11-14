@@ -1,0 +1,160 @@
+{
+  "name": "GhostClass Development",
+  "build": {
+    "dockerfile": "Dockerfile",
+    "context": "..",
+    "options": ["-t", "ghostclass-devhub:latest"]
+  },
+  "workspaceFolder": "/workspaces/GhostClass",
+  "remoteUser": "vscode",
+
+  "features": {
+    "ghcr.io/devcontainers/features/docker-outside-of-docker:1": {
+      "version": "latest",
+      "enableNonRootDocker": "true",
+      "moby": false
+    }
+  },
+
+  "mounts": [
+    "source=ghostclass-pub-cache,target=/home/vscode/.pub-cache,type=volume",
+    "source=ghostclass-gradle-cache,target=/home/vscode/.gradle,type=volume",
+    "source=ghostclass-npm-cache,target=/home/vscode/.npm,type=volume",
+    "source=ghostclass-playwright-cache,target=/home/vscode/.cache/ms-playwright,type=volume",
+    "target=/workspaces/GhostClass/mobile/.dart_tool,type=volume",
+    "target=/workspaces/GhostClass/mobile/build,type=volume",
+    "source=/tmp/.X11-unix,target=/tmp/.X11-unix,type=bind"
+  ],
+
+  "forwardPorts": [3000, 8181, 54321, 54322, 54323, 4000, 5001, 8080, 9099],
+  "portsAttributes": {
+    "3000": {
+      "label": "GhostClass Web (Next.js)",
+      "onAutoForward": "silent"
+    },
+    "8181": {
+      "label": "Dart DevTools",
+      "onAutoForward": "silent"
+    },
+    "54321": {
+      "label": "Supabase API Gateway",
+      "onAutoForward": "silent"
+    },
+    "54322": {
+      "label": "PostgreSQL Database",
+      "onAutoForward": "silent"
+    },
+    "54323": {
+      "label": "Supabase Studio",
+      "onAutoForward": "silent"
+    },
+    "4000": {
+      "label": "Firebase Emulator Suite",
+      "onAutoForward": "silent"
+    },
+    "5001": {
+      "label": "Firebase Functions",
+      "onAutoForward": "silent"
+    },
+    "8080": {
+      "label": "Firebase Firestore Emulator",
+      "onAutoForward": "silent"
+    },
+    "9099": {
+      "label": "Firebase Auth Emulator",
+      "onAutoForward": "silent"
+    }
+  },
+
+  "containerEnv": {
+    "ADB_SERVER_SOCKET": "tcp:host.docker.internal:5037",
+    "NODE_OPTIONS": "--max-old-space-size=9216",
+    "DISPLAY": "${localEnv:DISPLAY}",
+    "WAYLAND_DISPLAY": "${localEnv:WAYLAND_DISPLAY}",
+    "SUPABASE_SERVICES_HOSTNAME": "host.docker.internal",
+    "CHROME_EXECUTABLE": "/usr/bin/google-chrome",
+    "PLAYWRIGHT_BROWSERS_PATH": "/home/vscode/.cache/ms-playwright",
+    "NPM_CONFIG_UPDATE_NOTIFIER": "false"
+  },
+
+  "runArgs": [
+    "--name=GhostClass_Sandbox",
+    "--add-host=host.docker.internal:host-gateway",
+    "--ipc=host",
+    "--restart=unless-stopped"
+  ],
+
+  "postCreateCommand": "touch ~/.sudo_as_admin_successful ~/.hushlogin 2>/dev/null || true; for gid in $(id -G); do if ! getent group $gid >/dev/null 2>&1; then sudo groupadd -g $gid host-group-$gid 2>/dev/null || true; fi; done; bash /home/vscode/init_workspace.sh",
+
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "bradlc.vscode-tailwindcss",
+        "dsznajder.es7-react-js-snippets",
+        "formulahendry.auto-rename-tag",
+        "christian-kohler.path-intellisense",
+        "christian-kohler.npm-intellisense",
+        "davidanson.vscode-markdownlint",
+        "oderwat.indent-rainbow",
+        "usernamehw.errorlens",
+        "meezilla.json",
+        "ms-vscode.vscode-typescript-next",
+        "Dart-Code.flutter",
+        "Dart-Code.dart-code",
+        "vscjava.vscode-gradle",
+        "cweijan.vscode-database-client2",
+        "ms-playwright.playwright",
+        "google.google-antigravity",
+        "github.vscode-github-actions",
+        "openai.chatgpt",
+        "Anthropic.claude-code",
+        "mkhl.direnv"
+      ],
+      "settings": {
+        "remote.forwardAgent": true,
+        "dart.flutterSdkPath": "/opt/flutter",
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "esbenp.prettier-vscode",
+        "[dart]": {
+          "editor.defaultFormatter": "Dart-Code.dart-code",
+          "editor.formatOnSave": true
+        },
+        "[typescript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[typescriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[javascript]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[javascriptreact]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[json]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "[jsonc]": {
+          "editor.defaultFormatter": "esbenp.prettier-vscode"
+        },
+        "editor.codeActionsOnSave": {
+          "source.organizeImports": "explicit",
+          "source.fixAll.eslint": "explicit"
+        },
+        "js/ts.tsdk.path": "node_modules/typescript/lib",
+        "js/ts.inlayHints.variableTypes.enabled": true,
+        "js/ts.inlayHints.functionLikeReturnTypes.enabled": true,
+        "js/ts.inlayHints.parameterNames.enabled": "all",
+        "eslint.validate": [
+          "javascript",
+          "javascriptreact",
+          "typescript",
+          "typescriptreact"
+        ],
+        "errorlens.enabled": true
+      }
+    }
+  }
+}

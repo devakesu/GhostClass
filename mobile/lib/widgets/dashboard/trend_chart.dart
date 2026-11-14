@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
 import 'package:fl_chart/fl_chart.dart';
-import 'package:flutter/material.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:material_ui/material_ui.dart';
 
 class TrendChartSection extends StatefulWidget {
   const TrendChartSection({
@@ -189,9 +189,7 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                               style: GoogleFonts.manrope(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w800,
-                                color: Theme.of(
-                                  context,
-                                ).colorScheme.onSurface,
+                                color: Theme.of(context).colorScheme.onSurface,
                               ),
                             ),
                             const SizedBox(height: 2),
@@ -275,11 +273,10 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                                           style: GoogleFonts.manrope(
                                             fontSize: 10,
                                             fontWeight: FontWeight.w600,
-                                            color:
-                                                Theme.of(
-                                                      context,
-                                                    ).colorScheme.onSurface
-                                                    .withValues(alpha: 0.8),
+                                            color: Theme.of(context)
+                                                .colorScheme
+                                                .onSurface
+                                                .withValues(alpha: 0.8),
                                           ),
                                         ),
                                       ),
@@ -292,12 +289,10 @@ class _TrendChartSectionState extends State<TrendChartSection> {
                               drawVerticalLine: false,
                               horizontalInterval: 5,
                               getDrawingHorizontalLine: (_) => FlLine(
-                                color:
-                                    Theme.of(
-                                      context,
-                                    ).colorScheme.outlineVariant.withValues(
-                                      alpha: 0.2,
-                                    ),
+                                color: Theme.of(context)
+                                    .colorScheme
+                                    .outlineVariant
+                                    .withValues(alpha: 0.2),
                                 strokeWidth: 1,
                               ),
                             ),

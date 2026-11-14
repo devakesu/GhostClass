@@ -49,9 +49,7 @@ void main() {
     );
 
     final container = ProviderContainer(
-      overrides: [
-        authProvider.overrideWith(() => MockAuthNotifier(null)),
-      ],
+      overrides: [authProvider.overrideWith(() => MockAuthNotifier(null))],
     );
 
     // Reading routerProvider should construct the GoRouter and related listeners

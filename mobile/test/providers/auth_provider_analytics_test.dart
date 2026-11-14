@@ -102,21 +102,15 @@ void main() {
     when(
       () => mockApi.onUnauthorized,
     ).thenAnswer((_) => const Stream<void>.empty());
-    when(() => mockApi.onSecurityLockdown).thenAnswer(
-      (_) => const Stream<Map<String, String>>.empty(),
-    );
+    when(
+      () => mockApi.onSecurityLockdown,
+    ).thenAnswer((_) => const Stream<Map<String, String>>.empty());
     when(() => mockApi.clearCaches()).thenReturn(null);
     when(
-      () => mockApi.scheduleSync(
-        any(),
-        force: any(named: 'force'),
-      ),
+      () => mockApi.scheduleSync(any(), force: any(named: 'force')),
     ).thenAnswer((_) async {});
     when(
-      () => mockApi.refreshProfile(
-        any(),
-        sync: any(named: 'sync'),
-      ),
+      () => mockApi.refreshProfile(any(), sync: any(named: 'sync')),
     ).thenAnswer(
       (_) async => Response<dynamic>(
         requestOptions: RequestOptions(path: '/profile'),
@@ -149,9 +143,9 @@ void main() {
     when(() => mockStorage.getUsername()).thenAnswer((_) async => null);
     when(() => mockStorage.getTermsVersion()).thenAnswer((_) async => null);
     when(() => mockStorage.getSettings()).thenAnswer((_) async => null);
-    when(() => mockStorage.getUserProfile()).thenAnswer(
-      (_) async => const UserProfile(firstName: 'Test'),
-    );
+    when(
+      () => mockStorage.getUserProfile(),
+    ).thenAnswer((_) async => const UserProfile(firstName: 'Test'));
     when(() => mockStorage.saveEzygoToken(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveSupabaseUserId(any())).thenAnswer((_) async {});
     when(() => mockStorage.saveUsername(any())).thenAnswer((_) async {});
@@ -475,24 +469,16 @@ void main() {
         ),
       );
 
-      when(
-        () => mockStorage.getAcademicState(),
-      ).thenAnswer((_) async => null);
-      when(
-        () => mockStorage.saveAcademicState(any()),
-      ).thenAnswer((_) async {});
-      when(
-        () => mockApi.updateSemester(any(), mockStorage),
-      ).thenAnswer(
+      when(() => mockStorage.getAcademicState()).thenAnswer((_) async => null);
+      when(() => mockStorage.saveAcademicState(any())).thenAnswer((_) async {});
+      when(() => mockApi.updateSemester(any(), mockStorage)).thenAnswer(
         (_) async => Response<dynamic>(
           requestOptions: RequestOptions(path: '/semester'),
           statusCode: 200,
           data: {'ok': true},
         ),
       );
-      when(
-        () => mockApi.updateAcademicYear(any(), mockStorage),
-      ).thenAnswer(
+      when(() => mockApi.updateAcademicYear(any(), mockStorage)).thenAnswer(
         (_) async => Response<dynamic>(
           requestOptions: RequestOptions(path: '/year'),
           statusCode: 200,
@@ -569,24 +555,16 @@ void main() {
         ),
       );
 
-      when(
-        () => mockStorage.getAcademicState(),
-      ).thenAnswer((_) async => null);
-      when(
-        () => mockStorage.saveAcademicState(any()),
-      ).thenAnswer((_) async {});
-      when(
-        () => mockApi.updateSemester(any(), mockStorage),
-      ).thenAnswer(
+      when(() => mockStorage.getAcademicState()).thenAnswer((_) async => null);
+      when(() => mockStorage.saveAcademicState(any())).thenAnswer((_) async {});
+      when(() => mockApi.updateSemester(any(), mockStorage)).thenAnswer(
         (_) async => Response<dynamic>(
           requestOptions: RequestOptions(path: '/semester'),
           statusCode: 200,
           data: {'ok': true},
         ),
       );
-      when(
-        () => mockApi.updateAcademicYear(any(), mockStorage),
-      ).thenAnswer(
+      when(() => mockApi.updateAcademicYear(any(), mockStorage)).thenAnswer(
         (_) async => Response<dynamic>(
           requestOptions: RequestOptions(path: '/year'),
           statusCode: 200,
@@ -638,24 +616,16 @@ void main() {
       ),
     );
 
-    when(
-      () => mockStorage.getAcademicState(),
-    ).thenAnswer((_) async => null);
-    when(
-      () => mockStorage.saveAcademicState(any()),
-    ).thenAnswer((_) async {});
-    when(
-      () => mockApi.updateSemester(any(), mockStorage),
-    ).thenAnswer(
+    when(() => mockStorage.getAcademicState()).thenAnswer((_) async => null);
+    when(() => mockStorage.saveAcademicState(any())).thenAnswer((_) async {});
+    when(() => mockApi.updateSemester(any(), mockStorage)).thenAnswer(
       (_) async => Response<dynamic>(
         requestOptions: RequestOptions(path: '/semester'),
         statusCode: 200,
         data: {'ok': true},
       ),
     );
-    when(
-      () => mockApi.updateAcademicYear(any(), mockStorage),
-    ).thenAnswer(
+    when(() => mockApi.updateAcademicYear(any(), mockStorage)).thenAnswer(
       (_) async => Response<dynamic>(
         requestOptions: RequestOptions(path: '/year'),
         statusCode: 200,

@@ -36,7 +36,7 @@ class EzygoService {
   Future<Response<dynamic>> fetchCourses(SecureStorageService storage) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/institutionuser/courses/withusers';
-    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
+    return await _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchAttendanceReportDetailed(
@@ -45,7 +45,7 @@ class EzygoService {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/attendancereports/student/detailed';
     _requireEzygoToken(token);
-    return _fetcher.fetch(
+    return await _fetcher.fetch(
       path: path,
       token: token!,
       method: 'POST',
@@ -58,7 +58,7 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/institutionusers/myinstitutions';
-    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
+    return await _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> updateDefaultInstitution(
@@ -66,7 +66,7 @@ class EzygoService {
     SecureStorageService storage,
   ) async {
     final token = await storage.getNormalizedEzygoToken();
-    return _ref
+    return await _ref
         .read(dioServiceProvider)
         .dio
         .post(
@@ -84,7 +84,7 @@ class EzygoService {
     SecureStorageService storage,
   ) async {
     final token = await storage.getNormalizedEzygoToken();
-    return _ref
+    return await _ref
         .read(dioServiceProvider)
         .dio
         .post(
@@ -102,7 +102,7 @@ class EzygoService {
     SecureStorageService storage,
   ) async {
     final token = await storage.getNormalizedEzygoToken();
-    return _ref
+    return await _ref
         .read(dioServiceProvider)
         .dio
         .post(
@@ -118,7 +118,7 @@ class EzygoService {
   Future<Response<dynamic>> fetchSemester(SecureStorageService storage) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/user/setting/default_semester';
-    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
+    return await _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchAcademicYear(
@@ -126,7 +126,7 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/user/setting/default_academic_year';
-    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
+    return await _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<dynamic> _fetchWithCache(
@@ -219,7 +219,7 @@ class EzygoService {
   Future<Response<dynamic>> fetchExams(SecureStorageService storage) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/exams';
-    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
+    return await _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchExamQuestions(
@@ -229,7 +229,7 @@ class EzygoService {
     final token = await storage.getNormalizedEzygoToken();
     final path =
         '$_ezygoApiRoot/exams/$examId/examquestions?from_view_score=true';
-    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
+    return await _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 
   Future<Response<dynamic>> fetchExamAnswers(
@@ -238,7 +238,7 @@ class EzygoService {
   ) async {
     final token = await storage.getNormalizedEzygoToken();
     final path = '$_ezygoApiRoot/exams/$examId/institutionuser/examanswers';
-    return _fetcher.fetch(path: path, token: _requireEzygoToken(token));
+    return await _fetcher.fetch(path: path, token: _requireEzygoToken(token));
   }
 }
 

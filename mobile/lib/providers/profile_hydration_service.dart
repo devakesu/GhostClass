@@ -44,17 +44,13 @@ class ProfileHydrationService extends Notifier<void> {
     _lastRefresh = null;
   }
 
-  Future<void> refreshProfile({
-    bool force = false,
-  }) async {
+  Future<void> refreshProfile({bool force = false}) async {
     final inFlight = _refreshProfileInFlight;
-    if (inFlight != null) return inFlight;
+    if (inFlight != null) return await inFlight;
 
-    final future = _refreshProfileInternal(
-      force: force,
-    );
+    final future = _refreshProfileInternal(force: force);
     _refreshProfileInFlight = future;
-    return future.whenComplete(() {
+    return await future.whenComplete(() {
       if (identical(_refreshProfileInFlight, future)) {
         _refreshProfileInFlight = null;
       }
@@ -63,9 +59,7 @@ class ProfileHydrationService extends Notifier<void> {
 
   Future<void> syncProfile() => refreshProfile(force: true);
 
-  Future<void> _refreshProfileInternal({
-    bool force = false,
-  }) async {
+  Future<void> _refreshProfileInternal({bool force = false}) async {
     final authNotifier = ref.read(authProvider.notifier);
     final currentUser = ref.read(authProvider).value;
     if (currentUser == null) return;
@@ -324,10 +318,10 @@ class ProfileHydrationService extends Notifier<void> {
         (ezygoIdOverride != null && storedEzygoUserId == ezygoIdOverride);
 
     Future<String?> usernameFuture() async =>
-        matchesIdentity ? storage.getUsername() : null;
+        matchesIdentity ? await storage.getUsername() : null;
 
     Future<String?> termsVersionFuture() async =>
-        matchesIdentity ? storage.getTermsVersion() : null;
+        matchesIdentity ? await storage.getTermsVersion() : null;
 
     Future<UserSettings> settingsFuture() async {
       if (!matchesIdentity) {
@@ -339,7 +333,7 @@ class ProfileHydrationService extends Notifier<void> {
     }
 
     Future<UserProfile?> profileFuture() async =>
-        matchesIdentity ? storage.getUserProfile() : null;
+        matchesIdentity ? await storage.getUserProfile() : null;
 
     final hydrationReads = await Future.wait<dynamic>([
       usernameFuture(),
@@ -381,11 +375,7 @@ class ProfileHydrationService extends Notifier<void> {
     }
 
     final api = ref.read(apiServiceProvider);
-    final response = await api.refreshProfile(
-      token,
-      sync: sync,
-      force: force,
-    );
+    final response = await api.refreshProfile(token, sync: sync, force: force);
 
     if (response.statusCode == 401) {
       final data = response.data as Map<String, dynamic>?;

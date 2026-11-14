@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
@@ -7,6 +6,7 @@ import 'package:ghostclass/providers/tracking_provider.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:material_ui/material_ui.dart';
 
 class AttendanceCalendarWidget extends StatelessWidget {
   const AttendanceCalendarWidget({
@@ -123,9 +123,7 @@ class AttendanceCalendarWidget extends StatelessWidget {
                         border: isToday && !isSelected
                             ? Border.all(
                                 color:
-                                    (Theme.of(
-                                                  context,
-                                                )
+                                    (Theme.of(context)
                                                 .extension<GhostColors>()
                                                 ?.brandPurple ??
                                             const Color(0xFF7C3AED))

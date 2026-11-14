@@ -8,14 +8,8 @@ void main() {
         const UserProfile(firstName: 'Jane', lastName: 'Smith').fullName,
         'Jane Smith',
       );
-      expect(
-        const UserProfile(firstName: 'Jane').fullName,
-        'Jane',
-      );
-      expect(
-        const UserProfile(lastName: 'Smith').fullName,
-        'Smith',
-      );
+      expect(const UserProfile(firstName: 'Jane').fullName, 'Jane');
+      expect(const UserProfile(lastName: 'Smith').fullName, 'Smith');
       expect(const UserProfile().fullName, isNull);
     });
 

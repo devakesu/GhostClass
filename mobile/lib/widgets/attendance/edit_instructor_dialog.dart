@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/logic/error_utils.dart';
@@ -9,6 +8,7 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class EditInstructorDialog extends ConsumerStatefulWidget {
   const EditInstructorDialog({
@@ -62,6 +62,8 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       final supabaseToken = client.auth.currentSession?.accessToken;
       if (supabaseToken == null) throw Exception('Not authenticated');
 
+      final dashboardNotifier = ref.read(dashboardProvider.notifier);
+
       await apiService.upsertInstructor(
         courseCode: widget.courseCode,
         instructorName: name,
@@ -70,12 +72,7 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       );
 
       // Update dashboard locally to show new name without full refresh
-      await ref
-          .read(dashboardProvider.notifier)
-          .updateLocalInstructor(
-            widget.courseCode,
-            name,
-          );
+      await dashboardNotifier.updateLocalInstructor(widget.courseCode, name);
 
       if (mounted) Navigator.pop(context);
     } on Object catch (e, st) {
@@ -91,11 +88,7 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
       );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              formatApiError(e, 'saving instructor'),
-            ),
-          ),
+          SnackBar(content: Text(formatApiError(e, 'saving instructor'))),
         );
       }
     } finally {
@@ -291,12 +284,8 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                               enabledBorder: OutlineInputBorder(
                                 borderRadius: BorderRadius.circular(16),
                                 borderSide: BorderSide(
-                                  color:
-                                      Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withValues(
-                                        alpha: 0.1,
-                                      ),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.1),
                                 ),
                               ),
                               focusedBorder: OutlineInputBorder(
@@ -344,12 +333,10 @@ class _EditInstructorDialogState extends ConsumerState<EditInstructorDialog> {
                                     'CANCEL',
                                     style: GoogleFonts.manrope(
                                       fontWeight: FontWeight.w800,
-                                      color:
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface.withValues(
-                                            alpha: 0.4,
-                                          ),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.4),
                                     ),
                                   ),
                                 ),

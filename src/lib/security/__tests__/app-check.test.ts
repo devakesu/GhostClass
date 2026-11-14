@@ -100,7 +100,8 @@ describe("app-check logic", () => {
       expect(result.isValid).toBe(true);
     });
 
-    it("fails for unauthorized App ID with criticalRisk", async () => {
+    it("fails for unauthorized App ID with criticalRisk when ENFORCE_APP_CHECK is true", async () => {
+      process.env.ENFORCE_APP_CHECK = "true";
       const h = new Headers();
       h.set("X-Firebase-AppCheck", "valid-token");
       vi.mocked(headers).mockResolvedValue(h as any);
@@ -109,8 +110,39 @@ describe("app-check logic", () => {
 
       const result = await verifyAppCheckToken();
       expect(result.isValid).toBe(false);
+      expect(result.isAttested).toBe(false);
       expect(result.criticalRisk).toBe(true);
       expect(result.error).toBe("Unauthorized Application");
+    });
+
+    it("fails open (isValid: true, isAttested: false) for unauthorized App ID when ENFORCE_APP_CHECK is false", async () => {
+      process.env.ENFORCE_APP_CHECK = "false";
+      const h = new Headers();
+      h.set("X-Firebase-AppCheck", "valid-token");
+      vi.mocked(headers).mockResolvedValue(h as any);
+
+      mockAppCheck.verifyToken.mockResolvedValue({ appId: "malicious-app-id" });
+
+      const result = await verifyAppCheckToken();
+      expect(result.isValid).toBe(true);
+      expect(result.isAttested).toBe(false);
+      expect(result.criticalRisk).toBe(false);
+      expect(result.error).toBe("Unauthorized Application");
+    });
+
+    it("fails open (isValid: true, isAttested: false) when token verification throws in fail-open mode", async () => {
+      process.env.ENFORCE_APP_CHECK = "false";
+      const h = new Headers();
+      h.set("X-Firebase-AppCheck", "invalid-token");
+      vi.mocked(headers).mockResolvedValue(h as any);
+
+      mockAppCheck.verifyToken.mockRejectedValue(new Error("Token expired"));
+
+      const result = await verifyAppCheckToken();
+      expect(result.isValid).toBe(true);
+      expect(result.isAttested).toBe(false);
+      expect(result.criticalRisk).toBe(false);
+      expect(result.error).toBe("Security Verification Failed");
     });
   });
 

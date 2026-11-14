@@ -1,5 +1,4 @@
 import 'package:firebase_app_check/firebase_app_check.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/constants/static_content.dart';
@@ -81,6 +80,7 @@ import 'package:ghostclass/widgets/tracking/tracking_header_widgets.dart';
 import 'package:ghostclass/widgets/tracking/tracking_record_card.dart';
 import 'package:ghostclass/widgets/tracking/tracking_subject_picker.dart';
 import 'package:ghostclass/widgets/transparency_badge.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
@@ -161,10 +161,7 @@ void main() {
         await tester.pumpWidget(
           ProviderScope(
             overrides: overrides,
-            child: MaterialApp(
-              theme: AppTheme.darkTheme,
-              home: widget,
-            ),
+            child: MaterialApp(theme: AppTheme.darkTheme, home: widget),
           ),
         );
         await tester.pump(const Duration(milliseconds: 100));
@@ -258,10 +255,7 @@ void main() {
       const AppUpdateDialog(latestVersion: '3.1.0', isForceUpdate: false),
     );
     await pumpWidget(
-      const AddCourseDialog(
-        semester: '1',
-        academicYear: '2025',
-      ),
+      const AddCourseDialog(semester: '1', academicYear: '2025'),
     );
     await pumpWidget(
       Row(
@@ -333,27 +327,18 @@ void main() {
       dbDate: '2025-05-16',
       isDisabled: false,
     );
-    await pumpWidget(
-      const CalendarSessionCard(
-        event: event,
-      ),
-    );
+    await pumpWidget(const CalendarSessionCard(event: event));
     await pumpWidget(
       CourseCard(
         course: createMockDashboardData().courses[0],
-        stat:
-            CourseStat(
-                id: 'TEST101',
-                code: 'TEST101',
-                name: 'Test Course',
-              )
-              ..officialPresent = 1
-              ..officialTotal = 1
-              ..finalPresent = 1
-              ..finalTotal = 1
-              ..corrPresent = 0
-              ..extraPresent = 0
-              ..extraAbsent = 0,
+        stat: CourseStat(id: 'TEST101', code: 'TEST101', name: 'Test Course')
+          ..officialPresent = 1
+          ..officialTotal = 1
+          ..finalPresent = 1
+          ..finalTotal = 1
+          ..corrPresent = 0
+          ..extraPresent = 0
+          ..extraAbsent = 0,
         bunkResult: const AttendanceResult(
           canBunk: 0,
           requiredToAttend: 0,
@@ -393,19 +378,14 @@ void main() {
     await pumpWidget(
       DisableAwareCourseCard(
         course: createMockDashboardData().courses[0],
-        stat:
-            CourseStat(
-                id: 'TEST101',
-                code: 'TEST101',
-                name: 'Test Course',
-              )
-              ..officialPresent = 1
-              ..officialTotal = 1
-              ..finalPresent = 1
-              ..finalTotal = 1
-              ..corrPresent = 0
-              ..extraPresent = 0
-              ..extraAbsent = 0,
+        stat: CourseStat(id: 'TEST101', code: 'TEST101', name: 'Test Course')
+          ..officialPresent = 1
+          ..officialTotal = 1
+          ..finalPresent = 1
+          ..finalTotal = 1
+          ..corrPresent = 0
+          ..extraPresent = 0
+          ..extraAbsent = 0,
         bunkResult: const AttendanceResult(
           canBunk: 0,
           requiredToAttend: 0,
@@ -426,9 +406,7 @@ void main() {
           theme: AppTheme.darkTheme,
           home: Scaffold(
             body: CustomScrollView(
-              slivers: [
-                HeaderSection(data: mockDashboard),
-              ],
+              slivers: [HeaderSection(data: mockDashboard)],
             ),
           ),
         ),
@@ -462,10 +440,7 @@ void main() {
           home: Scaffold(
             body: CustomScrollView(
               slivers: [
-                StatsGridSection(
-                  stats: mockDashboard.stats,
-                  activeCount: 1,
-                ),
+                StatsGridSection(stats: mockDashboard.stats, activeCount: 1),
               ],
             ),
           ),
@@ -633,11 +608,7 @@ void main() {
       final ci = CourseInstructor.fromJson(instructorJson);
       expect(ci.instructorName, 'Dr. Test');
 
-      final instJson = {
-        'id': 1,
-        'name': 'Inst',
-        'role': 'Admin',
-      };
+      final instJson = {'id': 1, 'name': 'Inst', 'role': 'Admin'};
       final inst = Institution.fromJson(instJson);
       expect(inst.name, 'Inst');
 

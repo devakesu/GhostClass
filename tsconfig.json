@@ -1,11 +1,7 @@
 {
   "compilerOptions": {
     "target": "ES2022",
-    "lib": [
-      "dom",
-      "dom.iterable",
-      "esnext"
-    ],
+    "lib": ["dom", "dom.iterable", "esnext"],
     "allowJs": true,
     "skipLibCheck": true,
     // STRICT TYPE CHECKING
@@ -33,14 +29,10 @@
       }
     ],
     "paths": {
-      "@/*": [
-        "./src/*"
-      ]
+      "@/*": ["./src/*"]
     }
   },
-  "typeRoots": [
-    "node_modules/@types"
-  ],
+  "typeRoots": ["node_modules/@types"],
   "include": [
     "next-env.d.ts",
     "**/*.ts",
@@ -52,6 +44,14 @@
     "node_modules",
     "supabase",
     "mobile",
-    "Temp"
+    "Temp",
+    ".claude",
+    ".agents",
+    ".gemini",
+    ".husky",
+    ".github",
+    ".vscode",
+    ".cursor",
+    ".opencode"
   ]
 }

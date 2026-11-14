@@ -89,7 +89,7 @@ class AppConfig {
 
   /// Current application version
   static String get appVersion =>
-      const String.fromEnvironment('APP_VERSION', defaultValue: '4.6.5');
+      const String.fromEnvironment('APP_VERSION', defaultValue: '4.7.0');
 
   /// Commit SHA injected by CI for release builds.
   static String get appCommitSha =>
@@ -114,10 +114,8 @@ class AppConfig {
   static bool get isReleaseBuild => kReleaseMode;
 
   /// Author branding.
-  static String get authorName => const String.fromEnvironment(
-    'AUTHOR_NAME',
-    defaultValue: '@deva.kesu',
-  );
+  static String get authorName =>
+      const String.fromEnvironment('AUTHOR_NAME', defaultValue: '@deva.kesu');
 
   /// Author portfolio URL.
   static String get authorUrl => const String.fromEnvironment(
@@ -141,10 +139,8 @@ class AppConfig {
   );
 
   /// Display name of the application.
-  static String get appName => const String.fromEnvironment(
-    'APP_NAME',
-    defaultValue: 'GhostClass',
-  );
+  static String get appName =>
+      const String.fromEnvironment('APP_NAME', defaultValue: 'GhostClass');
 
   /// The Play Store URL for the application.
   static String get playStoreUrl {
@@ -157,9 +153,7 @@ class AppConfig {
 
   /// The App Store URL for the application.
   static String get appStoreUrl {
-    const appId = String.fromEnvironment(
-      'IOS_APP_ID',
-    );
+    const appId = String.fromEnvironment('IOS_APP_ID');
     return 'https://apps.apple.com/app/id$appId';
   }
 

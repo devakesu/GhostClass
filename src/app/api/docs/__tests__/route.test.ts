@@ -26,7 +26,10 @@ describe("GET /api/docs", () => {
     vi.stubEnv("NODE_ENV", "development");
     const { ApiReference } = await import("@scalar/nextjs-api-reference");
     vi.mocked(ApiReference).mockReturnValue(
-      () => new Response("scalar ui", { status: 200 }),
+      (() =>
+        new Response("scalar ui", { status: 200 })) as unknown as ReturnType<
+        typeof ApiReference
+      >,
     );
     const { GET } = await import("../route");
     const response = GET();

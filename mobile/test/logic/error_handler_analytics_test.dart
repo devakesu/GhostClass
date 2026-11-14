@@ -1,9 +1,9 @@
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/logic/app_exception.dart';
 import 'package:ghostclass/logic/error_handler.dart';
 import 'package:ghostclass/services/analytics_service.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockFirebaseAnalytics extends Mock implements FirebaseAnalytics {}
@@ -90,9 +90,7 @@ void main() {
 
   testWidgets(
     'logs app_error and allows tapping Contact Support in error dialog',
-    (
-      tester,
-    ) async {
+    (tester) async {
       await AnalyticsService.initialize(analyticsInstance: mockAnalytics);
 
       await tester.pumpWidget(

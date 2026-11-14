@@ -38,9 +38,6 @@ Sentry.init({
   // Only enable debug logs in development
   debug: process.env.NODE_ENV === "development",
 
-  // Security: Handle PII carefully
-  sendDefaultPii: false,
-
   beforeSend(event, hint) {
     // Filter out common network errors that don't indicate real issues
     const error = hint?.originalException;
