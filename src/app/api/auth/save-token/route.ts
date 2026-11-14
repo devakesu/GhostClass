@@ -492,7 +492,8 @@ const handler = async (
       current_year: syncRes?.academic?.current_year ?? info.current_year,
     };
 
-    if (authType !== "app-check") {
+    const isMobileClient = isAppCheck || !!fcm_token;
+    if (!isMobileClient) {
       await setAuthCookie(token);
 
       return NextResponse.json(response);
