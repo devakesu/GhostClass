@@ -119,7 +119,8 @@ export function AnalyticsTracker() {
 
     // Enhanced measurement: Outbound link clicks
     const handleClick = (e: MouseEvent) => {
-      const target = e.target as HTMLElement;
+      const target = e.target;
+      if (!(target instanceof Element)) return;
       const link = target.closest("a");
 
       if (link && link.href) {
@@ -159,7 +160,9 @@ export function AnalyticsTracker() {
 
     // Enhanced measurement: Form interactions (matching gtag.js)
     const handleFormInteraction = (e: Event) => {
-      const form = (e.target as HTMLElement).closest("form");
+      const target = e.target;
+      if (!(target instanceof Element)) return;
+      const form = target.closest("form");
       if (!form) return;
 
       const formData = formInteractions.current.get(form) || {

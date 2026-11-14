@@ -300,8 +300,14 @@ function useUserSettingsState() {
         .maybeSingle();
 
       if (error) {
-        Sentry.captureException(error);
-        throw error;
+        const err = new Error(error.message);
+        err.name = "PostgrestError";
+        Object.assign(err, error);
+        Sentry.captureException(err, {
+          tags: { code: error.code },
+          extra: { details: error.details, hint: error.hint },
+        });
+        throw err;
       }
       return data as UserSettings | null;
     },
@@ -344,8 +350,14 @@ function useUserSettingsState() {
       });
 
       if (error) {
-        Sentry.captureException(error);
-        throw error;
+        const err = new Error(error.message);
+        err.name = "PostgrestError";
+        Object.assign(err, error);
+        Sentry.captureException(err, {
+          tags: { code: error.code },
+          extra: { details: error.details, hint: error.hint },
+        });
+        throw err;
       }
     },
     onSuccess: (_, variables) => {

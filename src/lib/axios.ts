@@ -177,7 +177,9 @@ async function handleCsrfRetry(error: unknown) {
     msgStr.includes("csrf") ||
     msgStr.includes("invalid csrf token") ||
     msgStr.includes("csrf token session") ||
-    msgStr.includes("session mismatch");
+    msgStr.includes("session mismatch") ||
+    msgStr.includes("missing security token") ||
+    msgStr.includes("security token");
 
   if (errObj.response?.status === 403 && isCsrfError && !config._csrfRetried) {
     config._csrfRetried = true;

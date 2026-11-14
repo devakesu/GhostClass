@@ -473,7 +473,15 @@ const handler = async (
       isMobileApp: isAppCheck || !!fcm_token,
     });
 
-    const syncRes = await performProfileSync(token, verifiedId, authUserId);
+    let syncRes = null;
+    try {
+      syncRes = await performProfileSync(token, verifiedId, authUserId);
+    } catch (syncErr) {
+      logger.warn(
+        "[save-token] Background profile sync failed during token save, continuing login:",
+        syncErr,
+      );
+    }
     const info = calculateCurrentAcademicInfo();
 
     const response = {
