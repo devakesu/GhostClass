@@ -109,9 +109,6 @@ Sentry.init({
   // Only enable SDK debug output in development.
   debug: false,
 
-  // Security: Handle PII carefully
-  sendDefaultPii: false,
-
   beforeSend(event, hint) {
     // Filter out common network errors that don't indicate real issues
     const error = hint?.originalException;
