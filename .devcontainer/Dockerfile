@@ -8,13 +8,13 @@ USER root
 # 1. Native Dependencies & Toolchains (Pinned by SHA256)
 # ==============================================================================
 RUN install -m 0755 -d /etc/apt/keyrings \
-    # NodeSource Repo (Node 24 LTS)
+    # NodeSource Repo (Node 26 LTS)
     && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key -o /tmp/nodesource.key \
     && echo "b42e0321dabdc24e892115da705cf061167eac12a317f23d329862d0aa0a271d  /tmp/nodesource.key" | sha256sum -c - \
     && gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg /tmp/nodesource.key \
     && rm -f /tmp/nodesource.key \
     && chmod 644 /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_26.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
     # GitHub CLI Repo
     && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /tmp/githubcli.gpg \
     && echo "6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b  /tmp/githubcli.gpg" | sha256sum -c - \
@@ -69,8 +69,14 @@ RUN install -m 0755 -d /etc/apt/keyrings \
     zlib1g \
     && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# Install CLI tools via npm (pinned versions)
-RUN npm install -g firebase-tools@15.36.0 @infisical/cli@0.45.8 ui-ux-pro-max-cli@2.15.0
+# Upgrade npm to version 12 (pinned by SHA256) and install CLI tools
+RUN curl -fsSL https://registry.npmjs.org/npm/-/npm-12.2.2.tgz -o /tmp/npm.tgz \
+    && echo "07fecbf753e2c3bc10ebeb3e9ed8738f6a0cc1292998b79e2e9f1dd2a5525e0c  /tmp/npm.tgz" | sha256sum -c - \
+    && rm -rf /usr/lib/node_modules/npm \
+    && mkdir -p /usr/lib/node_modules/npm \
+    && tar -xz --strip-components=1 -C /usr/lib/node_modules/npm -f /tmp/npm.tgz \
+    && rm -f /tmp/npm.tgz \
+    && node /usr/lib/node_modules/npm/bin/npm-cli.js install -g firebase-tools@15.36.0 @infisical/cli@0.45.8 ui-ux-pro-max-cli@2.15.0
 
 # Install docker-mcp CLI plugin (Pinned by SHA256)
 RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
@@ -195,8 +201,8 @@ USER vscode
 
 # Android SDK Tools (Pinned by SHA256, Android 36 + 35 + 34, BuildTools 36.1.0, 36.0.0, 35.0.0, 34.0.0, 28.0.3)
 RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
-    && curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip" -o /tmp/cmdline-tools.zip \
-    && echo "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583  /tmp/cmdline-tools.zip" | sha256sum -c - \
+    && curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-16111833_latest.zip" -o /tmp/cmdline-tools.zip \
+    && echo "0877a1d048fe4a24efe2eff536ca4223f7adeb58648bb81909d33c446918cfa8  /tmp/cmdline-tools.zip" | sha256sum -c - \
     && unzip -q /tmp/cmdline-tools.zip -d /tmp \
     && mv /tmp/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest \
     && rm -f /tmp/cmdline-tools.zip \

@@ -75,6 +75,15 @@ export async function GET(req: Request | NextRequest) {
   const isAttested = result.isAttested ?? result.isValid;
   const isEnforced = process.env.ENFORCE_APP_CHECK === "true";
 
+  let action: string;
+  if (isAttested) {
+    action = "No action required.";
+  } else if (isEnforced) {
+    action = result.action || "Please try again.";
+  } else {
+    action = "Fail-open mode active: no action required.";
+  }
+
   return NextResponse.json({
     verified: isAttested,
     criticalRisk: isEnforced ? result.criticalRisk || false : false,
@@ -87,11 +96,7 @@ export async function GET(req: Request | NextRequest) {
     reason: isAttested
       ? result.reason || "Device verified successfully"
       : result.reason || "Device attestation unverified (fail-open mode)",
-    action: isAttested
-      ? "No action required."
-      : isEnforced
-        ? result.action || "Please try again."
-        : "Fail-open mode active: no action required.",
+    action,
     latestVersion,
     minVersion,
     type: "security",

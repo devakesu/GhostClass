@@ -1,7 +1,7 @@
 # GhostClass Mobile
 
-![Flutter](https://img.shields.io/badge/Flutter-3.47.4-02569B?style=for-the-badge&logo=flutter&logoColor=white)
-![Dart](https://img.shields.io/badge/Dart-3.13.3-0175C2?style=for-the-badge&logo=dart&logoColor=white)
+![Flutter](https://img.shields.io/badge/Flutter-3.50.0-02569B?style=for-the-badge&logo=flutter&logoColor=white)
+![Dart](https://img.shields.io/badge/Dart-3.14.0-0175C2?style=for-the-badge&logo=dart&logoColor=white)
 ![Android](https://img.shields.io/badge/Android-10+-3DDC84?style=for-the-badge&logo=android&logoColor=black)
 ![iOS](https://img.shields.io/badge/iOS-13+-000000?style=for-the-badge&logo=apple&logoColor=white)
 ![License](https://img.shields.io/badge/License-GPL%20v3-blue?style=for-the-badge)
@@ -47,8 +47,8 @@ are stored in hardware-backed secure storage — never in plain SharedPreference
 
 | Package     | Version | Purpose                     |
 | :---------- | :------ | :-------------------------- |
-| **Flutter** | 3.47.4  | Cross-platform UI framework |
-| **Dart**    | 3.13.3  | Language                    |
+| **Flutter** | 3.50.0  | Cross-platform UI framework |
+| **Dart**    | 3.14.0  | Language                    |
 
 ### State Management
 
@@ -74,8 +74,8 @@ are stored in hardware-backed secure storage — never in plain SharedPreference
 
 | Package                  | Version | Purpose                            |
 | :----------------------- | :------ | :--------------------------------- |
-| `firebase_core`          | ^4.7.0  | Firebase SDK                       |
-| `firebase_app_check`     | ^0.4.3  | Device integrity & API protection  |
+| `firebase_core`          | ^5.1.0  | Firebase SDK                       |
+| `firebase_app_check`     | ^0.5.1  | Device integrity & API protection  |
 | `flutter_secure_storage` | ^11.0.0 | Hardware-backed credential storage |
 | `pointycastle`           | ^3.9.1  | Certificate & ASN1 parsing         |
 | `encrypt`                | ^5.0.3  | AES-256 symmetric encryption       |
@@ -84,8 +84,8 @@ are stored in hardware-backed secure storage — never in plain SharedPreference
 
 | Package                 | Version   | Purpose                     |
 | :---------------------- | :-------- | :-------------------------- |
-| `lucide_icons_flutter`  | ^3.1.14+1 | Icon set (matches web)      |
-| `google_fonts`          | ^8.0.2    | Typography                  |
+| `lucide_icons_flutter`  | ^4.0.3    | Icon set (matches web)      |
+| `google_fonts`          | ^9.0.0    | Typography                  |
 | `flutter_animate`       | ^4.5.2    | Declarative animations      |
 | `fl_chart`              | ^1.2.0    | Attendance trend charts     |
 | `flutter_markdown_plus` | ^1.0.7    | Help page Markdown renderer |
@@ -94,7 +94,7 @@ are stored in hardware-backed secure storage — never in plain SharedPreference
 
 | Package                         | Version | Purpose                      |
 | :------------------------------ | :------ | :--------------------------- |
-| `sentry_flutter` + `sentry_dio` | ^9.18.0 | Error tracking + performance |
+| `sentry_flutter` + `sentry_dio` | ^10.4.0 | Error tracking + performance |
 
 ### Utilities
 
@@ -214,16 +214,35 @@ mobile/
 
 ## 🚀 Getting Started
 
-### Prerequisites
+### Option A: Dev Container Setup (Recommended)
 
-- **Flutter SDK** — 3.47.4
+GhostClass includes a pre-configured Dev Container (`.devcontainer/devcontainer.json`) containing Flutter 3.50.0, Dart 3.14.0, OpenJDK 21, and Android SDK commandline tools:
+
+1. Open the repository root in VS Code or Antigravity IDE and choose **"Reopen in Container"** (or run `bash .devcontainer/setup-dev-hub.sh`).
+2. Start the host ADB bridge on your host machine to connect an Android Emulator or Physical Device:
+   - **Windows Host**: Run `.\.devcontainer\Start.ps1` in PowerShell.
+   - **macOS / Linux Host**: Run `bash .devcontainer/start.sh` in a host terminal.
+   - Choose `[1] Android Emulator` (with dynamic AVD detection) or `[2] Physical Device`.
+3. Inside the container, the background daemon `scripts/adb_forward_bridge.py` automatically bridges the Dart VM Service and DevTools ports.
+4. Create `lib/config/app_secrets.dart` (see [Secrets Setup](#secrets-setup)) and run:
+
+   ```bash
+   cd mobile
+   flutter run
+   ```
+
+### Option B: Local Host Setup (Without Dev Container)
+
+#### Prerequisites
+
+- **Flutter SDK** — 3.50.0
   ([install](https://docs.flutter.dev/get-started/install))
-- **Dart SDK** — 3.13.3 (bundled with Flutter)
+- **Dart SDK** — 3.14.0 (bundled with Flutter)
 - **Android Studio / Xcode** — for emulator/simulator
 - **Firebase CLI** — for App Check configuration
 - **A GhostClass backend** — see the [root README](../README.md) for web setup
 
-### Quick Start
+#### Quick Start
 
 ```bash
 # 1. From the repo root, navigate to the mobile app

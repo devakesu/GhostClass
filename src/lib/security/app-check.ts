@@ -132,7 +132,7 @@ async function verifyCsrfTokenWithSessionBinding(
       const timeoutPromise = new Promise<null>((_, reject) => {
         timeoutId = setTimeout(
           () => reject(new Error("Redis session binding lookup timed out")),
-          1500,
+          800,
         );
       });
 
@@ -157,9 +157,9 @@ async function verifyCsrfTokenWithSessionBinding(
         return { isValid: false, error: "CSRF token session mismatch" };
       }
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
       logger.warn(
-        "CSRF session binding check unavailable; falling back to valid cookie token",
-        error,
+        `CSRF session binding check unavailable (${msg}); falling back to valid cookie token`,
       );
       // Cryptographic synchronizer token has already been validated against the httpOnly
       // cookie above. Allow request through to prevent Redis outages from halting web clients.
@@ -167,6 +167,70 @@ async function verifyCsrfTokenWithSessionBinding(
     }
   }
   return { isValid: true };
+}
+
+function handleMissingToken(isEnforced: boolean): AppCheckResult {
+  if (isEnforced) {
+    return {
+      isValid: false,
+      isAttested: false,
+      error: "Missing mandatory App Check token",
+      reason: SECURITY_ERRORS.MISSING_TOKEN.reason,
+      action: SECURITY_ERRORS.MISSING_TOKEN.action,
+    };
+  }
+  return { isValid: true, isAttested: false };
+}
+
+function handleOfflineAppCheck(isEnforced: boolean): AppCheckResult {
+  if (isEnforced) {
+    return {
+      isValid: false,
+      isAttested: false,
+      error: "Security Infrastructure Offline",
+      reason: "The server's security verifier is unavailable.",
+      action: "Please try again later.",
+    };
+  }
+  return { isValid: true, isAttested: false, alreadyLogged: true };
+}
+
+function handleUnauthorizedApp(
+  isEnforced: boolean,
+  appId: string,
+): AppCheckResult {
+  logger.warn(
+    `App Check unauthorized appId: ${appId} (enforced: ${isEnforced})`,
+  );
+  return {
+    isValid: !isEnforced,
+    isAttested: false,
+    error: "Unauthorized Application",
+    reason: SECURITY_ERRORS.UNAUTHORIZED_APP.reason,
+    action: SECURITY_ERRORS.UNAUTHORIZED_APP.action,
+    criticalRisk: isEnforced,
+  };
+}
+
+function handleVerificationError(
+  isEnforced: boolean,
+  error: unknown,
+): AppCheckResult {
+  const errMsg = error instanceof Error ? error.message : String(error);
+  if (isEnforced) {
+    Sentry.captureException(error);
+  } else {
+    logger.warn("App Check verification failed (fail-open mode):", error);
+  }
+  return {
+    isValid: !isEnforced,
+    isAttested: false,
+    error: "Security Verification Failed",
+    reason: SECURITY_ERRORS.VERIFICATION_FAILED.reason,
+    action: SECURITY_ERRORS.VERIFICATION_FAILED.action,
+    criticalRisk: isEnforced,
+    integrity: { error: errMsg },
+  };
 }
 
 export async function verifyAppCheckToken(
@@ -177,32 +241,10 @@ export async function verifyAppCheckToken(
   const headerList = req ? req.headers : await nextHeaders();
   const token = headerList.get("X-Firebase-AppCheck");
 
-  if (!token) {
-    if (isEnforced) {
-      return {
-        isValid: false,
-        isAttested: false,
-        error: "Missing mandatory App Check token",
-        reason: SECURITY_ERRORS.MISSING_TOKEN.reason,
-        action: SECURITY_ERRORS.MISSING_TOKEN.action,
-      };
-    }
-    return { isValid: true, isAttested: false };
-  }
+  if (!token) return handleMissingToken(isEnforced);
 
   const appCheck = getAppCheck();
-  if (!appCheck) {
-    if (isEnforced) {
-      return {
-        isValid: false,
-        isAttested: false,
-        error: "Security Infrastructure Offline",
-        reason: "The server's security verifier is unavailable.",
-        action: "Please try again later.",
-      };
-    }
-    return { isValid: true, isAttested: false, alreadyLogged: true };
-  }
+  if (!appCheck) return handleOfflineAppCheck(isEnforced);
 
   try {
     const decodedToken = await appCheck.verifyToken(token, {
@@ -214,27 +256,7 @@ export async function verifyAppCheckToken(
     ];
 
     if (!authIds.includes(decodedToken.appId)) {
-      logger.warn(
-        `App Check unauthorized appId: ${decodedToken.appId} (enforced: ${isEnforced})`,
-      );
-      if (isEnforced) {
-        return {
-          isValid: false,
-          isAttested: false,
-          error: "Unauthorized Application",
-          reason: SECURITY_ERRORS.UNAUTHORIZED_APP.reason,
-          action: SECURITY_ERRORS.UNAUTHORIZED_APP.action,
-          criticalRisk: true,
-        };
-      }
-      return {
-        isValid: true,
-        isAttested: false,
-        error: "Unauthorized Application",
-        reason: SECURITY_ERRORS.UNAUTHORIZED_APP.reason,
-        action: SECURITY_ERRORS.UNAUTHORIZED_APP.action,
-        criticalRisk: false,
-      };
+      return handleUnauthorizedApp(isEnforced, decodedToken.appId);
     }
 
     return {
@@ -243,32 +265,7 @@ export async function verifyAppCheckToken(
       integrity: { appId: decodedToken.appId, ...(decodedToken.token || {}) },
     };
   } catch (error: unknown) {
-    if (isEnforced) {
-      Sentry.captureException(error);
-      return {
-        isValid: false,
-        isAttested: false,
-        error: "Security Verification Failed",
-        reason: SECURITY_ERRORS.VERIFICATION_FAILED.reason,
-        action: SECURITY_ERRORS.VERIFICATION_FAILED.action,
-        criticalRisk: true,
-        integrity: {
-          error: error instanceof Error ? error.message : String(error),
-        },
-      };
-    }
-    logger.warn("App Check verification failed (fail-open mode):", error);
-    return {
-      isValid: true,
-      isAttested: false,
-      error: "Security Verification Failed",
-      reason: SECURITY_ERRORS.VERIFICATION_FAILED.reason,
-      action: SECURITY_ERRORS.VERIFICATION_FAILED.action,
-      criticalRisk: false,
-      integrity: {
-        error: error instanceof Error ? error.message : String(error),
-      },
-    };
+    return handleVerificationError(isEnforced, error);
   }
 }
 

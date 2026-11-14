@@ -6,15 +6,15 @@ ARG SOURCE_DATE_EPOCH=1767225600
 # ===============================
 # 0.1. Base layer with npm upgrade (pinned by hash)
 # ===============================
-FROM node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS base
+FROM node:26.13.1-alpine3.24@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS base
 
 # Update npm to version 12 without using `npm install -g` (avoids scorecard "npmCommand not pinned" flag).
 # /usr/local/bin/npm already symlinks to /usr/local/lib/node_modules/npm/bin/npm-cli.js,
 # so overwriting that directory via tar achieves the same result with no unpinned npm invocation.
 # The tarball is verified by SHA-256 before extraction.
 RUN apk add --no-cache wget && \
-  wget -O /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-12.0.2.tgz && \
-  echo "5dbb86c71d07a1957f2e90734092dd6a58bdcd9ebc2d8d41ca1c6e6a21d364e1  /tmp/npm.tgz" | sha256sum -c - && \
+  wget -O /tmp/npm.tgz https://registry.npmjs.org/npm/-/npm-12.2.2.tgz && \
+  echo "07fecbf753e2c3bc10ebeb3e9ed8738f6a0cc1292998b79e2e9f1dd2a5525e0c  /tmp/npm.tgz" | sha256sum -c - && \
   rm -rf /usr/local/lib/node_modules/npm && \
   mkdir -p /usr/local/lib/node_modules/npm && \
   tar -xz --strip-components=1 -C /usr/local/lib/node_modules/npm -f /tmp/npm.tgz && \
@@ -206,7 +206,7 @@ RUN sed -i -E 's|(process\.env\.NEXT_PRIVATE_STANDALONE_DIR[ =]+["'"'"'])/app/?(
 # ===============================
 # 3. Runtime layer
 # ===============================
-FROM node:24.18.1-alpine3.24@sha256:f70403e87646dc51b45295f4b8b70cdad0b63d2297c4c9899119b03f7af7a6b3 AS runner
+FROM node:26.13.1-alpine3.24@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS runner
 
 ARG SOURCE_DATE_EPOCH
 ARG APP_COMMIT_SHA
@@ -252,11 +252,11 @@ RUN addgroup --system --gid 1001 nodejs && \
     set -eu; \
     ARCH=$(uname -m); \
     case "${ARCH}" in \
-      x86_64) INF_ARCH="amd64"; EXPECTED_SHA="64a47155083c7b8042de64e67eee5629bf894903c102f7239f69c7ed93fdbfc5" ;; \
-      aarch64|arm64) INF_ARCH="arm64"; EXPECTED_SHA="28c3593bb14e4739f00058419304f6ffeb94741114efcc4208d74bdfc4ea881f" ;; \
+      x86_64) INF_ARCH="amd64"; EXPECTED_SHA="b0ddefa3f744f66cdeb5c5beab94ce3c28c7d12a4db03de612c0eb079f6a5655" ;; \
+      aarch64|arm64) INF_ARCH="arm64"; EXPECTED_SHA="f2e637e4d91e0075f849434a9537f301e83b46c803125dc247aefe534aa127ff" ;; \
       *) echo "Unsupported arch: ${ARCH}"; exit 1 ;; \
     esac; \
-    wget -O /tmp/infisical.tar.gz "https://github.com/Infisical/cli/releases/download/v0.43.84/cli_0.43.84_linux_${INF_ARCH}.tar.gz" && \
+    wget -O /tmp/infisical.tar.gz "https://github.com/Infisical/cli/releases/download/v0.45.8/cli_0.45.8_linux_${INF_ARCH}.tar.gz" && \
     echo "${EXPECTED_SHA}  /tmp/infisical.tar.gz" | sha256sum -c - && \
     tar -xz -C /usr/local/bin -f /tmp/infisical.tar.gz infisical && \
     rm -f /tmp/infisical.tar.gz

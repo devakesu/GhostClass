@@ -111,15 +111,15 @@ git config --global --add safe.directory /ghostclass 2>/dev/null || true
 if [ -f "$TARGET_DIR/package.json" ]; then
     echo "📦 Synchronizing Node/NPM dependencies in $TARGET_DIR..."
     if [ -f "$TARGET_DIR/package-lock.json" ]; then
-        (cd "$TARGET_DIR" && npm ci --legacy-peer-deps || npm install --legacy-peer-deps)
-    else
-        (cd "$TARGET_DIR" && npm install --legacy-peer-deps)
+        (cd "$TARGET_DIR" && npm ci --legacy-peer-deps)
     fi
 fi
 
 if [ -f "$TARGET_DIR/workers/package.json" ]; then
     echo "📦 Synchronizing Workers dependencies..."
-    (cd "$TARGET_DIR/workers" && npm install) 2>/dev/null || true
+    if [ -f "$TARGET_DIR/workers/package-lock.json" ]; then
+        (cd "$TARGET_DIR/workers" && npm ci) 2>/dev/null || true
+    fi
 fi
 
 if [ -d "$TARGET_DIR/mobile" ] && command -v flutter >/dev/null 2>&1; then
@@ -179,7 +179,10 @@ fi
 # --- 8. UI/UX SKILLS & IMPECCABLE INITIALIZATION ---
 echo "🎨 Initializing UI/UX skills & Impeccable..."
 if ! command -v uipro >/dev/null 2>&1; then
-    sudo npm install -g ui-ux-pro-max-cli@2.15.0 >/dev/null 2>&1 || npm install -g ui-ux-pro-max-cli@2.15.0 >/dev/null 2>&1 || true
+    NPM_CLI="$(command -v npm 2>/dev/null || true)"
+    if [ -n "$NPM_CLI" ]; then
+        sudo node "$NPM_CLI" install -g ui-ux-pro-max-cli@2.15.0 >/dev/null 2>&1 || true
+    fi
 fi
 
 (

@@ -27,15 +27,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Initialize CodeQL (JS/TS)
-        uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        uses: github/codeql-action/init@52cf1852265d99e9bea071b03366fc777a602909
         with:
           languages: javascript-typescript
 
       - name: Autobuild (JS/TS)
-        uses: github/codeql-action/autobuild@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        uses: github/codeql-action/autobuild@52cf1852265d99e9bea071b03366fc777a602909
 
       - name: Run CodeQL analysis (JS/TS)
-        uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        uses: github/codeql-action/analyze@52cf1852265d99e9bea071b03366fc777a602909
         with:
           category: "/language:javascript-typescript"
 
@@ -51,15 +51,15 @@ jobs:
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
 
       - name: Initialize CodeQL (Actions)
-        uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        uses: github/codeql-action/init@52cf1852265d99e9bea071b03366fc777a602909
         with:
           languages: actions
 
       - name: Autobuild (Actions)
-        uses: github/codeql-action/autobuild@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        uses: github/codeql-action/autobuild@52cf1852265d99e9bea071b03366fc777a602909
 
       - name: Run CodeQL analysis (Actions)
-        uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        uses: github/codeql-action/analyze@52cf1852265d99e9bea071b03366fc777a602909
         with:
           category: "/language:actions"
 
@@ -80,7 +80,7 @@ jobs:
           echo "497c8c2a7e5031f6aa847f88104aa80a93532ec32ee17bdb8d1d2f67a194a9c7  mobile/android/gradle/wrapper/gradle-wrapper.jar" | sha256sum -c -
 
       - name: Set up JDK
-        uses: actions/setup-java@b6effb05e454b25005698d916606bdc6ffcbf961
+        uses: actions/setup-java@d1374f8ac74474200d16ef8ecee22c7ae7a51880
         with:
           distribution: "temurin"
           java-version: "25"
@@ -130,7 +130,7 @@ jobs:
           fi
 
       - name: Initialize CodeQL (Java + Kotlin)
-        uses: github/codeql-action/init@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        uses: github/codeql-action/init@52cf1852265d99e9bea071b03366fc777a602909
         with:
           languages: java-kotlin
           build-mode: manual
@@ -140,6 +140,6 @@ jobs:
         run: ./gradlew :app:compileDebugSources --no-daemon
 
       - name: Run CodeQL analysis (Android)
-        uses: github/codeql-action/analyze@e58424170fb0262c8d7ed60a2e84b9bffe205c67
+        uses: github/codeql-action/analyze@52cf1852265d99e9bea071b03366fc777a602909
         with:
           category: "/language:java-kotlin"

@@ -18,9 +18,19 @@ you understand our development workflow and contribution process.
 
 ### Prerequisites
 
-- **Docker Desktop** (with WSL2 backend enabled)
-- **WSL2** (Linux distribution such as Ubuntu/Debian)
-- **VS Code or Antigravity IDE / any IDE with WSL/Docker Support**
+- **Docker Desktop** (with WSL2 backend enabled on Windows, or Docker Desktop / Engine on macOS and Linux)
+- **VS Code or Antigravity IDE** with the **Dev Containers** extension (or any devcontainer-compatible IDE)
+- *(Optional - Windows)* **WSL2** (Ubuntu/Debian) for optimal host integration and SSH relay
+
+### Dev Container Workflow (Recommended)
+
+GhostClass provides an automated Dev Container (`.devcontainer/devcontainer.json` & `.devcontainer/Dockerfile`):
+
+1. **Launch**: Open the repository root in VS Code or Antigravity IDE and select **"Reopen in Container"** (or run `bash .devcontainer/setup-dev-hub.sh` from your terminal).
+2. **Auto-Initialization**: Dependencies (`npm ci`, `flutter pub get`), permissions, cache mounts, and the ADB forward bridge daemon are set up automatically via `init_workspace.sh`.
+3. **Mobile Debugging**: To debug the Flutter app on a host Android emulator or physical device, run the host bridge on your host machine:
+   - **Windows Host**: `.\.devcontainer\Start.ps1`
+   - **macOS / Linux Host**: `bash .devcontainer/start.sh`
 
 Complete step-by-step dev container environment setup:
 **[Getting Started / Dev Container Setup](../README.md#-getting-started)**.
