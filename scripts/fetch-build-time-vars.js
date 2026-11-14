@@ -110,6 +110,20 @@ async function fetchSecrets(
 }
 
 /**
+ * Helper to mask single or multi-line values in GitHub Actions logs.
+ */
+function maskValue(val) {
+  if (!val) return;
+  const str = String(val);
+  for (const line of str.split(/\r?\n/)) {
+    const trimmed = line.trim();
+    if (trimmed.length > 0) {
+      console.log(`::add-mask::${trimmed}`);
+    }
+  }
+}
+
+/**
  * Exports secrets to GITHUB_ENV and registers masks for sensitive values.
  */
 function exportSecrets(secrets) {
@@ -117,6 +131,11 @@ function exportSecrets(secrets) {
 
   // Define exactly which keys should be masked in GitHub logs
   const keysToMask = [
+    "GOOGLE_SERVICES_JSON_BASE64",
+    "MOBILE_SENTRY_AUTH_TOKEN",
+    "FIREBASE_API_KEY_ANDROID",
+    "FIREBASE_API_KEY_IOS",
+    "NEXT_PUBLIC_MOBILE_SENTRY_DSN",
     "NEXT_PUBLIC_BACKEND_URL",
     "NEXT_PUBLIC_SUPABASE_URL",
     "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
@@ -125,6 +144,8 @@ function exportSecrets(secrets) {
     "NEXT_PUBLIC_SENTRY_DSN",
     "NEXT_PUBLIC_TURNSTILE_SITE_KEY",
     "NEXT_PUBLIC_GA_ID",
+    "FIREBASE_PROJECT_ID",
+    "FIREBASE_STORAGE_BUCKET",
   ];
 
   // Explicitly omit dev URLs/keys from masking
@@ -133,30 +154,43 @@ function exportSecrets(secrets) {
     "NEXT_PUBLIC_SUPABASE_DEV_PUBLISHABLE_KEY",
   ];
 
+  // Also mask any key matching sensitive token/secret patterns
+  const sensitivePattern = /(_KEY|_SECRET|_TOKEN|_PASSWORD|_AUTH|_DSN|_BASE64)$/i;
+
+  function shouldMask(key) {
+    if (keysToOmitFromMasking.includes(key)) return false;
+    if (keysToMask.includes(key)) return true;
+    return sensitivePattern.test(key);
+  }
+
   if (githubEnvFile) {
     console.log(`📝 Exporting variables to GITHUB_ENV...`);
     for (const secret of secrets) {
       if (
-        keysToMask.includes(secret.secretKey) &&
-        !keysToOmitFromMasking.includes(secret.secretKey) &&
+        shouldMask(secret.secretKey) &&
         secret.secretValue
       ) {
-        console.log(`::add-mask::${secret.secretValue}`);
+        maskValue(secret.secretValue);
       }
-      fs.appendFileSync(
-        githubEnvFile,
-        `${secret.secretKey}=${secret.secretValue}\n`,
-      );
+      if (secret.secretValue && String(secret.secretValue).includes("\n")) {
+        const delimiter = `EOF_${Date.now()}_${Math.random().toString(36).substring(2, 8)}`;
+        fs.appendFileSync(
+          githubEnvFile,
+          `${secret.secretKey}<<${delimiter}\n${secret.secretValue}\n${delimiter}\n`,
+        );
+      } else {
+        fs.appendFileSync(
+          githubEnvFile,
+          `${secret.secretKey}=${secret.secretValue || ""}\n`,
+        );
+      }
       console.log(`   + ${secret.secretKey}`);
     }
     console.log(`🎉 Variables exported successfully!`);
   } else {
     console.log(`ℹ️ GITHUB_ENV is not set. Values loaded:`);
     for (const secret of secrets) {
-      if (
-        keysToMask.includes(secret.secretKey) &&
-        !keysToOmitFromMasking.includes(secret.secretKey)
-      ) {
+      if (shouldMask(secret.secretKey)) {
         console.log(`   ${secret.secretKey}=[MASKED]`);
       } else {
         console.log(`   ${secret.secretKey}=${secret.secretValue}`);
