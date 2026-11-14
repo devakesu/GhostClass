@@ -1,303 +1,333 @@
-# syntax=docker/dockerfile:1.4@sha256:9ba7531bd80fb0a858632727cf7a112fbfd19b17e94c4e84ced81e24ef1a0dbc
+# syntax=docker/dockerfile:1@sha256:4edf897a3ffa55b89f906fc8cc78afdb3f1834cc9c7083565e611a8a7d5fe99e
+FROM mcr.microsoft.com/devcontainers/base:ubuntu-24.04@sha256:d94c97dd9cacf183d0a6fd12a8e87b526e9e928307674ae9c94139139c0c6eae
 
-# Main Base Image (Ubuntu 24.04 GLIBC compatible)
-FROM mcr.microsoft.com/devcontainers/base:2.1.7-ubuntu24.04@sha256:4bcb1b466771b1ba1ea110e2a27daea2f6093f9527fb75ee59703ec89b5561cb
-
+ARG TARGETARCH
 USER root
 
-# 1. Native System Runtime & Dependencies
-RUN apt-get update && apt-get install -y --no-install-recommends \
+# ==============================================================================
+# 1. Native Dependencies & Toolchains (Pinned by SHA256)
+# ==============================================================================
+RUN install -m 0755 -d /etc/apt/keyrings \
+    # NodeSource Repo (Node 24 LTS)
+    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key -o /tmp/nodesource.key \
+    && echo "b42e0321dabdc24e892115da705cf061167eac12a317f23d329862d0aa0a271d  /tmp/nodesource.key" | sha256sum -c - \
+    && gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg /tmp/nodesource.key \
+    && rm -f /tmp/nodesource.key \
+    && chmod 644 /etc/apt/keyrings/nodesource.gpg \
+    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" > /etc/apt/sources.list.d/nodesource.list \
+    # GitHub CLI Repo
+    && curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg -o /tmp/githubcli.gpg \
+    && echo "6084d5d7bd8e288441e0e94fc6275570895da18e6751f70f057485dc2d1a811b  /tmp/githubcli.gpg" | sha256sum -c - \
+    && install -m 0644 /tmp/githubcli.gpg /usr/share/keyrings/githubcli-archive-keyring.gpg \
+    && rm -f /tmp/githubcli.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" > /etc/apt/sources.list.d/github-cli.list \
+    # Docker CE CLI Repo
+    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg -o /tmp/docker.gpg \
+    && echo "1500c1f56fa9e26b9b8f42452a553675796ade0807cdce11975eb98170b3a570  /tmp/docker.gpg" | sha256sum -c - \
+    && gpg --dearmor -o /etc/apt/keyrings/docker.gpg /tmp/docker.gpg \
+    && rm -f /tmp/docker.gpg \
+    && chmod 644 /etc/apt/keyrings/docker.gpg \
+    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" > /etc/apt/sources.list.d/docker.list \
+    # Single unified APT update & install
+    && apt-get update && apt-get install -y --no-install-recommends \
     acl \
-    adb \
+    build-essential \
     ca-certificates \
-    curl \
+    clang \
+    cmake \
+    direnv \
+    docker-buildx-plugin \
+    docker-ce-cli \
+    docker-compose-plugin \
+    gh \
     git \
+    gnome-keyring \
     gnupg \
+    iproute2 \
+    iputils-ping \
     jq \
+    lcov \
+    libgtk-3-dev \
+    liblzma-dev \
+    libnss3-tools \
+    libsecret-1-dev \
+    mesa-utils \
+    net-tools \
+    ninja-build \
+    nodejs \
     openjdk-21-jdk-headless \
     openssh-client \
     pkg-config \
+    postgresql-client \
+    python3 \
+    redis-tools \
     socat \
     unzip \
     wget \
+    xdg-desktop-portal \
+    xdg-desktop-portal-gtk \
     zlib1g \
-    && install -m 0755 -d /etc/apt/keyrings \
-    \
-    # NodeSource Setup (Node 24)
-    && curl -fsSL https://deb.nodesource.com/gpgkey/nodesource-repo.gpg.key \
-        | gpg --dearmor -o /etc/apt/keyrings/nodesource.gpg \
-    && chmod 644 /etc/apt/keyrings/nodesource.gpg \
-    && echo "deb [signed-by=/etc/apt/keyrings/nodesource.gpg] https://deb.nodesource.com/node_24.x nodistro main" \
-        > /etc/apt/sources.list.d/nodesource.list \
-    \
-    # Docker CE Setup
-    && curl -fsSL https://download.docker.com/linux/ubuntu/gpg \
-        | gpg --dearmor -o /etc/apt/keyrings/docker.gpg \
-    && chmod 644 /etc/apt/keyrings/docker.gpg \
-    && echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/docker.gpg] https://download.docker.com/linux/ubuntu noble stable" \
-        > /etc/apt/sources.list.d/docker.list \
-    \
-    # Final package install
-    && apt-get update \
-    && apt-get install -y --no-install-recommends \
-        docker-buildx-plugin \
-        docker-ce-cli \
-        docker-compose-plugin \
-        nodejs \
-    && apt-get clean \
-    && rm -rf /var/lib/apt/lists/*
+    && apt-get clean && rm -rf /var/lib/apt/lists/*
 
-# 2. CLI Tools (Supabase + Infisical)
-USER root
-RUN set -eux; \
-    SUPABASE_URL="$(curl -fsSL https://api.github.com/repos/supabase/cli/releases/latest | jq -r '.assets[] | select(.name | contains("linux_amd64.tar.gz")) | .browser_download_url' | head -n 1)"; \
-    test -n "$SUPABASE_URL"; \
-    curl -fSL "$SUPABASE_URL" -o /tmp/supabase.tar.gz; \
-    tar -xzf /tmp/supabase.tar.gz -C /tmp; \
-    find /tmp -maxdepth 2 -type f -name supabase -exec install -m 0755 {} /usr/local/bin/supabase \; -exec rm -f {} \; ; \
-    rm -f /tmp/supabase.tar.gz; \
-    INFISICAL_URL="$(curl -fsSL https://api.github.com/repos/Infisical/cli/releases/latest | jq -r '.assets[] | select(.name | endswith("_linux_amd64.tar.gz")) | .browser_download_url' | head -n 1)"; \
-    test -n "$INFISICAL_URL"; \
-    curl -fSL "$INFISICAL_URL" -o /tmp/infisical.tar.gz; \
-    tar -xzf /tmp/infisical.tar.gz -C /tmp; \
-    find /tmp -maxdepth 3 -type f -name infisical -exec install -m 0755 {} /usr/local/bin/infisical \; -exec rm -f {} \; ; \
-    rm -f /tmp/infisical.tar.gz; \
-    command -v supabase; \
-    command -v infisical
+# Install CLI tools via npm (pinned versions)
+RUN npm install -g firebase-tools@15.36.0 @infisical/cli@0.45.8 ui-ux-pro-max-cli@2.15.0
 
-# 3. Configure Paths & Runtime Defaults
-USER vscode
+# Install docker-mcp CLI plugin (Pinned by SHA256)
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && case "${ARCH}" in \
+      amd64) \
+        DOCKER_MCP_ARCH="linux-amd64" \
+        DOCKER_MCP_SHA256="e4df4c2dcc013011519da70a546589d8db0c1461a0050070239339675cfca98c" ;; \
+      arm64) \
+        DOCKER_MCP_ARCH="linux-arm64" \
+        DOCKER_MCP_SHA256="9d833fffb523c290cbd6e69d830a6f525998de0096cddb484ffecd7ce1d3096d" ;; \
+      *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+    esac \
+    && mkdir -p /usr/libexec/docker/cli-plugins \
+    && curl -fsSL "https://github.com/docker/mcp-gateway/releases/download/v0.44.3/docker-mcp-${DOCKER_MCP_ARCH}.tar.gz" -o /tmp/docker-mcp.tar.gz \
+    && echo "${DOCKER_MCP_SHA256}  /tmp/docker-mcp.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/docker-mcp.tar.gz -C /usr/libexec/docker/cli-plugins \
+    && rm -f /tmp/docker-mcp.tar.gz \
+    && chmod 755 /usr/libexec/docker/cli-plugins/docker-mcp
+
+# Install Sentry CLI & Astral uv with redis-mcp-server (Pinned by SHA256)
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && case "${ARCH}" in \
+      amd64) \
+        SENTRY_ARCH="x86_64" \
+        SENTRY_SHA256="c958865f9d4000183509ea21b1f04925d5390de6d8d87386b9e69f2b305070c3" \
+        UV_ARCH="x86_64" \
+        UV_SHA256="5acfd9177cfecf0bf87578f059728215ccc884388988f55f7a65041b57387d91" ;; \
+      arm64) \
+        SENTRY_ARCH="aarch64" \
+        SENTRY_SHA256="b6e49fca868a36d20da2ada1832a0ce2f9ac7012c128207518b09d6b6c991f4d" \
+        UV_ARCH="aarch64" \
+        UV_SHA256="74f2f5c6024d397481db228db8fc25eed420db192243f88438c118e7e013e585" ;; \
+      *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+    esac \
+    && curl -fsSL "https://github.com/getsentry/sentry-cli/releases/download/3.8.2/sentry-cli-Linux-${SENTRY_ARCH}" -o /usr/local/bin/sentry \
+    && echo "${SENTRY_SHA256}  /usr/local/bin/sentry" | sha256sum -c - \
+    && chmod 755 /usr/local/bin/sentry \
+    && curl -fsSL "https://github.com/astral-sh/uv/releases/download/0.13.8/uv-${UV_ARCH}-unknown-linux-gnu.tar.gz" -o /tmp/uv.tar.gz \
+    && echo "${UV_SHA256}  /tmp/uv.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/uv.tar.gz -C /tmp \
+    && install -m 0755 "/tmp/uv-${UV_ARCH}-unknown-linux-gnu/uv" /usr/local/bin/uv \
+    && install -m 0755 "/tmp/uv-${UV_ARCH}-unknown-linux-gnu/uvx" /usr/local/bin/uvx \
+    && rm -rf /tmp/uv* \
+    && env UV_TOOL_DIR="/usr/local/share/uv-tools" UV_TOOL_BIN_DIR="/usr/local/bin" uv tool install --force redis-mcp-server
+
+# ==============================================================================
+# 2. Chrome / Chromium Browser (Pinned by SHA256)
+# ==============================================================================
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && case "${ARCH}" in \
+      amd64) \
+        CHROME_SHA256="4d740636b5c96f687798602c5aad6a5a270f44dd02e48db0638ae77aa4867b1b" \
+        && curl -fsSL "https://dl.google.com/linux/direct/google-chrome-stable_current_amd64.deb" -o /tmp/chrome.deb \
+        && echo "${CHROME_SHA256}  /tmp/chrome.deb" | sha256sum -c - \
+        && apt-get update && apt-get install -y --no-install-recommends /tmp/chrome.deb \
+        && rm -f /tmp/chrome.deb ;; \
+      arm64) \
+        apt-get update && apt-get install -y --no-install-recommends software-properties-common \
+        && add-apt-repository -y ppa:xtradeb/apps \
+        && apt-get update && apt-get install -y --no-install-recommends chromium \
+        && ln -sf /usr/bin/chromium /usr/bin/google-chrome ;; \
+      *) echo "Unsupported architecture for browser installation: ${ARCH}" && exit 1 ;; \
+    esac \
+    && apt-get clean && rm -rf /var/lib/apt/lists/* \
+    && if [ -f /usr/bin/google-chrome ]; then \
+         mv /usr/bin/google-chrome /usr/bin/google-chrome-orig \
+         && printf '#!/bin/bash\nexec /usr/bin/google-chrome-orig --no-sandbox --disable-dev-shm-usage "$@"\n' > /usr/bin/google-chrome \
+         && chmod 755 /usr/bin/google-chrome; \
+       fi
+
+# ==============================================================================
+# 3. Multi-Arch Supabase CLI (Pinned by SHA256)
+# ==============================================================================
+RUN ARCH="${TARGETARCH:-$(dpkg --print-architecture)}" \
+    && case "${ARCH}" in \
+      amd64) \
+        SUPA_ARCH="amd64" \
+        SUPA_SHA256="dbe9fd66771337fc198727da86b9d3551302f87a7091cd8781be2a4cd0c8ac4d" ;; \
+      arm64) \
+        SUPA_ARCH="arm64" \
+        SUPA_SHA256="e49b2ab2f4fb428f4e033174d6d9747dd93c95d1504142ba5090699b1ecd2563" ;; \
+      *) echo "Unsupported architecture: ${ARCH}" && exit 1 ;; \
+    esac \
+    && curl -fsSL "https://github.com/supabase/cli/releases/download/v3.1.0/supabase_3.1.0_linux_${SUPA_ARCH}.tar.gz" -o /tmp/supabase.tar.gz \
+    && echo "${SUPA_SHA256}  /tmp/supabase.tar.gz" | sha256sum -c - \
+    && tar -xzf /tmp/supabase.tar.gz -C /usr/local/bin supabase \
+    && rm -f /tmp/supabase.tar.gz \
+    && chmod 755 /usr/local/bin/supabase
+
+# ==============================================================================
+# 4. Directories Pre-Creation & Environment
+# ==============================================================================
+ENV ANDROID_HOME="/opt/android-sdk"
+ENV FLUTTER_HOME="/opt/flutter"
+ENV CHROME_EXECUTABLE="/usr/bin/google-chrome"
+ENV PLAYWRIGHT_BROWSERS_PATH="/home/vscode/.cache/ms-playwright"
 ENV HOME="/home/vscode"
-ENV DEV_HUB="$HOME/dev-hub"
-ENV FLUTTER_HOME="$DEV_HUB/sdks/flutter"
-ENV ANDROID_HOME="$DEV_HUB/sdks/android"
 ENV PUB_CACHE="$HOME/.pub-cache"
-ENV PLAYWRIGHT_BROWSERS_PATH="$DEV_HUB/caches/playwright-browsers"
 ENV NODE_OPTIONS="--max-old-space-size=9216"
 ENV NPM_CONFIG_UPDATE_NOTIFIER="false"
-ENV PATH="$PATH:$DEV_HUB/bin:$FLUTTER_HOME/bin:$ANDROID_HOME/cmdline-tools/latest/bin:$ANDROID_HOME/platform-tools:$PUB_CACHE/bin"
+ENV PATH="$PATH:${FLUTTER_HOME}/bin:${ANDROID_HOME}/cmdline-tools/latest/bin:${ANDROID_HOME}/platform-tools:${PUB_CACHE}/bin"
 
-# Backwards-compatibility symlink for sdk-mounts
-RUN mkdir -p $HOME/dev-hub/sdks && ln -sf $HOME/dev-hub/sdks $HOME/sdk-mounts
+# Pre-create SDK and volume target dirs with vscode ownership ONCE
+RUN mkdir -p ${ANDROID_HOME} \
+             ${FLUTTER_HOME} \
+             /home/vscode/.pub-cache \
+             /home/vscode/.gradle \
+             /home/vscode/.npm \
+             /home/vscode/.cache/ms-playwright \
+             /home/vscode/.ssh \
+             /workspaces/GhostClass/mobile/.dart_tool \
+             /workspaces/GhostClass/mobile/build \
+    && touch /home/vscode/.sudo_as_admin_successful /home/vscode/.hushlogin \
+    && chown -R vscode:vscode ${ANDROID_HOME} ${FLUTTER_HOME} /home/vscode /workspaces \
+    && chmod -R 775 /workspaces/GhostClass \
+    && ln -sf /workspaces/GhostClass /ghostclass
 
-# 4. Bake IDE Settings & Cross-IDE Extension Symlinks
-RUN mkdir -p $HOME/.antigravity-server/data/Machine \
-             $HOME/.antigravity-ide-server/data/Machine \
-             $HOME/.vscode-server/data/Machine \
-             $HOME/.vscode-server/extensions \
-    && ln -s $HOME/.vscode-server/extensions $HOME/.antigravity-server/extensions \
-    && ln -s $HOME/.vscode-server/extensions $HOME/.antigravity-ide-server/extensions \
+# ==============================================================================
+# 5. Non-Root Toolchain Setup (Pinned by SHA256)
+# ==============================================================================
+USER vscode
+
+# Android SDK Tools (Pinned by SHA256, Android 36 + 35 + 34, BuildTools 36.1.0, 36.0.0, 35.0.0, 34.0.0, 28.0.3)
+RUN mkdir -p ${ANDROID_HOME}/cmdline-tools \
+    && curl -fsSL "https://dl.google.com/android/repository/commandlinetools-linux-15859902_latest.zip" -o /tmp/cmdline-tools.zip \
+    && echo "4e4c464f145a7512b57d088ac6c278c03c9eea610886b35a5e0804e74eedf583  /tmp/cmdline-tools.zip" | sha256sum -c - \
+    && unzip -q /tmp/cmdline-tools.zip -d /tmp \
+    && mv /tmp/cmdline-tools ${ANDROID_HOME}/cmdline-tools/latest \
+    && rm -f /tmp/cmdline-tools.zip \
+    && yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true \
+    && ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager \
+        "platform-tools" \
+        "platforms;android-36" \
+        "platforms;android-35" \
+        "platforms;android-34" \
+        "build-tools;36.1.0" \
+        "build-tools;36.0.0" \
+        "build-tools;35.0.0" \
+        "build-tools;34.0.0" \
+        "build-tools;28.0.3" >/dev/null \
+    && yes | ${ANDROID_HOME}/cmdline-tools/latest/bin/sdkmanager --licenses >/dev/null 2>&1 || true
+
+# Flutter SDK (Pinned by SHA256 Linux Archive)
+RUN curl -fsSL "https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_3.50.0-stable.tar.xz" -o /tmp/flutter.tar.xz \
+    && echo "6ea2d806fd57269ae783e6788e2a81fc26eaad782f1e0d0ff38623bb765ff9f5  /tmp/flutter.tar.xz" | sha256sum -c - \
+    && tar -xJf /tmp/flutter.tar.xz -C /opt \
+    && rm -f /tmp/flutter.tar.xz \
+    && git config --global --add safe.directory ${FLUTTER_HOME} \
+    && flutter config --no-analytics >/dev/null 2>&1 \
+    && flutter config --enable-linux-desktop >/dev/null 2>&1 \
+    && flutter config --android-sdk "${ANDROID_HOME}" >/dev/null 2>&1 \
+    && flutter precache --android --linux >/dev/null 2>&1 || true \
+    && yes | flutter doctor --android-licenses >/dev/null 2>&1 || true
+
+# ==============================================================================
+# 6. Multi-IDE Machine Settings & Extension Symlinks
+# ==============================================================================
+RUN for dir in .antigravity-server .antigravity-ide-server .vscode-server .cursor-server; do \
+      mkdir -p "$HOME/$dir/data/Machine"; \
+    done \
+    && ln -sf $HOME/.vscode-server/extensions $HOME/.antigravity-server/extensions \
+    && ln -sf $HOME/.vscode-server/extensions $HOME/.antigravity-ide-server/extensions \
+    && ln -sf $HOME/.vscode-server/extensions $HOME/.cursor-server/extensions \
     && SETTINGS='{ \
-        "remote.forwardAgent": false, \
+        "remote.forwardAgent": true, \
+        "dart.flutterSdkPath": "/opt/flutter", \
         "editor.formatOnSave": true, \
+        "editor.defaultFormatter": "esbenp.prettier-vscode", \
+        "[dart]": { \
+            "editor.defaultFormatter": "Dart-Code.dart-code", \
+            "editor.formatOnSave": true \
+        }, \
+        "[typescript]": { \
+            "editor.defaultFormatter": "esbenp.prettier-vscode" \
+        }, \
+        "[typescriptreact]": { \
+            "editor.defaultFormatter": "esbenp.prettier-vscode" \
+        }, \
+        "[javascript]": { \
+            "editor.defaultFormatter": "esbenp.prettier-vscode" \
+        }, \
+        "[javascriptreact]": { \
+            "editor.defaultFormatter": "esbenp.prettier-vscode" \
+        }, \
+        "[json]": { \
+            "editor.defaultFormatter": "esbenp.prettier-vscode" \
+        }, \
+        "[jsonc]": { \
+            "editor.defaultFormatter": "esbenp.prettier-vscode" \
+        }, \
         "editor.codeActionsOnSave": { \
             "source.organizeImports": "explicit", \
             "source.fixAll.eslint": "explicit" \
         }, \
-        "editor.defaultFormatter": "esbenp.prettier-vscode", \
-        "typescript.tsdk": "node_modules/typescript/lib", \
-        "typescript.inlayHints.variableTypes.enabled": true, \
-        "typescript.inlayHints.functionLikeReturnTypes.enabled": true, \
-        "typescript.inlayHints.parameterNames.enabled": "all", \
+        "js/ts.tsdk.path": "node_modules/typescript/lib", \
+        "js/ts.inlayHints.variableTypes.enabled": true, \
+        "js/ts.inlayHints.functionLikeReturnTypes.enabled": true, \
+        "js/ts.inlayHints.parameterNames.enabled": "all", \
         "eslint.validate": ["javascript", "javascriptreact", "typescript", "typescriptreact"], \
-        "errorlens.enabled": true, \
-        "dart.flutterSdkPath": "/home/vscode/dev-hub/sdks/flutter" \
+        "errorlens.enabled": true \
     }' \
     && echo "$SETTINGS" > $HOME/.antigravity-server/data/Machine/settings.json \
     && echo "$SETTINGS" > $HOME/.antigravity-ide-server/data/Machine/settings.json \
-    && echo "$SETTINGS" > $HOME/.vscode-server/data/Machine/settings.json
+    && echo "$SETTINGS" > $HOME/.vscode-server/data/Machine/settings.json \
+    && echo "$SETTINGS" > $HOME/.cursor-server/data/Machine/settings.json \
+    && mkdir -p $HOME/.gemini/config $HOME/.gemini/antigravity $HOME/.config/Claude $HOME/.cursor \
+    && MCP_CONFIG='{ \
+        "mcpServers": { \
+            "supabase": { \
+                "serverUrl": "https://mcp.supabase.com/mcp", \
+                "url": "https://mcp.supabase.com/mcp", \
+                "type": "http" \
+            }, \
+            "dart": { \
+                "command": "dart", \
+                "args": ["mcp-server"] \
+            }, \
+            "MCP_DOCKER": { \
+                "command": "docker", \
+                "args": ["mcp", "gateway", "run"] \
+            }, \
+            "context7": { \
+                "type": "http", \
+                "url": "https://mcp.context7.com/mcp", \
+                "serverUrl": "https://mcp.context7.com/mcp" \
+            }, \
+            "sentry": { \
+                "command": "sentry", \
+                "args": ["mcp"] \
+            }, \
+            "redis": { \
+                "command": "redis-mcp-server", \
+                "args": ["--url", "redis://localhost:6379/0"] \
+            }, \
+            "cloudflare": { \
+                "type": "http", \
+                "url": "https://mcp.cloudflare.com/mcp", \
+                "serverUrl": "https://mcp.cloudflare.com/mcp" \
+            } \
+        } \
+    }' \
+    && echo "$MCP_CONFIG" > $HOME/.gemini/config/mcp_config.json \
+    && echo "$MCP_CONFIG" > $HOME/.gemini/antigravity/mcp_config.json \
+    && echo "$MCP_CONFIG" > $HOME/.config/Claude/claude_desktop_config.json \
+    && echo "$MCP_CONFIG" > $HOME/.cursor/mcp.json
 
-# 5. Initialization Script Creation
+# ==============================================================================
+# 7. Companion Scripts Installation
+# ==============================================================================
 USER root
-COPY --chown=vscode:vscode --chmod=755 <<"EOF" /home/vscode/init_workspace.sh
-#!/bin/bash
-set -euo pipefail
-
-echo "🚀 Starting GhostClass Workspace Setup..."
-
-# --- 1. GIT CONFIG DIVERSION ---
-if [ ! -L "/home/vscode/.gitconfig" ]; then
-    if [ -f "/home/vscode/.gitconfig" ]; then
-        mv /home/vscode/.gitconfig /home/vscode/.gitconfig_local
-    else
-        touch /home/vscode/.gitconfig_local
-    fi
-    ln -sf /home/vscode/.gitconfig_local /home/vscode/.gitconfig
-fi
-chmod 644 /home/vscode/.gitconfig_local 2>/dev/null || true
-
-# --- 2. SSH AGENT & SIGNING SETUP ---
-echo "🔑 Checking SSH Agent Forwarding..."
-HAS_SSH_KEY=false
-CLEAN_KEY=""
-
-if [ -S "${SSH_AUTH_SOCK:-}" ] && ssh-add -L >/dev/null 2>&1; then
-    CLEAN_KEY=$(ssh-add -L 2>/dev/null | tr -d '\r' | grep -i "ghost" | head -n 1 || true)
-    [ -z "$CLEAN_KEY" ] && CLEAN_KEY=$(ssh-add -L 2>/dev/null | tr -d '\r' | head -n 1 || true)
-
-    if [ -n "$CLEAN_KEY" ]; then
-        HAS_SSH_KEY=true
-        git config --global user.signingkey "$CLEAN_KEY"
-        git config --global gpg.format ssh
-        git config --global commit.gpgsign true
-        echo "✅ SSH signing enabled."
-    fi
-else
-    echo "⚠️ SSH Agent is not active or has no keys loaded."
-fi
-
-# --- 3. GIT IDENTITY ---
-CURRENT_NAME=$(git config --global user.name 2>/dev/null || true)
-CURRENT_EMAIL=$(git config --global user.email 2>/dev/null || true)
-
-if [ -z "$CURRENT_NAME" ] || [ -z "$CURRENT_EMAIL" ]; then
-    if [ -t 0 ]; then
-        echo "👤 Setting up Git identity..."
-        [ -z "$CURRENT_NAME" ] && read -rp "Enter Git Name: " CURRENT_NAME && git config --global user.name "$CURRENT_NAME"
-        [ -z "$CURRENT_EMAIL" ] && read -rp "Enter Git Email: " CURRENT_EMAIL && git config --global user.email "$CURRENT_EMAIL"
-    else
-        AUTO_EMAIL=$(ssh-add -L 2>/dev/null | awk '{print $3}' | grep "@" | head -n 1 || true)
-        [ -z "$CURRENT_NAME" ] && git config --global user.name "${GIT_NAME:-User}"
-        [ -z "$CURRENT_EMAIL" ] && git config --global user.email "${GIT_EMAIL:-${AUTO_EMAIL:-dev@example.com}}"
-        echo "ℹ️ Auto-configured Git identity: $(git config --global user.name) <$(git config --global user.email)>"
-    fi
-fi
-
-# --- 4. POPULATE ALLOWED SIGNERS ---
-if [ "$HAS_SSH_KEY" = true ]; then
-    FINAL_EMAIL=$(git config --global user.email)
-    ALLOWED_SIGNERS_FILE="/home/vscode/.ssh/allowed_signers"
-
-    mkdir -p /home/vscode/.ssh
-    chmod 700 /home/vscode/.ssh
-
-    echo "${FINAL_EMAIL:-*} ${CLEAN_KEY}" > "$ALLOWED_SIGNERS_FILE"
-    chmod 600 "$ALLOWED_SIGNERS_FILE"
-
-    git config --global gpg.ssh.allowedSignersFile "$ALLOWED_SIGNERS_FILE"
-    echo "✅ Local SSH signature verification configured for ${FINAL_EMAIL:-*}"
-fi
-
-# --- 5. GIT SAFE DIRECTORY ---
-TARGET_DIR="${WORKSPACE_DIR:-/ghostclass}"
-
-if [ ! -d "$TARGET_DIR" ] && [ -d "$PWD" ]; then
-    TARGET_DIR="$PWD"
-fi
-
-git config --global --add safe.directory "$TARGET_DIR"
-
-# --- 6. NPM & FLUTTER SETUP ---
-if [ -f "$TARGET_DIR/package.json" ]; then
-    echo "📦 Synchronizing NPM packages..."
-    cd "$TARGET_DIR"
-
-    if [ -f "package-lock.json" ]; then
-        npm ci --legacy-peer-deps
-    else
-        echo "⚠️ No package-lock.json found; running npm install instead."
-        npm install
-    fi
-
-    echo "✅ NPM dependencies ready."
-else
-    echo "ℹ️ No package.json found yet; skipping NPM dependency installation."
-fi
-
-if [ -d "$TARGET_DIR/mobile" ] && command -v flutter >/dev/null 2>&1; then
-    echo "🐦 Synchronizing Flutter dependencies..."
-    cd "$TARGET_DIR/mobile" && flutter pub get
-    echo "✅ Flutter dependencies ready."
-fi
-
-# --- 7. EXTENSION SYNC ---
-EXTENSIONS=(
-    "Dart-Code.flutter"
-    "Dart-Code.dart-code"
-    "esbenp.prettier-vscode"
-    "dbaeumer.vscode-eslint"
-    "bradlc.vscode-tailwindcss"
-    "dsznajder.es7-react-js-snippets"
-    "formulahendry.auto-rename-tag"
-    "christian-kohler.path-intellisense"
-    "christian-kohler.npm-intellisense"
-    "davidanson.vscode-markdownlint"
-    "oderwat.indent-rainbow"
-    "usernamehw.errorlens"
-    "ms-vscode.vscode-typescript-next"
-)
-
-echo "🔍 Searching for active IDE server binaries..."
-VALID_CLIS=()
-
-while IFS= read -r binary_path; do
-    if [ -n "$binary_path" ] && "$binary_path" --version >/dev/null 2>&1; then
-        VALID_CLIS+=("$binary_path")
-    fi
-done < <(
-    find \
-        ~/.vscode-server \
-        ~/.antigravity-server \
-        ~/.antigravity-ide-server \
-        ~/.cursor-server \
-        -type f -executable \
-        \( -name "code-server" -o -name "antigravity-server" -o -name "antigravity-ide-server" -o -name "cursor-server" \) \
-        2>/dev/null || true
-)
-
-if [ ${#VALID_CLIS[@]} -eq 0 ]; then
-    echo "ℹ️ No active IDE server binaries found yet. Extensions can be installed when the IDE connects."
-else
-    while IFS= read -r CLI; do
-        [ -z "$CLI" ] && continue
-
-        echo "🔧 Synchronizing extensions via: $CLI"
-        INSTALLED_EXTS=$("$CLI" --list-extensions 2>/dev/null | tr '[:upper:]' '[:lower:]' || true)
-
-        for ext in "${EXTENSIONS[@]}"; do
-            EXT_LOWER=$(echo "$ext" | tr '[:upper:]' '[:lower:]')
-
-            if ! echo "$INSTALLED_EXTS" | grep -q "^${EXT_LOWER}$"; then
-                echo "  ⬇️ Installing extension: $ext"
-                "$CLI" --install-extension "$ext" >/dev/null 2>&1 || true
-            fi
-        done
-    done < <(printf '%s\n' "${VALID_CLIS[@]}" | sort -u)
-fi
-
-echo "🎯 Initialization Complete!"
-EOF
-
+COPY --chown=vscode:vscode --chmod=755 .devcontainer/init_workspace.sh /home/vscode/init_workspace.sh
 RUN sed -i 's/\r$//' /home/vscode/init_workspace.sh
 
-COPY --chmod=755 <<'EOF' /usr/local/bin/docker-group-entrypoint.sh
-#!/usr/bin/env bash
-
-set -euo pipefail
-
-DOCKER_SOCKET="${DOCKER_HOST_SOCKET:-/var/run/docker.sock}"
-
-if [ -S "$DOCKER_SOCKET" ]; then
-    DOCKER_GID="$(stat -c '%g' "$DOCKER_SOCKET")"
-
-    if ! getent group "$DOCKER_GID" >/dev/null 2>&1; then
-        groupadd --gid "$DOCKER_GID" docker-host
-    else
-        DOCKER_GROUP="$(getent group "$DOCKER_GID" | cut -d: -f1)"
-    fi
-
-    DOCKER_GROUP="${DOCKER_GROUP:-docker-host}"
-
-    usermod -aG "$DOCKER_GROUP" vscode
-fi
-
-exec runuser -u vscode -- "$@"
-EOF
-
-ENTRYPOINT ["/usr/local/bin/docker-group-entrypoint.sh"]
-
-# 6. User Environment Defaults & Entrypoint
-USER root
-WORKDIR /ghostclass
-EXPOSE 3000 8000 8080 4000 5001 8081 8085 9099 54321 54322 54323 8181
+# ==============================================================================
+# 8. Runtime Defaults & Entrypoint
+# ==============================================================================
+USER vscode
+WORKDIR /workspaces/GhostClass
+EXPOSE 3000 8000 8181 54321 54322 54323 4000 5001 8080 9099
 CMD ["sleep", "infinity"]
