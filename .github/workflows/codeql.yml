@@ -109,7 +109,9 @@ jobs:
           set -euo pipefail
           set +x
           if [ -n "${GOOGLE_SERVICES_JSON_BASE64:-}" ]; then
-            echo "::add-mask::$GOOGLE_SERVICES_JSON_BASE64"
+            while IFS= read -r line; do
+              [ -n "$line" ] && echo "::add-mask::$line"
+            done <<< "$GOOGLE_SERVICES_JSON_BASE64"
             printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > android/app/google-services.json
             echo "✓ Recreated android/app/google-services.json from secret"
           elif [ -f android/app/google-services.json ]; then

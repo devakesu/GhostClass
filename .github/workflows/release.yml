@@ -740,7 +740,11 @@ jobs:
 
           : "${GOOGLE_SERVICES_JSON_BASE64:?GOOGLE_SERVICES_JSON_BASE64 environment variable or secret is required}"
 
-          [ -n "$GOOGLE_SERVICES_JSON_BASE64" ] && echo "::add-mask::$GOOGLE_SERVICES_JSON_BASE64"
+          if [ -n "$GOOGLE_SERVICES_JSON_BASE64" ]; then
+            while IFS= read -r line; do
+              [ -n "$line" ] && echo "::add-mask::$line"
+            done <<< "$GOOGLE_SERVICES_JSON_BASE64"
+          fi
 
           mkdir -p app
           printf '%s' "$GOOGLE_SERVICES_JSON_BASE64" | base64 --decode > app/google-services.json
@@ -749,6 +753,7 @@ jobs:
           if [ -z "${FIREBASE_API_KEY_ANDROID:-}" ]; then
             DERIVED_KEY=$(jq -r '.client[0].api_key[0].current_key // empty' app/google-services.json)
             if [ -n "$DERIVED_KEY" ]; then
+              echo "::add-mask::$DERIVED_KEY"
               echo "FIREBASE_API_KEY_ANDROID=$DERIVED_KEY" >> "$GITHUB_ENV"
               echo "✓ Derived FIREBASE_API_KEY_ANDROID directly from google-services.json"
             fi
@@ -757,6 +762,7 @@ jobs:
           if [ -z "${FIREBASE_PROJECT_ID:-}" ]; then
             DERIVED_PROJECT_ID=$(jq -r '.project_info.project_id // empty' app/google-services.json)
             if [ -n "$DERIVED_PROJECT_ID" ]; then
+              echo "::add-mask::$DERIVED_PROJECT_ID"
               echo "FIREBASE_PROJECT_ID=$DERIVED_PROJECT_ID" >> "$GITHUB_ENV"
               echo "✓ Derived FIREBASE_PROJECT_ID directly from google-services.json"
             fi
