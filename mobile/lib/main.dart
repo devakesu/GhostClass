@@ -3,7 +3,6 @@ import 'dart:io';
 
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
@@ -17,6 +16,7 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/security_lockdown_listener.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -83,17 +83,15 @@ void main() async {
       50 * 1024 * 1024; // 50MB
 
   // Initialize Sentry early to capture all startup exceptions
-  await SentryFlutter.init(
-    (options) {
-      options
-        ..dsn = AppConfig.sentryDsn
-        ..tracesSampleRate = !kReleaseMode ? 1.0 : 0.1
-        ..release = 'ghostclass@${AppConfig.appVersion}'
-        ..environment = !kReleaseMode ? 'development' : 'production'
-        ..attachStacktrace = true
-        ..enableAutoPerformanceTracing = true;
-    },
-  );
+  await SentryFlutter.init((options) {
+    options
+      ..dsn = AppConfig.sentryDsn
+      ..tracesSampleRate = !kReleaseMode ? 1.0 : 0.1
+      ..release = 'ghostclass@${AppConfig.appVersion}'
+      ..environment = !kReleaseMode ? 'development' : 'production'
+      ..attachStacktrace = true
+      ..enableAutoPerformanceTracing = true;
+  });
 
   HttpOverrides.global = MyHttpOverrides();
 
@@ -138,27 +136,18 @@ void main() async {
     Supabase.initialize(
       url: sUrl,
       publishableKey: sKey,
-      headers: {
-        'Origin': sOrigin,
-      },
+      headers: {'Origin': sOrigin},
     ),
     ThemeNotifier.preload(),
   ]);
 
   // Defer font pre-warm so UI can render faster
   AppLogger.safeUnawait(
-    GoogleFonts.pendingFonts([
-      GoogleFonts.manrope(),
-      GoogleFonts.firaCode(),
-    ]),
+    GoogleFonts.pendingFonts([GoogleFonts.manrope(), GoogleFonts.firaCode()]),
     'Fonts pre-warm',
   );
 
-  runApp(
-    ProviderScope(
-      child: SentryWidget(child: const MyApp()),
-    ),
-  );
+  runApp(ProviderScope(child: SentryWidget(child: const MyApp())));
 
   await Sentry.addBreadcrumb(
     Breadcrumb(
@@ -199,10 +188,7 @@ class _MyAppState extends ConsumerState<MyApp> {
         routerConfig: router,
         debugShowCheckedModeBanner: false,
         builder: (context, child) {
-          return Semantics(
-            label: 'GhostClass',
-            child: child,
-          );
+          return Semantics(label: 'GhostClass', child: child);
         },
       ),
     );

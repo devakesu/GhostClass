@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/widgets/aesthetic_refresh_indicator.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ServiceRefreshIndicator extends StatelessWidget {
   const ServiceRefreshIndicator({

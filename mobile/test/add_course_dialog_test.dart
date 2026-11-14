@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/widgets/attendance/add_course_dialog.dart';
+import 'package:material_ui/material_ui.dart';
 
 void main() {
   testWidgets('AddCourseDialog renders fields and buttons', (tester) async {

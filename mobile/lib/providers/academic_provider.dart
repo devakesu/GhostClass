@@ -256,11 +256,7 @@ class AcademicNotifier extends AsyncNotifier<AcademicState?> {
             optimistic: true,
           );
     } on Object catch (e, st) {
-      AppLogger.e(
-        'AcademicNotifier: updateAcademicContext failed',
-        e,
-        st,
-      );
+      AppLogger.e('AcademicNotifier: updateAcademicContext failed', e, st);
       rethrow;
     }
   }

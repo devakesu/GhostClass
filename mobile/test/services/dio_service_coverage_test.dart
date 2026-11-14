@@ -26,17 +26,13 @@ void main() {
     mockAdapter = MockHttpClientAdapter();
 
     container = ProviderContainer(
-      overrides: [
-        appCheckProvider.overrideWithValue(mockAppCheck),
-      ],
+      overrides: [appCheckProvider.overrideWithValue(mockAppCheck)],
     );
     dioService = container.read(dioServiceProvider);
 
     dioService.dio.httpClientAdapter = mockAdapter;
 
-    when(
-      () => mockAdapter.fetch(any(), any(), any()),
-    ).thenAnswer(
+    when(() => mockAdapter.fetch(any(), any(), any())).thenAnswer(
       (_) async => ResponseBody.fromString(
         '{"status": "ok"}',
         200,

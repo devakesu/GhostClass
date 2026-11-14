@@ -6,10 +6,7 @@ import 'package:ghostclass/services/security_service.dart';
 /// State object containing the version check result and whether the optional
 /// update notification has been dismissed.
 class AppUpdateState {
-  AppUpdateState({
-    this.checkResult,
-    this.dialogDismissed = false,
-  });
+  AppUpdateState({this.checkResult, this.dialogDismissed = false});
 
   final AppVersionCheckResult? checkResult;
   final bool dialogDismissed;

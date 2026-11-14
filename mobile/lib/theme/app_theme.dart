@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:material_ui/material_ui.dart';
 
 @immutable
 class GhostColors extends ThemeExtension<GhostColors> {
@@ -149,7 +149,7 @@ class AppTheme {
           surfaceLighter: AppColors.surfaceLighter,
         ),
       ],
-      textTheme: GoogleFonts.manropeTextTheme(base.textTheme).copyWith(
+      textTheme: _createManropeTextTheme(base.textTheme).copyWith(
         bodyLarge: const TextStyle(color: AppColors.primary, fontSize: 16),
         bodyMedium: const TextStyle(
           color: AppColors.mutedForeground,
@@ -232,7 +232,7 @@ class AppTheme {
           surfaceLighter: AppColors.lightSurfaceLighter,
         ),
       ],
-      textTheme: GoogleFonts.manropeTextTheme(base.textTheme).copyWith(
+      textTheme: _createManropeTextTheme(base.textTheme).copyWith(
         bodyLarge: const TextStyle(color: AppColors.lightPrimary, fontSize: 16),
         bodyMedium: const TextStyle(
           color: AppColors.lightMutedForeground,
@@ -285,6 +285,34 @@ class AppTheme {
           borderSide: const BorderSide(color: AppColors.brandPink, width: 2),
         ),
       ),
+    );
+  }
+
+  static TextTheme _createManropeTextTheme(TextTheme baseTextTheme) {
+    return TextTheme(
+      displayLarge: GoogleFonts.manrope(textStyle: baseTextTheme.displayLarge),
+      displayMedium: GoogleFonts.manrope(
+        textStyle: baseTextTheme.displayMedium,
+      ),
+      displaySmall: GoogleFonts.manrope(textStyle: baseTextTheme.displaySmall),
+      headlineLarge: GoogleFonts.manrope(
+        textStyle: baseTextTheme.headlineLarge,
+      ),
+      headlineMedium: GoogleFonts.manrope(
+        textStyle: baseTextTheme.headlineMedium,
+      ),
+      headlineSmall: GoogleFonts.manrope(
+        textStyle: baseTextTheme.headlineSmall,
+      ),
+      titleLarge: GoogleFonts.manrope(textStyle: baseTextTheme.titleLarge),
+      titleMedium: GoogleFonts.manrope(textStyle: baseTextTheme.titleMedium),
+      titleSmall: GoogleFonts.manrope(textStyle: baseTextTheme.titleSmall),
+      bodyLarge: GoogleFonts.manrope(textStyle: baseTextTheme.bodyLarge),
+      bodyMedium: GoogleFonts.manrope(textStyle: baseTextTheme.bodyMedium),
+      bodySmall: GoogleFonts.manrope(textStyle: baseTextTheme.bodySmall),
+      labelLarge: GoogleFonts.manrope(textStyle: baseTextTheme.labelLarge),
+      labelMedium: GoogleFonts.manrope(textStyle: baseTextTheme.labelMedium),
+      labelSmall: GoogleFonts.manrope(textStyle: baseTextTheme.labelSmall),
     );
   }
 }

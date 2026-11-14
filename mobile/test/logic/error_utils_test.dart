@@ -79,10 +79,7 @@ void main() {
           data: 'Bad Request String',
         ),
       );
-      expect(
-        formatApiError(dioStringErr, 'fetching'),
-        'Plain error message',
-      );
+      expect(formatApiError(dioStringErr, 'fetching'), 'Plain error message');
 
       final dioNetworkErr = DioException(
         requestOptions: RequestOptions(path: '/test'),

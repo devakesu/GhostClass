@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/logic/encrypted_value.dart';
@@ -11,6 +10,7 @@ import 'package:ghostclass/providers/dashboard_provider.dart';
 import 'package:ghostclass/screens/dashboard_screen.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
+import 'package:material_ui/material_ui.dart';
 
 import '../coverage_helper.dart';
 
@@ -92,9 +92,7 @@ void main() {
       await tester.pumpWidget(
         ProviderScope(
           overrides: [
-            dashboardProvider.overrideWith(
-              () => MockDashboardNotifier(null),
-            ),
+            dashboardProvider.overrideWith(() => MockDashboardNotifier(null)),
             academicProvider.overrideWith(
               () => MockAcademicNotifier(
                 AcademicState(

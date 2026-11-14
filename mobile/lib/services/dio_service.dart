@@ -144,9 +144,7 @@ class DioService {
     }
   }
 
-  Future<String?> _fetchAppCheckTokenWithRetry({
-    required bool limited,
-  }) async {
+  Future<String?> _fetchAppCheckTokenWithRetry({required bool limited}) async {
     Object? lastError;
 
     for (var attempt = 1; attempt <= _maxAppCheckAttempts; attempt++) {
@@ -205,9 +203,7 @@ class DioService {
       } else {
         var isNew = false;
         if (_tokenFetchInFlight == null) {
-          _tokenFetchInFlight = _fetchAppCheckTokenWithRetry(
-            limited: false,
-          );
+          _tokenFetchInFlight = _fetchAppCheckTokenWithRetry(limited: false);
           isNew = true;
         }
         appCheckToken = await _tokenFetchInFlight!.timeout(
@@ -217,15 +213,13 @@ class DioService {
           AppLogger.safeUnawait(
             Future.delayed(const Duration(seconds: 5), () {
               _tokenFetchInFlight = null;
-            }).catchError(
-              (Object e, StackTrace st) {
-                AppLogger.e(
-                  'DioService: delayed clear of token fetch failed',
-                  e,
-                  st,
-                );
-              },
-            ),
+            }).catchError((Object e, StackTrace st) {
+              AppLogger.e(
+                'DioService: delayed clear of token fetch failed',
+                e,
+                st,
+              );
+            }),
             'DioService: delayed clear token fetch',
           );
         }

@@ -164,7 +164,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
           final legacyKey =
               '${prefix}_${user.supabaseUserId}_${academic.semester}_${academic.year}';
           if (legacyKey != '${prefix}_$cacheKeySuffix') {
-            return storage.getCachedData(legacyKey);
+            return await storage.getCachedData(legacyKey);
           }
           return null;
         }
@@ -310,13 +310,11 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
         _needsRevalidate = false;
         final currentGen = ++_revalidationGeneration;
         _inFlightRevalidation =
-            _silentRevalidate(
-              trackingList,
-              academic,
-              currentGen,
-            ).whenComplete(() {
-              _inFlightRevalidation = null;
-            });
+            _silentRevalidate(trackingList, academic, currentGen).whenComplete(
+              () {
+                _inFlightRevalidation = null;
+              },
+            );
         AppLogger.safeUnawait(
           _inFlightRevalidation!,
           'DashboardNotifier: silent revalidate',
@@ -430,7 +428,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
             );
           }
         }
-        return _fetchAttendanceOnce(api: api, storage: storage);
+        return await _fetchAttendanceOnce(api: api, storage: storage);
       }
 
       var instructorsFetched = false;
@@ -474,9 +472,8 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
               instructorsFetched = true;
               sharedInstructors = instructorsRes
                   .map(
-                    (json) => CourseInstructor.fromJson(
-                      json as Map<String, dynamic>,
-                    ),
+                    (json) =>
+                        CourseInstructor.fromJson(json as Map<String, dynamic>),
                   )
                   .toList();
             })
@@ -761,12 +758,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
     }
 
     if (s == null) {
-      return (
-        tier: tier,
-        canBunk: 0,
-        safeCanBunk: 0,
-        requiredToAttend: 0,
-      );
+      return (tier: tier, canBunk: 0, safeCanBunk: 0, requiredToAttend: 0);
     }
 
     final bunkRes = utils.calculateAttendance(
@@ -849,7 +841,7 @@ class DashboardNotifier extends AsyncNotifier<DashboardData> {
                 .currentSession
                 ?.accessToken;
             if (supabaseToken == null) return null;
-            return ref
+            return await ref
                 .read(apiServiceProvider)
                 .runCronSync(supabaseToken, force: true);
           },

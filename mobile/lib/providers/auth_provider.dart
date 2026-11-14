@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/app_exception.dart';
@@ -23,6 +22,7 @@ import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:ghostclass/services/settings_service.dart';
 import 'package:ghostclass/services/startup_flow_service.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -56,7 +56,7 @@ final authProvider = AsyncNotifierProvider<AuthNotifier, AuthenticatedUser?>(
 final institutionsProvider = FutureProvider<List<Institution>>((ref) async {
   final userId = ref.read(authProvider).value?.supabaseUserId;
   if (userId == null) return [];
-  return ref.read(authProvider.notifier).fetchInstitutions();
+  return await ref.read(authProvider.notifier).fetchInstitutions();
 });
 
 // ─── Authenticated User Model ─────────────────────────────────────────────────
@@ -654,10 +654,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
     );
 
     state = AsyncValue.data(
-      user.copyWith(
-        settings: updatedSettings,
-        isUpdatingSettings: true,
-      ),
+      user.copyWith(settings: updatedSettings, isUpdatingSettings: true),
     );
 
     final service = ref.read(settingsServiceProvider);
@@ -694,10 +691,7 @@ class AuthNotifier extends AsyncNotifier<AuthenticatedUser?>
         e,
       );
       state = AsyncValue.data(
-        user.copyWith(
-          settings: previousSettings,
-          isUpdatingSettings: false,
-        ),
+        user.copyWith(settings: previousSettings, isUpdatingSettings: false),
       );
       rethrow;
     } finally {

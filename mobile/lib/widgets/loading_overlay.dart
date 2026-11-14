@@ -1,10 +1,10 @@
 import 'dart:ui';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class LoadingOverlay extends StatelessWidget {
   const LoadingOverlay({
@@ -39,15 +39,8 @@ class LoadingOverlay extends StatelessWidget {
                         color: primary.withValues(alpha: 0.1),
                       ),
                       child: showLogo
-                          ? Image.asset(
-                              'assets/images/logo.png',
-                              height: 60,
-                            )
-                          : Icon(
-                              LucideIcons.ghost,
-                              size: 60,
-                              color: primary,
-                            ),
+                          ? Image.asset('assets/images/logo.png', height: 60)
+                          : Icon(LucideIcons.ghost, size: 60, color: primary),
                     )
                     .animate(onPlay: (c) => c.repeat())
                     .shimmer(

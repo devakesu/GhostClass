@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/models/institution.dart';
@@ -11,6 +10,7 @@ import 'package:ghostclass/screens/ghostclass_screen.dart';
 import 'package:ghostclass/screens/profile_dump_screen.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/dashboard/disable_aware_course_card.dart';
+import 'package:material_ui/material_ui.dart';
 
 import 'coverage_helper.dart';
 

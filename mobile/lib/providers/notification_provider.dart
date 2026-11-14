@@ -131,7 +131,11 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
     }
 
     // 2. Cold start: fetch from network.
-    return _fetchInitialData(userId, storage: storage, cacheKey: cacheKey);
+    return await _fetchInitialData(
+      userId,
+      storage: storage,
+      cacheKey: cacheKey,
+    );
   }
 
   NotificationsState? _deserializeState(Map<String, dynamic> raw) {
@@ -264,11 +268,7 @@ class NotificationsNotifier extends AsyncNotifier<NotificationsState> {
           Object e,
           StackTrace st,
         ) {
-          AppLogger.e(
-            'NotificationsNotifier: Failed to save cache',
-            e,
-            st,
-          );
+          AppLogger.e('NotificationsNotifier: Failed to save cache', e, st);
         }),
         'NotificationsNotifier: saveCachedData',
       );

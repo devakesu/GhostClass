@@ -1,5 +1,5 @@
 import 'dart:async';
-import 'package:flutter/material.dart';
+
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/constants/static_content.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
@@ -23,6 +23,7 @@ import 'package:ghostclass/screens/tracking_screen.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:go_router/go_router.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:sentry_flutter/sentry_flutter.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -59,13 +60,10 @@ Page<dynamic> _smoothPage(GoRouterState state, Widget child) {
     child: child,
     reverseTransitionDuration: const Duration(milliseconds: 250),
     transitionsBuilder: (context, animation, secondaryAnimation, child) {
-      final slide =
-          Tween<Offset>(
-            begin: const Offset(0, 0.04),
-            end: Offset.zero,
-          ).animate(
-            CurvedAnimation(parent: animation, curve: Curves.easeOutCubic),
-          );
+      final slide = Tween<Offset>(
+        begin: const Offset(0, 0.04),
+        end: Offset.zero,
+      ).animate(CurvedAnimation(parent: animation, curve: Curves.easeOutCubic));
       return FadeTransition(
         opacity: animation,
         child: SlideTransition(position: slide, child: child),
@@ -95,10 +93,7 @@ final routerProvider = Provider<GoRouter>((ref) {
   return GoRouter(
     navigatorKey: rootNavigatorKey,
     initialLocation: '/',
-    refreshListenable: Listenable.merge([
-      refreshStream,
-      authRefreshNotifier,
-    ]),
+    refreshListenable: Listenable.merge([refreshStream, authRefreshNotifier]),
     observers: [
       SentryNavigatorObserver(),
       AnalyticsService.instance.appObserver,

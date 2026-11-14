@@ -1,9 +1,11 @@
+// Test suite mocks deprecated FCM token and listener APIs under test.
+// ignore_for_file: deprecated_member_use
+
 import 'dart:async';
 
 import 'package:dio/dio.dart';
 import 'package:firebase_analytics/firebase_analytics.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/providers/auth_provider.dart';
@@ -14,6 +16,7 @@ import 'package:ghostclass/services/push_notification_service.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 
@@ -104,10 +107,7 @@ void main() {
     final mockRouter = GoRouter(
       navigatorKey: GlobalKey<NavigatorState>(),
       routes: [
-        GoRoute(
-          path: '/',
-          builder: (context, state) => const SizedBox(),
-        ),
+        GoRoute(path: '/', builder: (context, state) => const SizedBox()),
       ],
     );
 
@@ -266,9 +266,7 @@ void main() {
     when(
       () => mockSettings.authorizationStatus,
     ).thenReturn(AuthorizationStatus.authorized);
-    when(
-      () => mockMessaging.getToken(),
-    ).thenAnswer((_) async => 'fcm-token');
+    when(() => mockMessaging.getToken()).thenAnswer((_) async => 'fcm-token');
     when(
       () => mockMessaging.onTokenRefresh,
     ).thenAnswer((_) => const Stream.empty());
@@ -335,10 +333,8 @@ void main() {
         options: any(named: 'options'),
       ),
     ).thenAnswer(
-      (_) async => Response<dynamic>(
-        requestOptions: RequestOptions(),
-        statusCode: 200,
-      ),
+      (_) async =>
+          Response<dynamic>(requestOptions: RequestOptions(), statusCode: 200),
     );
 
     // Mock analytics to throw exception
@@ -396,10 +392,7 @@ void main() {
 
     final service = container.read(pushNotificationServiceProvider);
     // Should complete without throwing even if token retrieval fails
-    await expectLater(
-      service.initialize(registerHandlers: false),
-      completes,
-    );
+    await expectLater(service.initialize(registerHandlers: false), completes);
   });
 
   testWidgets(
@@ -442,9 +435,8 @@ void main() {
         routes: [
           GoRoute(
             path: '/',
-            builder: (context, state) => const Scaffold(
-              body: Center(child: Text('Main Screen')),
-            ),
+            builder: (context, state) =>
+                const Scaffold(body: Center(child: Text('Main Screen'))),
           ),
           GoRoute(
             path: '/notifications',
@@ -464,9 +456,7 @@ void main() {
             supabaseClientProvider.overrideWithValue(mockSupabase),
             routerProvider.overrideWithValue(router),
           ],
-          child: MaterialApp.router(
-            routerConfig: router,
-          ),
+          child: MaterialApp.router(routerConfig: router),
         ),
       );
 
@@ -540,10 +530,8 @@ void main() {
         options: any(named: 'options'),
       ),
     ).thenAnswer(
-      (_) async => Response<dynamic>(
-        requestOptions: RequestOptions(),
-        statusCode: 200,
-      ),
+      (_) async =>
+          Response<dynamic>(requestOptions: RequestOptions(), statusCode: 200),
     );
 
     final service = container.read(pushNotificationServiceProvider);
@@ -569,9 +557,7 @@ void main() {
         sound: any(named: 'sound'),
       ),
     ).thenAnswer((_) async => mockSettings);
-    when(
-      () => mockMessaging.getToken(),
-    ).thenAnswer((_) async => 'new-token');
+    when(() => mockMessaging.getToken()).thenAnswer((_) async => 'new-token');
     when(
       () => mockMessaging.onTokenRefresh,
     ).thenAnswer((_) => const Stream.empty());
@@ -583,10 +569,8 @@ void main() {
         options: any(named: 'options'),
       ),
     ).thenAnswer(
-      (_) async => Response<dynamic>(
-        requestOptions: RequestOptions(),
-        statusCode: 500,
-      ),
+      (_) async =>
+          Response<dynamic>(requestOptions: RequestOptions(), statusCode: 500),
     );
 
     final service = container.read(pushNotificationServiceProvider);
@@ -607,9 +591,7 @@ void main() {
         sound: any(named: 'sound'),
       ),
     ).thenAnswer((_) async => mockSettings);
-    when(
-      () => mockMessaging.getToken(),
-    ).thenAnswer((_) async => 'new-token');
+    when(() => mockMessaging.getToken()).thenAnswer((_) async => 'new-token');
     when(
       () => mockMessaging.onTokenRefresh,
     ).thenAnswer((_) => const Stream.empty());
@@ -659,10 +641,8 @@ void main() {
         options: any(named: 'options'),
       ),
     ).thenAnswer(
-      (_) async => Response<dynamic>(
-        requestOptions: RequestOptions(),
-        statusCode: 200,
-      ),
+      (_) async =>
+          Response<dynamic>(requestOptions: RequestOptions(), statusCode: 200),
     );
 
     when(
@@ -678,9 +658,7 @@ void main() {
           supabaseClientProvider.overrideWithValue(mockSupabase),
           routerProvider.overrideWithValue(mockGoRouter),
         ],
-        child: const MaterialApp(
-          home: Scaffold(body: SizedBox()),
-        ),
+        child: const MaterialApp(home: Scaffold(body: SizedBox())),
       ),
     );
 
@@ -723,10 +701,8 @@ void main() {
         options: any(named: 'options'),
       ),
     ).thenAnswer(
-      (_) async => Response<dynamic>(
-        requestOptions: RequestOptions(),
-        statusCode: 200,
-      ),
+      (_) async =>
+          Response<dynamic>(requestOptions: RequestOptions(), statusCode: 200),
     );
 
     final service = container.read(pushNotificationServiceProvider);

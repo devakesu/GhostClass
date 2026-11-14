@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/widgets/common/icon_badge.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:material_ui/material_ui.dart';
 
 class GhostClassSettingsCard extends StatelessWidget {
   const GhostClassSettingsCard({

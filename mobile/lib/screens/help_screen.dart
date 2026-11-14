@@ -1,9 +1,9 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class HelpScreen extends StatelessWidget {
   const HelpScreen({super.key});
@@ -245,11 +245,7 @@ class HelpScreen extends StatelessWidget {
             ),
             const SizedBox(height: 16),
             ..._faqs.map(
-              (faq) => _buildFaqItem(
-                context,
-                faq['question']!,
-                faq['answer']!,
-              ),
+              (faq) => _buildFaqItem(context, faq['question']!, faq['answer']!),
             ),
             const SizedBox(height: 32),
 

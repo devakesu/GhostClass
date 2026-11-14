@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/widgets/service_error_dialog.dart';
+import 'package:material_ui/material_ui.dart';
 
 class SecurityErrorDialog extends StatelessWidget {
   const SecurityErrorDialog({

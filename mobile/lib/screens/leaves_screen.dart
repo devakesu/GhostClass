@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/leave.dart';
 import 'package:ghostclass/providers/academic_provider.dart';
@@ -16,6 +15,7 @@ import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class LeavesScreen extends ConsumerWidget {
   const LeavesScreen({super.key});
@@ -94,11 +94,7 @@ class LeavesScreen extends ConsumerWidget {
                 color: color.withValues(alpha: 0.1),
                 shape: BoxShape.circle,
               ),
-              child: Icon(
-                LucideIcons.user,
-                size: 12,
-                color: color,
-              ),
+              child: Icon(LucideIcons.user, size: 12, color: color),
             ),
             const SizedBox(width: 10),
             Expanded(
@@ -107,17 +103,12 @@ class LeavesScreen extends ConsumerWidget {
                 style: GoogleFonts.manrope(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
-                  color: Theme.of(
-                    context,
-                  ).colorScheme.onSurface,
+                  color: Theme.of(context).colorScheme.onSurface,
                 ),
               ),
             ),
             Container(
-              padding: const EdgeInsets.symmetric(
-                horizontal: 8,
-                vertical: 2,
-              ),
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
               decoration: BoxDecoration(
                 color: color.withValues(alpha: 0.1),
                 borderRadius: BorderRadius.circular(6),
@@ -133,9 +124,7 @@ class LeavesScreen extends ConsumerWidget {
             ),
             const SizedBox(width: 8),
             Text(
-              _formatDate(
-                approver.actionAt ?? approver.updatedAt,
-              ),
+              _formatDate(approver.actionAt ?? approver.updatedAt),
               style: GoogleFonts.manrope(
                 fontSize: 11,
                 color: Theme.of(
@@ -219,7 +208,7 @@ class LeavesScreen extends ConsumerWidget {
                         .currentSession
                         ?.accessToken;
                     if (supabaseToken == null) return null;
-                    return ref
+                    return await ref
                         .read(apiServiceProvider)
                         .runCronSync(supabaseToken, force: true);
                   },
@@ -281,7 +270,7 @@ class LeavesScreen extends ConsumerWidget {
                                 .currentSession
                                 ?.accessToken;
                             if (supabaseToken == null) return null;
-                            return ref
+                            return await ref
                                 .read(apiServiceProvider)
                                 .runCronSync(supabaseToken, force: true);
                           },
@@ -319,17 +308,17 @@ class LeavesScreen extends ConsumerWidget {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.onSurface.withValues(
-                    alpha: 0.03,
-                  ),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.03),
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
                   LucideIcons.fileX,
                   size: 64,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(
-                    alpha: 0.1,
-                  ),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.1),
                 ),
               ),
               const SizedBox(height: 24),
@@ -338,9 +327,9 @@ class LeavesScreen extends ConsumerWidget {
                 style: GoogleFonts.manrope(
                   fontSize: 18,
                   fontWeight: FontWeight.w700,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(
-                    alpha: 0.4,
-                  ),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.4),
                 ),
               ),
               const SizedBox(height: 8),
@@ -348,9 +337,9 @@ class LeavesScreen extends ConsumerWidget {
                 'Pull down to refresh or check back later',
                 style: GoogleFonts.manrope(
                   fontSize: 13,
-                  color: Theme.of(context).colorScheme.onSurface.withValues(
-                    alpha: 0.25,
-                  ),
+                  color: Theme.of(
+                    context,
+                  ).colorScheme.onSurface.withValues(alpha: 0.25),
                 ),
               ),
             ],
@@ -391,11 +380,8 @@ class LeavesScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 24),
           ...data.leaves.map(
-            (leave) => _buildLeaveCard(
-              context,
-              leave,
-              data.sessions[leave.id] ?? [],
-            ),
+            (leave) =>
+                _buildLeaveCard(context, leave, data.sessions[leave.id] ?? []),
           ),
         ]),
       ),
@@ -414,10 +400,7 @@ class LeavesScreen extends ConsumerWidget {
         decoration: BoxDecoration(
           color: color.withValues(alpha: 0.12),
           borderRadius: BorderRadius.circular(24),
-          border: Border.all(
-            color: color.withValues(alpha: 0.3),
-            width: 1.5,
-          ),
+          border: Border.all(color: color.withValues(alpha: 0.3), width: 1.5),
           boxShadow: [
             BoxShadow(
               color: color.withValues(alpha: 0.05),
@@ -785,9 +768,7 @@ class LeavesScreen extends ConsumerWidget {
             top: 0,
             bottom: 0,
             width: 6,
-            child: Container(
-              color: status.color,
-            ),
+            child: Container(color: status.color),
           ),
         ],
       ),
@@ -808,9 +789,9 @@ class LeavesScreen extends ConsumerWidget {
           style: GoogleFonts.manrope(
             fontSize: 10,
             fontWeight: FontWeight.w900,
-            color: Theme.of(context).colorScheme.onSurface.withValues(
-              alpha: 0.55,
-            ),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: 0.55),
             letterSpacing: 0.7,
           ),
         ),
@@ -904,11 +885,7 @@ class LeavesScreen extends ConsumerWidget {
 
     // All levels have acted, and none rejected.
     if (lastAction == 'approve') {
-      return _LeaveStatus(
-        'Approved',
-        successGreen,
-        LucideIcons.checkCircle2,
-      );
+      return _LeaveStatus('Approved', successGreen, LucideIcons.checkCircle2);
     }
     if (lastAction == 'forward') {
       return _LeaveStatus('Forwarded', Colors.indigo, LucideIcons.arrowRight);

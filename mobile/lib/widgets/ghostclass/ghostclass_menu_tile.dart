@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/widgets/common/icon_badge.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:material_ui/material_ui.dart';
 
 class GhostClassMenuTile extends StatelessWidget {
   const GhostClassMenuTile({
@@ -58,10 +58,7 @@ class GhostClassMenuTile extends StatelessWidget {
           child: Row(
             children: [
               // Use shared IconBadge to reduce duplication
-              IconBadge(
-                icon: icon,
-                color: color,
-              ),
+              IconBadge(icon: icon, color: color),
               const SizedBox(width: 16),
               Expanded(
                 child: Column(

@@ -121,10 +121,7 @@ void main() {
             'founded': 1985,
             'country': 'USA',
           },
-          'institution_role': {
-            'name': 'Researcher',
-            'level': 5,
-          },
+          'institution_role': {'name': 'Researcher', 'level': 5},
           'extra_field': 'ignored',
         });
 

@@ -94,7 +94,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         final legacyKey =
             '${prefix}_${user.supabaseUserId}_${academic.semester}_${academic.year}';
         if (legacyKey != '${prefix}_$cacheKeySuffix') {
-          return storage.getCachedData(legacyKey);
+          return await storage.getCachedData(legacyKey);
         }
         return null;
       }
@@ -168,7 +168,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
     }
 
     // 2. Initial Load from network
-    return _fetchAndProcess(academic: academic, isInitial: true);
+    return await _fetchAndProcess(academic: academic, isInitial: true);
   }
 
   Future<TrackingState> _fetchAndProcess({
@@ -230,11 +230,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
 
     final grouped = <String, List<TrackingRecord>>{};
     for (final record in records) {
-      final safeId = _resolveToSafeId(
-        record.course,
-        officialReport,
-        academic,
-      );
+      final safeId = _resolveToSafeId(record.course, officialReport, academic);
       if (!grouped.containsKey(safeId)) grouped[safeId] = [];
       grouped[safeId]!.add(record);
     }
@@ -317,10 +313,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
 
     state = const AsyncValue.loading();
     state = await AsyncValue.guard(
-      () => _fetchAndProcess(
-        academic: academic,
-        forceSync: forceSync,
-      ),
+      () => _fetchAndProcess(academic: academic, forceSync: forceSync),
     );
   }
 
@@ -542,10 +535,7 @@ class TrackingNotifier extends AsyncNotifier<TrackingState> {
         AppLogger.safeUnawait(
           ref
               .read(secureStorageProvider)
-              .saveCachedData(
-                'tracking_records_$cacheKeySuffix',
-                <dynamic>[],
-              ),
+              .saveCachedData('tracking_records_$cacheKeySuffix', <dynamic>[]),
           'TrackingNotifier: clear cache on clearRecords',
         );
       }

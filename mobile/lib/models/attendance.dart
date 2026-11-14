@@ -54,9 +54,7 @@ class AttendanceReportDetailed {
     final rawAttendance = (json['studentAttendanceData'] is Map)
         ? Map<String, dynamic>.from(json['studentAttendanceData'] as Map)
         : (json['student_attendance_data'] is Map)
-        ? Map<String, dynamic>.from(
-            json['student_attendance_data'] as Map,
-          )
+        ? Map<String, dynamic>.from(json['student_attendance_data'] as Map)
         : const <String, dynamic>{};
     final rawDates = (json['attendanceDates'] is Map)
         ? Map<String, dynamic>.from(json['attendanceDates'] as Map)
@@ -78,33 +76,29 @@ class AttendanceReportDetailed {
           ),
         ),
       ),
-      studentAttendanceData: rawAttendance.map(
-        (date, sessions) {
-          if (sessions is! Map) {
-            return MapEntry(date, <String, AttendanceSession>{});
-          }
-          return MapEntry(
-            date,
-            sessions.map(
-              (sessionKey, sessionValue) {
-                final keyStr = sessionKey.toString();
-                if (sessionValue is! Map) {
-                  return MapEntry(
-                    keyStr,
-                    const AttendanceSession(course: 0, attendance: 0),
-                  );
-                }
-                return MapEntry(
-                  keyStr,
-                  AttendanceSession.fromJson(
-                    Map<String, dynamic>.from(sessionValue),
-                  ),
-                );
-              },
-            ),
-          );
-        },
-      ),
+      studentAttendanceData: rawAttendance.map((date, sessions) {
+        if (sessions is! Map) {
+          return MapEntry(date, <String, AttendanceSession>{});
+        }
+        return MapEntry(
+          date,
+          sessions.map((sessionKey, sessionValue) {
+            final keyStr = sessionKey.toString();
+            if (sessionValue is! Map) {
+              return MapEntry(
+                keyStr,
+                const AttendanceSession(course: 0, attendance: 0),
+              );
+            }
+            return MapEntry(
+              keyStr,
+              AttendanceSession.fromJson(
+                Map<String, dynamic>.from(sessionValue),
+              ),
+            );
+          }),
+        );
+      }),
       attendanceDates: rawDates,
       sessions: rawSessions,
     );
@@ -188,8 +182,7 @@ enum AttendanceStatus {
   absent(111),
   otherLeave(112),
   dutyLeave(225),
-  unknown(0),
-  ;
+  unknown(0);
 
   const AttendanceStatus(this.code);
   final int code;

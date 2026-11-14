@@ -1,6 +1,5 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/config/app_config.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
@@ -26,6 +25,7 @@ import 'package:ghostclass/widgets/service_refresh_indicator.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
+import 'package:material_ui/material_ui.dart';
 
 bool isSameDay(DateTime a, DateTime b) =>
     a.year == b.year && a.month == b.month && a.day == b.day;
@@ -404,31 +404,27 @@ class _CalendarContent extends ConsumerWidget {
             SliverPadding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               sliver: SliverList(
-                delegate: SliverChildBuilderDelegate(
-                  (context, index) {
-                    final event = events[index];
-                    return CalendarSessionCard(
+                delegate: SliverChildBuilderDelegate((context, index) {
+                  final event = events[index];
+                  return CalendarSessionCard(
+                    event: event,
+                    onMarkDl: () => _showCorrectionSheet(
+                      context: context,
+                      ref: ref,
                       event: event,
-                      onMarkDl: () => _showCorrectionSheet(
-                        context: context,
-                        ref: ref,
-                        event: event,
-                        initialStatus: 'dutyLeave',
-                      ),
-                      onMarkPresent: () => _showCorrectionSheet(
-                        context: context,
-                        ref: ref,
-                        event: event,
-                        initialStatus: 'present',
-                      ),
-                      onDelete: event.trackingId == null
-                          ? null
-                          : () =>
-                                _deleteRecord(context, ref, event.trackingId!),
-                    );
-                  },
-                  childCount: events.length,
-                ),
+                      initialStatus: 'dutyLeave',
+                    ),
+                    onMarkPresent: () => _showCorrectionSheet(
+                      context: context,
+                      ref: ref,
+                      event: event,
+                      initialStatus: 'present',
+                    ),
+                    onDelete: event.trackingId == null
+                        ? null
+                        : () => _deleteRecord(context, ref, event.trackingId!),
+                  );
+                }, childCount: events.length),
               ),
             ),
           const SliverPadding(padding: EdgeInsets.only(bottom: 24)),
@@ -514,10 +510,9 @@ class _CalendarContent extends ConsumerWidget {
                         decoration: InputDecoration(
                           hintText: hint,
                           hintStyle: GoogleFonts.manrope(
-                            color: Theme.of(context).colorScheme.onSurface
-                                .withValues(
-                                  alpha: 0.4,
-                                ),
+                            color: Theme.of(
+                              context,
+                            ).colorScheme.onSurface.withValues(alpha: 0.4),
                             fontSize: 13,
                           ),
                           filled: true,
@@ -542,12 +537,8 @@ class _CalendarContent extends ConsumerWidget {
                               child: Text(
                                 'CANCEL',
                                 style: GoogleFonts.manrope(
-                                  color:
-                                      Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withValues(
-                                        alpha: 0.4,
-                                      ),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.4),
                                   fontWeight: FontWeight.w800,
                                   letterSpacing: 1,
                                 ),

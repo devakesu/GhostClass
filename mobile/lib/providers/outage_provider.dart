@@ -8,7 +8,7 @@ class OutageNotifier extends Notifier<bool> {
   @override
   bool build() => false;
 
-  // ignore: use_setters_to_change_properties, avoid_positional_boolean_parameters -- Matches functional callback signature
+  // ignore: use_setters_to_change_properties -- Matches functional callback signature
   void update(bool value) {
     state = value;
   }

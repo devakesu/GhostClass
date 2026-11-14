@@ -1,10 +1,10 @@
 import 'dart:math' as math;
 
-import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/widgets/loading_overlay.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// AestheticRefreshIndicator
 /// -------------------------

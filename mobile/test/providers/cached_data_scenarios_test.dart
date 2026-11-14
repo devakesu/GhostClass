@@ -196,11 +196,7 @@ void main() {
             },
           },
           'courses': {
-            'CS302': {
-              'id': 101,
-              'name': 'Operating Systems',
-              'code': 'CS302',
-            },
+            'CS302': {'id': 101, 'name': 'Operating Systems', 'code': 'CS302'},
           },
           'attendance_dates': <dynamic>[],
           'sessions': <dynamic>[],
@@ -232,11 +228,7 @@ void main() {
             },
           },
           'courses': {
-            'CS302': {
-              'id': 101,
-              'name': 'Operating Systems',
-              'code': 'CS302',
-            },
+            'CS302': {'id': 101, 'name': 'Operating Systems', 'code': 'CS302'},
           },
           'attendance_dates': <dynamic>[],
           'sessions': <dynamic>[],
@@ -261,9 +253,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             authProvider.overrideWith(() => MockAuthNotifier(mockUser)),
-            academicProvider.overrideWith(
-              () => MockAcademicNotifier(academic),
-            ),
+            academicProvider.overrideWith(() => MockAcademicNotifier(academic)),
             trackingProvider.overrideWith(TestTrackingNotifier.new),
             apiServiceProvider.overrideWith((ref) => mockApi),
             secureStorageProvider.overrideWith((ref) => mockStorage),
@@ -410,9 +400,7 @@ void main() {
         final observer = InvalidationObserver();
         final container = ProviderContainer(
           observers: [observer],
-          overrides: [
-            apiServiceProvider.overrideWith((ref) => mockApi),
-          ],
+          overrides: [apiServiceProvider.overrideWith((ref) => mockApi)],
         );
         addTearDown(container.dispose);
 
@@ -462,9 +450,7 @@ void main() {
         final observer = InvalidationObserver();
         final container = ProviderContainer(
           observers: [observer],
-          overrides: [
-            apiServiceProvider.overrideWith((ref) => mockApi),
-          ],
+          overrides: [apiServiceProvider.overrideWith((ref) => mockApi)],
         );
         addTearDown(container.dispose);
 
@@ -523,11 +509,7 @@ void main() {
             },
           },
           'courses': {
-            'CS201': {
-              'id': 201,
-              'name': 'Algorithms',
-              'code': 'CS201',
-            },
+            'CS201': {'id': 201, 'name': 'Algorithms', 'code': 'CS201'},
           },
           'attendance_dates': <dynamic>[],
           'sessions': <dynamic>[],
@@ -563,9 +545,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             authProvider.overrideWith(() => MockAuthNotifier(mockUser)),
-            academicProvider.overrideWith(
-              () => MockAcademicNotifier(academic),
-            ),
+            academicProvider.overrideWith(() => MockAcademicNotifier(academic)),
             trackingProvider.overrideWith(TestTrackingNotifier.new),
             apiServiceProvider.overrideWith((ref) => mockApi),
             secureStorageProvider.overrideWith((ref) => mockStorage),
@@ -619,11 +599,7 @@ void main() {
             },
           },
           'courses': {
-            'CS301': {
-              'id': 301,
-              'name': 'Database Systems',
-              'code': 'CS301',
-            },
+            'CS301': {'id': 301, 'name': 'Database Systems', 'code': 'CS301'},
           },
           'attendance_dates': <dynamic>[],
           'sessions': <dynamic>[],
@@ -656,9 +632,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             authProvider.overrideWith(() => MockAuthNotifier(mockUser)),
-            academicProvider.overrideWith(
-              () => MockAcademicNotifier(academic),
-            ),
+            academicProvider.overrideWith(() => MockAcademicNotifier(academic)),
             trackingProvider.overrideWith(TestTrackingNotifier.new),
             apiServiceProvider.overrideWith((ref) => mockApi),
             secureStorageProvider.overrideWith((ref) => mockStorage),
@@ -726,9 +700,7 @@ void main() {
         final container = ProviderContainer(
           overrides: [
             authProvider.overrideWith(() => MockAuthNotifier(mockUser)),
-            academicProvider.overrideWith(
-              () => MockAcademicNotifier(academic),
-            ),
+            academicProvider.overrideWith(() => MockAcademicNotifier(academic)),
             trackingProvider.overrideWith(TestTrackingNotifier.new),
             apiServiceProvider.overrideWith((ref) => mockApi),
             secureStorageProvider.overrideWith((ref) => mockStorage),

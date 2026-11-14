@@ -457,7 +457,7 @@ class SecurityService {
   Future<Response<dynamic>> fetchAttestationDetails([
     String? supabaseToken,
   ]) async {
-    return _dio.get<dynamic>(
+    return await _dio.get<dynamic>(
       '$_ghostclassBaseUrl/security/attestation',
       options: Options(
         headers: {

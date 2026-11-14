@@ -30,15 +30,13 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 /// Initializes Firebase Cloud Messaging (FCM), requests native permissions,
 /// manages foreground/background dispatchers, and synchronises device tokens
 /// with the secure GhostClass backend app-check guarded routes.
-final firebaseMessagingProvider = Provider<FirebaseMessaging?>(
-  (ref) {
-    try {
-      return FirebaseMessaging.instance;
-    } on Object catch (_) {
-      return null;
-    }
-  },
-);
+final firebaseMessagingProvider = Provider<FirebaseMessaging?>((ref) {
+  try {
+    return FirebaseMessaging.instance;
+  } on Object catch (_) {
+    return null;
+  }
+});
 
 class PushNotificationService {
   PushNotificationService(this._ref)
@@ -120,13 +118,10 @@ class PushNotificationService {
           try {
             AppLogger.safeUnawait(
               AnalyticsService.instance
-                  .logCustom(
-                    'fcm_foreground_received',
-                    {
-                      'title': message.notification?.title ?? '',
-                      'has_data': message.data.isNotEmpty,
-                    },
-                  )
+                  .logCustom('fcm_foreground_received', {
+                    'title': message.notification?.title ?? '',
+                    'has_data': message.data.isNotEmpty,
+                  })
                   .catchError(
                     (Object e, StackTrace st) => AppLogger.e(
                       'PushNotificationService: Analytics fcm_foreground_received failed',
@@ -180,13 +175,10 @@ class PushNotificationService {
                   try {
                     AppLogger.safeUnawait(
                       AnalyticsService.instance
-                          .logCustom(
-                            'fcm_opened',
-                            {
-                              'title': message.notification?.title ?? '',
-                              'has_data': message.data.isNotEmpty,
-                            },
-                          )
+                          .logCustom('fcm_opened', {
+                            'title': message.notification?.title ?? '',
+                            'has_data': message.data.isNotEmpty,
+                          })
                           .catchError(
                             (Object e, StackTrace st) => AppLogger.e(
                               'PushNotificationService: Analytics fcm_opened failed',
@@ -200,6 +192,7 @@ class PushNotificationService {
                 });
 
         // Retrieve token and execute initial synchronization
+        // ignore: deprecated_member_use
         final token = await _messaging.getToken();
         if (token != null) {
           final hasSession =
@@ -226,9 +219,7 @@ class PushNotificationService {
           try {
             AppLogger.safeUnawait(
               AnalyticsService.instance
-                  .logCustom('fcm_token_retrieved', {
-                    'length': token.length,
-                  })
+                  .logCustom('fcm_token_retrieved', {'length': token.length})
                   .catchError(
                     (Object e, StackTrace st) => AppLogger.e(
                       'PushNotificationService: Analytics fcm_token_retrieved failed',
@@ -242,6 +233,7 @@ class PushNotificationService {
         }
 
         // Establish ongoing refresh listener for security token rotations
+        // ignore: deprecated_member_use
         _tokenSub = _messaging.onTokenRefresh.listen((newToken) {
           AppLogger.i('FCM device token refreshed');
           AppLogger.safeUnawait(
@@ -263,6 +255,8 @@ class PushNotificationService {
   Future<void> syncToken({bool force = false}) async {
     try {
       if (_messaging == null) return;
+      // FCM getToken is retained for explicit sync before onRegistered stream is active.
+      // ignore: deprecated_member_use
       final token = await _messaging.getToken();
       if (token != null) {
         await _syncTokenWithBackend(token, force: force);
@@ -319,9 +313,7 @@ class PushNotificationService {
                 try {
                   AppLogger.safeUnawait(
                     AnalyticsService.instance
-                        .logCustom('fcm_registered', {
-                          'registered': true,
-                        })
+                        .logCustom('fcm_registered', {'registered': true})
                         .catchError(
                           (Object e, StackTrace st) => AppLogger.e(
                             'PushNotificationService: Analytics fcm_registered (deferred) failed',
@@ -372,9 +364,7 @@ class PushNotificationService {
         try {
           AppLogger.safeUnawait(
             AnalyticsService.instance
-                .logCustom('fcm_registered', {
-                  'registered': true,
-                })
+                .logCustom('fcm_registered', {'registered': true})
                 .catchError(
                   (Object e, StackTrace st) => AppLogger.e(
                     'PushNotificationService: Analytics fcm_registered failed',
@@ -456,10 +446,10 @@ class PushNotificationService {
   }
 }
 
-final pushNotificationServiceProvider = Provider<PushNotificationService>(
-  (ref) {
-    final service = PushNotificationService(ref);
-    ref.onDispose(service.dispose);
-    return service;
-  },
-);
+final pushNotificationServiceProvider = Provider<PushNotificationService>((
+  ref,
+) {
+  final service = PushNotificationService(ref);
+  ref.onDispose(service.dispose);
+  return service;
+});

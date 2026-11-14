@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/models/institution.dart';
@@ -17,6 +16,7 @@ import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:go_router/go_router.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 /// GhostClassScreen
 /// ----------------
@@ -787,9 +787,7 @@ class GhostClassScreen extends ConsumerWidget {
                                           localCourseTargets
                                             ..remove(stdCode)
                                             ..remove(code)
-                                            ..remove(
-                                              course.id.toString(),
-                                            );
+                                            ..remove(course.id.toString());
                                         });
                                       },
                                       tooltip: 'Reset to default',
@@ -1042,20 +1040,16 @@ class GhostClassScreen extends ConsumerWidget {
                             decoration: BoxDecoration(
                               color: isSelected
                                   ? primary.withValues(alpha: 0.1)
-                                  : Theme.of(
-                                      context,
-                                    ).colorScheme.onSurface.withValues(
-                                      alpha: 0.05,
-                                    ),
+                                  : Theme.of(context).colorScheme.onSurface
+                                        .withValues(alpha: 0.05),
                               borderRadius: BorderRadius.circular(16),
                               border: Border.all(
                                 color: isSelected
                                     ? primary.withValues(alpha: 0.3)
-                                    : Theme.of(
-                                        context,
-                                      ).colorScheme.outlineVariant.withValues(
-                                        alpha: 0.1,
-                                      ),
+                                    : Theme.of(context)
+                                          .colorScheme
+                                          .outlineVariant
+                                          .withValues(alpha: 0.1),
                                 width: isSelected ? 2 : 1,
                               ),
                             ),

@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class EmptyTrackingState extends StatelessWidget {
   const EmptyTrackingState({super.key});
@@ -15,9 +15,9 @@ class EmptyTrackingState extends StatelessWidget {
           Icon(
             LucideIcons.clipboardList,
             size: 64,
-            color: Theme.of(context).colorScheme.onSurface.withValues(
-              alpha: isDark ? 0.1 : 0.2,
-            ),
+            color: Theme.of(
+              context,
+            ).colorScheme.onSurface.withValues(alpha: isDark ? 0.1 : 0.2),
           ),
           const SizedBox(height: 24),
           Text(

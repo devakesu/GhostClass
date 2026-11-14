@@ -60,9 +60,7 @@ void main() {
     test(
       'verifyIntegrity refreshes stale cached attestation before returning',
       () async {
-        when(
-          () => mockSecureStorage.getAttestationResult(),
-        ).thenAnswer(
+        when(() => mockSecureStorage.getAttestationResult()).thenAnswer(
           (_) async => jsonEncode({
             'latestVersion': AppConfig.appVersion,
             'minVersion': AppConfig.appVersion,
@@ -108,10 +106,7 @@ void main() {
           response: Response(
             requestOptions: options,
             statusCode: 403,
-            data: {
-              'error': 'Forbidden',
-              'type': 'security',
-            },
+            data: {'error': 'Forbidden', 'type': 'security'},
           ),
           type: DioExceptionType.badResponse,
         );
@@ -327,10 +322,7 @@ void main() {
         when(
           () => mockDio.get<dynamic>(any(), options: any(named: 'options')),
         ).thenAnswer(
-          (_) async => Response(
-            requestOptions: options,
-            statusCode: 500,
-          ),
+          (_) async => Response(requestOptions: options, statusCode: 500),
         );
 
         expect(

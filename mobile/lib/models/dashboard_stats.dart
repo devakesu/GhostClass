@@ -65,11 +65,7 @@ class DashboardStats {
         catalogCodesSet.add(stdCode);
         courseStats.putIfAbsent(
           safeId,
-          () => CourseStat(
-            id: safeId,
-            code: stdCode,
-            name: course.name,
-          ),
+          () => CourseStat(id: safeId, code: stdCode, name: course.name),
         );
 
         idToSafeId[course.id.toString()] = safeId;
@@ -98,9 +94,7 @@ class DashboardStats {
           final status = _parseStatus(session.attendance);
           final rawCourseCode = attendanceData.courses[rawCid]?.code ?? rawCid;
           final stdCourseCode = standardize(rawCourseCode);
-          final courseDisabled = disabledCourseCodes.contains(
-            stdCourseCode,
-          );
+          final courseDisabled = disabledCourseCodes.contains(stdCourseCode);
 
           // Web Parity: Only specific codes count toward official stats
           final attStatus = AttendanceStatus.fromCode(status);
@@ -346,11 +340,8 @@ class DashboardStats {
 }
 
 class CourseStat {
-  CourseStat({
-    required this.id,
-    required this.code,
-    String? name,
-  }) : name = name ?? '';
+  CourseStat({required this.id, required this.code, String? name})
+    : name = name ?? '';
   final String id;
   final String code;
   final String name;

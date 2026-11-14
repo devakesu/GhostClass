@@ -10,10 +10,7 @@ import 'package:ghostclass/services/logger.dart';
 /// allowing dependency injection of the [FirebaseAppCheck] instance.
 
 typedef ActivateFn =
-    Future<void> Function({
-      Object? providerAndroid,
-      Object? providerApple,
-    });
+    Future<void> Function({Object? providerAndroid, Object? providerApple});
 
 /// SecurityInitializer
 /// -------------------

@@ -64,11 +64,7 @@ class ApiService {
     String supabaseToken, {
     bool sync = false,
     bool force = false,
-  }) => _auth.refreshProfile(
-    supabaseToken,
-    sync: sync,
-    force: force,
-  );
+  }) => _auth.refreshProfile(supabaseToken, sync: sync, force: force);
 
   Future<Response<dynamic>> syncMobileAuth(String supabaseToken) =>
       _auth.syncMobileAuth(supabaseToken);
@@ -147,7 +143,7 @@ class ApiService {
     bool force = false,
   }) async {
     // 1. Deduplication
-    if (_syncInFlight != null) return _syncInFlight!;
+    if (_syncInFlight != null) return await _syncInFlight!;
 
     // 2. Circuit Breaker
     final outage = _ref.read(outageProvider);
@@ -241,16 +237,13 @@ class ApiService {
       }
     }();
 
-    return _syncInFlight!;
+    return await _syncInFlight!;
   }
 
   /// Schedule a background sync safely. This wraps [triggerSync] and ensures
   /// any thrown errors are logged and do not bubble to callers that intended
   /// to run sync in a fire-and-forget manner.
-  Future<void> scheduleSync(
-    String supabaseToken, {
-    bool force = false,
-  }) async {
+  Future<void> scheduleSync(String supabaseToken, {bool force = false}) async {
     try {
       await triggerSync(supabaseToken, force: force);
     } on Object catch (e, st) {
@@ -284,12 +277,9 @@ class ApiService {
     required String courseName,
     required String supabaseToken,
   }) async {
-    return client.post(
+    return await client.post(
       '${AppConfig.ghostclassApiUrl}/courses/add',
-      data: {
-        'courseCode': courseCode,
-        'courseName': courseName,
-      },
+      data: {'courseCode': courseCode, 'courseName': courseName},
       options: Options(headers: {'Authorization': 'Bearer $supabaseToken'}),
     );
   }
@@ -300,7 +290,7 @@ class ApiService {
     required String supabaseToken,
     String? courseName,
   }) async {
-    return client.post(
+    return await client.post(
       '${AppConfig.ghostclassApiUrl}/instructors/upsert',
       data: {
         'courseCode': courseCode,

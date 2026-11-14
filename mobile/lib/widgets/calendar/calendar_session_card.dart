@@ -1,7 +1,7 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class CalendarEvent {
   const CalendarEvent({
@@ -140,12 +140,8 @@ class CalendarSessionCard extends StatelessWidget {
                         style: GoogleFonts.manrope(
                           fontSize: 11,
                           fontWeight: FontWeight.w700,
-                          color:
-                              Theme.of(
-                                context,
-                              ).colorScheme.onSurface.withValues(
-                                alpha: isDark ? 0.6 : 0.65,
-                              ),
+                          color: Theme.of(context).colorScheme.onSurface
+                              .withValues(alpha: isDark ? 0.6 : 0.65),
                         ),
                       ),
                   ],
@@ -214,12 +210,9 @@ class CalendarSessionCard extends StatelessWidget {
                 style: GoogleFonts.manrope(
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
-                  color:
-                      Theme.of(
-                        context,
-                      ).colorScheme.onSurface.withValues(
-                        alpha: isDark ? 0.6 : 0.65,
-                      ),
+                  color: Theme.of(context).colorScheme.onSurface.withValues(
+                    alpha: isDark ? 0.6 : 0.65,
+                  ),
                   fontStyle: FontStyle.italic,
                 ),
               ),

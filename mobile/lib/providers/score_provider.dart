@@ -114,7 +114,7 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       return cached;
     }
 
-    return _initialFetch(user: user, academic: academic);
+    return await _initialFetch(user: user, academic: academic);
   }
 
   Future<ScoreState?> _tryHydrateFromCache({
@@ -296,27 +296,25 @@ class ScoreNotifier extends AsyncNotifier<ScoreState> {
       for (var i = 0; i < targetExams.length; i += poolSize) {
         final slice = targetExams.skip(i).take(poolSize);
         await Future.wait(
-          slice.map(
-            (exam) async {
-              try {
-                await _loadExamDetails(
-                  exam: exam,
-                  api: api,
-                  storage: storage,
-                  questionsMap: questionsMap,
-                  answersMap: answersMap,
-                  resolvedScores: resolvedScores,
-                  bypassCache: bypassCache,
-                );
-              } on Object catch (err, st) {
-                AppLogger.e(
-                  'Failed to load details for exam ${exam.id}',
-                  err,
-                  st,
-                );
-              }
-            },
-          ),
+          slice.map((exam) async {
+            try {
+              await _loadExamDetails(
+                exam: exam,
+                api: api,
+                storage: storage,
+                questionsMap: questionsMap,
+                answersMap: answersMap,
+                resolvedScores: resolvedScores,
+                bypassCache: bypassCache,
+              );
+            } on Object catch (err, st) {
+              AppLogger.e(
+                'Failed to load details for exam ${exam.id}',
+                err,
+                st,
+              );
+            }
+          }),
         );
       }
 

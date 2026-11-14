@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/models/dashboard_stats.dart';
 import 'package:ghostclass/widgets/common/icon_badge.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class StatsGridSection extends StatelessWidget {
   const StatsGridSection({
@@ -153,10 +153,7 @@ class _StatCard extends StatelessWidget {
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.12),
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(
-          color: color.withValues(alpha: 0.4),
-          width: 2,
-        ),
+        border: Border.all(color: color.withValues(alpha: 0.4), width: 2),
         boxShadow: [
           BoxShadow(
             color: color.withValues(alpha: 0.08),
@@ -174,11 +171,7 @@ class _StatCard extends StatelessWidget {
             bottom: -8,
             child: Opacity(
               opacity: 0.08,
-              child: Icon(
-                icon,
-                size: isFullWidth ? 80 : 60,
-                color: color,
-              ),
+              child: Icon(icon, size: isFullWidth ? 80 : 60, color: color),
             ),
           ),
           Padding(
@@ -234,12 +227,8 @@ class _StatCard extends StatelessWidget {
                                 style: GoogleFonts.manrope(
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
-                                  color:
-                                      Theme.of(
-                                        context,
-                                      ).colorScheme.onSurface.withValues(
-                                        alpha: 0.4,
-                                      ),
+                                  color: Theme.of(context).colorScheme.onSurface
+                                      .withValues(alpha: 0.4),
                                 ),
                               ),
                             ],

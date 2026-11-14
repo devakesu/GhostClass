@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/models/attendance.dart';
 import 'package:ghostclass/models/course_details.dart';
@@ -6,6 +5,7 @@ import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/tracking/tracking_record_card.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class TrackingCourseSection extends StatelessWidget {
   const TrackingCourseSection({

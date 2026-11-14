@@ -1,6 +1,6 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_markdown_plus/flutter_markdown_plus.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:material_ui/material_ui.dart';
 
 class StaticPageScreen extends StatelessWidget {
   const StaticPageScreen({

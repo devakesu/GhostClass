@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:firebase_analytics/firebase_analytics.dart';
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:ghostclass/providers/app_update_provider.dart';
@@ -9,6 +8,7 @@ import 'package:ghostclass/providers/auth_provider.dart';
 import 'package:ghostclass/screens/login_screen.dart';
 import 'package:ghostclass/services/analytics_service.dart';
 import 'package:ghostclass/services/security_service.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 
 class MockFirebaseAnalytics extends Mock implements FirebaseAnalytics {}
@@ -22,10 +22,8 @@ class FakeLoginAuthNotifier extends AuthNotifier {
   FutureOr<AuthenticatedUser?> build() async => null;
 
   @override
-  Future<void> login(String username, String password) => onLogin(
-    username,
-    password,
-  );
+  Future<void> login(String username, String password) =>
+      onLogin(username, password);
 }
 
 class FakeAppUpdateNotifier extends AppUpdateNotifier {

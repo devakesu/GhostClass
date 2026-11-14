@@ -1,5 +1,5 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/logic/type_utils.dart';
+import 'package:material_ui/material_ui.dart';
 
 String? _firstNonEmptyString(Map<String, dynamic> json, List<String> keys) {
   for (final key in keys) {
@@ -150,11 +150,7 @@ class ExamQuestion {
 }
 
 class ExamAnswer {
-  ExamAnswer({
-    required this.id,
-    required this.examQuestionId,
-    this.score,
-  });
+  ExamAnswer({required this.id, required this.examQuestionId, this.score});
 
   factory ExamAnswer.fromJson(Map<String, dynamic> json) {
     return ExamAnswer(

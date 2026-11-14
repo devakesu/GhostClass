@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/logic/attendance_utils.dart'
     show calculateCurrentAcademicInfo;
@@ -9,6 +8,7 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class HeaderSection extends ConsumerStatefulWidget {
   const HeaderSection({required this.data, super.key});
@@ -199,10 +199,7 @@ class _HeaderSectionState extends ConsumerState<HeaderSection> {
     try {
       await ref
           .read(academicProvider.notifier)
-          .setAcademicPeriod(
-            targetPeriod.semester,
-            targetPeriod.year,
-          );
+          .setAcademicPeriod(targetPeriod.semester, targetPeriod.year);
     } on Object catch (e, st) {
       AppLogger.e('HeaderSection: Failed to update academic period', e, st);
       if (mounted) {

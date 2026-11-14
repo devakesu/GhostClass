@@ -99,16 +99,10 @@ class AppLogger {
   /// exceptions are logged and do not get silently dropped.
   static void safeUnawait(Future<dynamic> future, [String? context]) {
     unawaited(
-      future.catchError(
-        (Object e, StackTrace st) {
-          AppLogger.e(
-            'SafeUnawait${context != null ? ': $context' : ''}',
-            e,
-            st,
-          );
-          return null;
-        },
-      ),
+      future.catchError((Object e, StackTrace st) {
+        AppLogger.e('SafeUnawait${context != null ? ': $context' : ''}', e, st);
+        return null;
+      }),
     );
   }
 
@@ -119,11 +113,9 @@ class AppLogger {
     unawaited(
       Sentry.addBreadcrumb(
         Breadcrumb(message: message, level: SentryLevel.info),
-      ).catchError(
-        (Object e, StackTrace st) {
-          debugPrint('Sentry breadcrumb failed: $e $st');
-        },
-      ),
+      ).catchError((Object e, StackTrace st) {
+        debugPrint('Sentry breadcrumb failed: $e $st');
+      }),
     );
   }
 
@@ -141,11 +133,9 @@ class AppLogger {
           level: SentryLevel.warning,
           data: error != null ? {'error': error.toString()} : null,
         ),
-      ).catchError(
-        (Object e, StackTrace st) {
-          debugPrint('Sentry breadcrumb failed: $e $st');
-        },
-      ),
+      ).catchError((Object e, StackTrace st) {
+        debugPrint('Sentry breadcrumb failed: $e $st');
+      }),
     );
   }
 
@@ -227,12 +217,10 @@ class AppLogger {
           }
           await scope.setContexts('logger', loggerContext);
         },
-      ).catchError(
-        (Object e, StackTrace st) {
-          debugPrint('Sentry capture failed: $e $st');
-          return const SentryId.empty();
-        },
-      ),
+      ).catchError((Object e, StackTrace st) {
+        debugPrint('Sentry capture failed: $e $st');
+        return const SentryId.empty();
+      }),
     );
   }
 }

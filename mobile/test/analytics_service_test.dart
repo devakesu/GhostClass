@@ -204,10 +204,7 @@ void main() {
       AnalyticsService.instance.logLogin(method: 'test'),
       completes,
     );
-    await expectLater(
-      AnalyticsService.instance.logLogout(),
-      completes,
-    );
+    await expectLater(AnalyticsService.instance.logLogout(), completes);
     await expectLater(
       AnalyticsService.instance.logSignUp(method: 'test'),
       completes,

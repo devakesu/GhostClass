@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/logic/attendance_utils.dart' as utils;
 import 'package:ghostclass/models/course_details.dart';
 import 'package:ghostclass/models/course_instructor.dart';
@@ -7,6 +6,7 @@ import 'package:ghostclass/theme/app_theme.dart';
 import 'package:ghostclass/widgets/attendance/edit_instructor_dialog.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class CourseCard extends StatelessWidget {
   const CourseCard({
@@ -119,11 +119,8 @@ class CourseCard extends StatelessWidget {
                   ? Border.all(
                       color: isEnabled && !noDataAtAll
                           ? statusColor.withValues(alpha: 0.3)
-                          : Theme.of(
-                              context,
-                            ).colorScheme.outlineVariant.withValues(
-                              alpha: 0.05,
-                            ),
+                          : Theme.of(context).colorScheme.outlineVariant
+                                .withValues(alpha: 0.05),
                     )
                   : null,
               boxShadow: [
@@ -324,12 +321,10 @@ class CourseCard extends StatelessWidget {
                                       child: Icon(
                                         LucideIcons.edit3,
                                         size: 14,
-                                        color:
-                                            Theme.of(
-                                              context,
-                                            ).colorScheme.onSurface.withValues(
-                                              alpha: 0.4,
-                                            ),
+                                        color: Theme.of(context)
+                                            .colorScheme
+                                            .onSurface
+                                            .withValues(alpha: 0.4),
                                       ),
                                     ),
                                   ),
@@ -499,12 +494,10 @@ class CourseCard extends StatelessWidget {
                                     height: 10,
                                     width: double.infinity,
                                     decoration: BoxDecoration(
-                                      color:
-                                          Theme.of(
-                                            context,
-                                          ).colorScheme.onSurface.withValues(
-                                            alpha: 0.05,
-                                          ),
+                                      color: Theme.of(context)
+                                          .colorScheme
+                                          .onSurface
+                                          .withValues(alpha: 0.05),
                                       borderRadius: BorderRadius.circular(10),
                                     ),
                                   ),
@@ -512,10 +505,7 @@ class CourseCard extends StatelessWidget {
                                     // Solid Extra Gain Bar
                                     FractionallySizedBox(
                                       widthFactor: (stat.percentage / 100)
-                                          .clamp(
-                                            0.0,
-                                            1.0,
-                                          ),
+                                          .clamp(0.0, 1.0),
                                       child: Container(
                                         height: 10,
                                         decoration: BoxDecoration(
@@ -579,10 +569,7 @@ class CourseCard extends StatelessWidget {
                                     // Solid Final Bar
                                     FractionallySizedBox(
                                       widthFactor: (stat.percentage / 100)
-                                          .clamp(
-                                            0.0,
-                                            1.0,
-                                          ),
+                                          .clamp(0.0, 1.0),
                                       child: Stack(
                                         children: [
                                           Container(

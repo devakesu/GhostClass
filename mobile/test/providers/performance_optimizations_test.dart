@@ -369,11 +369,7 @@ void main() {
         final cachedAttendance = {
           'student_attendance_data': <String, dynamic>{},
           'courses': {
-            'CS302': {
-              'id': 101,
-              'name': 'Operating Systems',
-              'code': 'CS302',
-            },
+            'CS302': {'id': 101, 'name': 'Operating Systems', 'code': 'CS302'},
           },
           'attendance_dates': <dynamic>[],
           'sessions': <dynamic>[],

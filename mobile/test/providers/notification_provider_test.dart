@@ -35,9 +35,7 @@ void main() {
 
   ProviderContainer buildContainer() {
     return ProviderContainer(
-      overrides: [
-        authProvider.overrideWith(DummyAuthNotifier.new),
-      ],
+      overrides: [authProvider.overrideWith(DummyAuthNotifier.new)],
     );
   }
 
@@ -76,10 +74,7 @@ void main() {
         notifier.state = AsyncValue.data(initialSnapshot);
 
         // markAllAsRead will attempt DB call to placeholder domain, which must throw
-        await expectLater(
-          notifier.markAllAsRead(),
-          throwsA(anything),
-        );
+        await expectLater(notifier.markAllAsRead(), throwsA(anything));
 
         // Verify that it reverted back to initialSnapshot exactly
         final finalState = container.read(notificationsProvider).value;

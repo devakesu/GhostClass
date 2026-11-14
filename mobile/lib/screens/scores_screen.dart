@@ -1,4 +1,3 @@
-import 'package:flutter/material.dart';
 import 'package:flutter_animate/flutter_animate.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:ghostclass/models/score.dart';
@@ -18,6 +17,7 @@ import 'package:ghostclass/widgets/service_toast.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class ScoresScreen extends ConsumerStatefulWidget {
   const ScoresScreen({super.key});
@@ -114,7 +114,10 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                     final supabaseToken =
                         supabaseClient.auth.currentSession?.accessToken;
                     if (supabaseToken == null) return null;
-                    return apiService.runCronSync(supabaseToken, force: true);
+                    return await apiService.runCronSync(
+                      supabaseToken,
+                      force: true,
+                    );
                   },
                   onSyncResult: (result) {
                     if (result is CronSyncResult && result.hasChanges) {
@@ -216,19 +219,19 @@ class _ScoresScreenState extends ConsumerState<ScoresScreen> {
                       : SliverPadding(
                           padding: const EdgeInsets.symmetric(horizontal: 24),
                           sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, index) {
-                                final group = data.groupedExams[index];
-                                return _CourseGroupWidget(
-                                  group: group,
-                                  resolvedScores: data.resolvedScores,
-                                  questions: data.questions,
-                                  answers: data.answers,
-                                  formatDate: _formatDate,
-                                );
-                              },
-                              childCount: data.groupedExams.length,
-                            ),
+                            delegate: SliverChildBuilderDelegate((
+                              context,
+                              index,
+                            ) {
+                              final group = data.groupedExams[index];
+                              return _CourseGroupWidget(
+                                group: group,
+                                resolvedScores: data.resolvedScores,
+                                questions: data.questions,
+                                answers: data.answers,
+                                formatDate: _formatDate,
+                              );
+                            }, childCount: data.groupedExams.length),
                           ),
                         ),
                   loading: () => const SliverFillRemaining(

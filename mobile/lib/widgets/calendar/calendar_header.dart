@@ -1,8 +1,8 @@
-import 'package:flutter/material.dart';
 import 'package:ghostclass/theme/app_theme.dart';
 import 'package:google_fonts/google_fonts.dart';
 import 'package:intl/intl.dart';
 import 'package:lucide_icons_flutter/lucide_icons.dart';
+import 'package:material_ui/material_ui.dart';
 
 class CalendarHeader extends StatelessWidget {
   const CalendarHeader({

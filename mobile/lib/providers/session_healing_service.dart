@@ -13,9 +13,7 @@ import 'package:ghostclass/services/logger.dart';
 import 'package:ghostclass/services/secure_storage.dart';
 
 final sessionHealingServiceProvider =
-    NotifierProvider<SessionHealingService, void>(
-      SessionHealingService.new,
-    );
+    NotifierProvider<SessionHealingService, void>(SessionHealingService.new);
 
 class SessionHealingService extends Notifier<void> {
   int _consecutiveHealFailures = 0;

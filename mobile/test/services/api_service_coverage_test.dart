@@ -22,9 +22,7 @@ void main() {
     when(() => mockDioService.dio).thenReturn(mockDio);
 
     container = ProviderContainer(
-      overrides: [
-        dioServiceProvider.overrideWith((ref) => mockDioService),
-      ],
+      overrides: [dioServiceProvider.overrideWith((ref) => mockDioService)],
     );
 
     apiService = container.read(apiServiceProvider);
