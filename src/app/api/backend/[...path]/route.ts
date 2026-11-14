@@ -234,8 +234,7 @@ async function validateProxyAuthAndOrigin(
   authType?: "app-check" | "csrf" | "none",
 ): Promise<{ token?: string; errorResponse?: NextResponse }> {
   const isPublic = PUBLIC_PATHS.has(fullPath);
-  const isMobileApp =
-    authType === "app-check" || !req.headers.has("sec-fetch-site");
+  const isMobileApp = authType === "app-check";
 
   const originError = await validateOrigin(
     req,

@@ -224,6 +224,7 @@ class DioService {
         const errorMsg =
             'App Check token is empty - verify Firebase activation';
         options.extra['appCheckError'] = errorMsg;
+        options.headers['X-Firebase-AppCheck'] = 'unverified';
         AppLogger.w('DioService: $errorMsg (continuing in fail-open mode)');
       }
     } on Object catch (e) {
@@ -236,6 +237,7 @@ class DioService {
       );
       options.extra['appCheckError'] = e.toString();
       options.extra['appCheckTransient'] = _isTransientAppCheckFailure(e);
+      options.headers['X-Firebase-AppCheck'] = 'unverified';
     }
   }
 

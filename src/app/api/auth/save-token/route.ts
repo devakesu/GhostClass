@@ -387,8 +387,7 @@ const handler = async (
 ) => {
   const headerList = await headers();
   const cookieStore = await cookies();
-  const isAppCheck =
-    authType === "app-check" || !headerList.has("sec-fetch-site");
+  const isAppCheck = authType === "app-check";
   const headerErr = await validateRequestHeaders(headerList, isAppCheck);
   if (headerErr) return headerErr;
 
