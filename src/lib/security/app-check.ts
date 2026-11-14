@@ -47,6 +47,7 @@ function getWebApiLimiter(): Ratelimit {
 
 export interface AppCheckResult {
   isValid: boolean;
+  isAttested?: boolean;
   error?: string;
   reason?: string;
   action?: string;
@@ -86,6 +87,7 @@ export type AuthType = "csrf" | "app-check" | "none";
 
 export interface AuthResult {
   isValid: boolean;
+  isAttested?: boolean;
   error?: string;
   reason?: string;
   action?: string;
@@ -171,32 +173,35 @@ export async function verifyAppCheckToken(
   req?: Request,
   options: AppCheckOptions = {},
 ): Promise<AppCheckResult> {
+  const isEnforced = process.env.ENFORCE_APP_CHECK === "true";
   const headerList = req ? req.headers : await nextHeaders();
   const token = headerList.get("X-Firebase-AppCheck");
 
   if (!token) {
-    if (process.env.ENFORCE_APP_CHECK === "true") {
+    if (isEnforced) {
       return {
         isValid: false,
+        isAttested: false,
         error: "Missing mandatory App Check token",
         reason: SECURITY_ERRORS.MISSING_TOKEN.reason,
         action: SECURITY_ERRORS.MISSING_TOKEN.action,
       };
     }
-    return { isValid: true };
+    return { isValid: true, isAttested: false };
   }
 
   const appCheck = getAppCheck();
   if (!appCheck) {
-    if (process.env.ENFORCE_APP_CHECK === "true") {
+    if (isEnforced) {
       return {
         isValid: false,
+        isAttested: false,
         error: "Security Infrastructure Offline",
         reason: "The server's security verifier is unavailable.",
         action: "Please try again later.",
       };
     }
-    return { isValid: true, alreadyLogged: true };
+    return { isValid: true, isAttested: false, alreadyLogged: true };
   }
 
   try {
@@ -209,27 +214,57 @@ export async function verifyAppCheckToken(
     ];
 
     if (!authIds.includes(decodedToken.appId)) {
+      logger.warn(
+        `App Check unauthorized appId: ${decodedToken.appId} (enforced: ${isEnforced})`,
+      );
+      if (isEnforced) {
+        return {
+          isValid: false,
+          isAttested: false,
+          error: "Unauthorized Application",
+          reason: SECURITY_ERRORS.UNAUTHORIZED_APP.reason,
+          action: SECURITY_ERRORS.UNAUTHORIZED_APP.action,
+          criticalRisk: true,
+        };
+      }
       return {
-        isValid: false,
+        isValid: true,
+        isAttested: false,
         error: "Unauthorized Application",
         reason: SECURITY_ERRORS.UNAUTHORIZED_APP.reason,
         action: SECURITY_ERRORS.UNAUTHORIZED_APP.action,
-        criticalRisk: true,
+        criticalRisk: false,
       };
     }
 
     return {
       isValid: true,
+      isAttested: true,
       integrity: { appId: decodedToken.appId, ...(decodedToken.token || {}) },
     };
   } catch (error: unknown) {
-    Sentry.captureException(error);
+    if (isEnforced) {
+      Sentry.captureException(error);
+      return {
+        isValid: false,
+        isAttested: false,
+        error: "Security Verification Failed",
+        reason: SECURITY_ERRORS.VERIFICATION_FAILED.reason,
+        action: SECURITY_ERRORS.VERIFICATION_FAILED.action,
+        criticalRisk: true,
+        integrity: {
+          error: error instanceof Error ? error.message : String(error),
+        },
+      };
+    }
+    logger.warn("App Check verification failed (fail-open mode):", error);
     return {
-      isValid: false,
+      isValid: true,
+      isAttested: false,
       error: "Security Verification Failed",
       reason: SECURITY_ERRORS.VERIFICATION_FAILED.reason,
       action: SECURITY_ERRORS.VERIFICATION_FAILED.action,
-      criticalRisk: true,
+      criticalRisk: false,
       integrity: {
         error: error instanceof Error ? error.message : String(error),
       },
@@ -245,16 +280,19 @@ async function verifyAppCheckAuth(
   if (!res.isValid) {
     return {
       isValid: false,
+      isAttested: false,
       error: res.error,
       reason: res.reason,
       action: res.action,
       authType: "app-check",
       isMobileRequest: true,
       alreadyLogged: res.alreadyLogged,
+      criticalRisk: res.criticalRisk,
     };
   }
   return {
     isValid: true,
+    isAttested: res.isAttested ?? false,
     authType: "app-check",
     isMobileRequest: true,
     integrity: res.integrity,
@@ -345,10 +383,14 @@ async function verifyAuthentication(
   return { isValid: false, error: "Unauthenticated", authType: "none" };
 }
 
-async function handleRateLimit(req: NextRequest, clientIp: string | null) {
+async function handleRateLimit(
+  req: NextRequest,
+  clientIp: string | null,
+  isAttested?: boolean,
+) {
   if (!clientIp) return true;
-  const headerList = req.headers;
-  if (headerList.has("X-Firebase-AppCheck")) return true;
+  // Cryptographically attested mobile clients bypass standard web rate limiting
+  if (isAttested) return true;
 
   try {
     const path = req.nextUrl?.pathname || new URL(req.url).pathname;
@@ -414,16 +456,6 @@ export function withSecurity<T = unknown>(
       logger.dev("IP check failed", e);
     }
 
-    if (!(await handleRateLimit(req, clientIp))) {
-      return NextResponse.json(
-        { error: "Rate limit exceeded" },
-        {
-          status: 429,
-          headers: { "Retry-After": "60" },
-        },
-      );
-    }
-
     const authRes = await verifyAuthentication(req, options);
     if (!authRes.isValid) {
       return NextResponse.json(
@@ -436,6 +468,16 @@ export function withSecurity<T = unknown>(
           type: "security",
         },
         { status: authRes.authType === "csrf" ? 403 : 401 },
+      );
+    }
+
+    if (!(await handleRateLimit(req, clientIp, authRes.isAttested))) {
+      return NextResponse.json(
+        { error: "Rate limit exceeded" },
+        {
+          status: 429,
+          headers: { "Retry-After": "60" },
+        },
       );
     }
 

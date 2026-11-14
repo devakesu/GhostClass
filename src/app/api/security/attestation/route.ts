@@ -72,19 +72,26 @@ export async function GET(req: Request | NextRequest) {
     latestVersion = minVersion;
   }
 
+  const isAttested = result.isAttested ?? result.isValid;
+  const isEnforced = process.env.ENFORCE_APP_CHECK === "true";
+
   return NextResponse.json({
-    verified: result.isValid,
-    criticalRisk: result.criticalRisk || false,
-    appCheck: result.isValid,
-    appCheckCriticalRisk: result.criticalRisk || false,
+    verified: isAttested,
+    criticalRisk: isEnforced ? result.criticalRisk || false : false,
+    appCheck: isAttested,
+    appCheckCriticalRisk: isEnforced ? result.criticalRisk || false : false,
     appCheckError: result.error,
     appId: appIdVal,
     details: tokenDetails,
-    enforced: process.env.ENFORCE_APP_CHECK === "true",
-    reason: result.reason || "Device verified successfully",
-    action: result.isValid
+    enforced: isEnforced,
+    reason: isAttested
+      ? result.reason || "Device verified successfully"
+      : result.reason || "Device attestation unverified (fail-open mode)",
+    action: isAttested
       ? "No action required."
-      : result.action || "Please try again.",
+      : isEnforced
+        ? result.action || "Please try again."
+        : "Fail-open mode active: no action required.",
     latestVersion,
     minVersion,
     type: "security",

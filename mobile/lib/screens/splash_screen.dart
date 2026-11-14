@@ -293,21 +293,8 @@ class _SplashScreenState extends ConsumerState<SplashScreen> {
             'SplashScreen: Firebase & App Check initialization completed.',
           );
         } on Object catch (initErr) {
-          AppLogger.e(
-            'SplashScreen: Firebase & App Check initialization failed',
-            initErr,
-          );
-          throw AppException(
-            message: 'Security subsystem initialization failed.',
-            type: AppExceptionType.unauthorized,
-            details: {
-              'type': 'security',
-              'reason': 'Device security verification setup failed.',
-              'action':
-                  'Please ensure Google Play Services are enabled and update the app.',
-              'criticalRisk': true,
-              'appCheckError': initErr.toString(),
-            },
+          AppLogger.w(
+            'SplashScreen: Firebase & App Check initialization failed (fail-open mode: continuing startup): $initErr',
           );
         }
       }

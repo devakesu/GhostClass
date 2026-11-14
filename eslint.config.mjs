@@ -1,9 +1,9 @@
 import js from "@eslint/js";
-import tseslint from "typescript-eslint";
+import pluginNext from "@next/eslint-plugin-next";
 import pluginReact from "eslint-plugin-react";
 import pluginReactHooks from "eslint-plugin-react-hooks";
-import pluginNext from "@next/eslint-plugin-next";
 import globals from "globals";
+import tseslint from "typescript-eslint";
 
 import security from "eslint-plugin-security";
 import sonarjs from "eslint-plugin-sonarjs";
@@ -12,12 +12,25 @@ import unusedImports from "eslint-plugin-unused-imports";
 export default [
   {
     ignores: [
-      ".next/*",
-      "node_modules/*",
+      ".claude/**",
+      ".agents/**",
+      ".gemini/**",
+      ".cursor/**",
+      ".opencode/**",
+      ".husky/**",
+      ".github/**",
+      ".vscode/**",
+      ".idea/**",
+      ".turbo/**",
+      ".vercel/**",
+      ".next/**",
+      "node_modules/**",
       "lint-staged.config.js",
       "public/sw.js",
-      "Temp/*",
-      "mobile/*",
+      "Temp/**",
+      "mobile/**",
+      "supabase/**",
+      "scripts/**",
       "**/__tests__/**",
       "**/*.test.ts",
       "**/*.test.tsx",
@@ -64,10 +77,10 @@ export default [
       "unused-imports/no-unused-vars": [
         "warn",
         {
-          "vars": "all",
-          "varsIgnorePattern": "^_",
-          "args": "after-used",
-          "argsIgnorePattern": "^_",
+          vars: "all",
+          varsIgnorePattern: "^_",
+          args: "after-used",
+          argsIgnorePattern: "^_",
         },
       ],
 

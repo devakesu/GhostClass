@@ -350,7 +350,10 @@ class SecurityService {
 
       if (response.statusCode == 200) {
         final data = response.data as Map<String, dynamic>;
-        if (data['verified'] != true) {
+        final isEnforced = data['enforced'] == true;
+        final isVerified = data['verified'] == true;
+
+        if (!isVerified && isEnforced) {
           final reason =
               (data['reason'] as String?) ??
               (data['appCheckError'] as String?) ??
@@ -377,6 +380,12 @@ class SecurityService {
               'criticalRisk': criticalRisk,
               'appCheckError': appCheckError,
             },
+          );
+        }
+
+        if (!isVerified) {
+          AppLogger.w(
+            'SecurityService: Attestation unverified but server is fail-open (enforced: false). Continuing.',
           );
         }
 

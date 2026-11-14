@@ -58,8 +58,8 @@ class DioService {
               _handle401(err.requestOptions);
             }
 
-            // If App Check produced a local error (token issue), surface a
-            // lockdown event so security flows can react (e.g. forced logout).
+            // If App Check produced a local error or 403 security response,
+            // log the event for telemetry without triggering a destructive lockdown.
             final appCheckError =
                 err.requestOptions.extra['appCheckError'] as String?;
             final responseData = err.response?.data;
@@ -69,19 +69,9 @@ class DioService {
             if (err.response?.statusCode == 403 &&
                 isSecurityType &&
                 appCheckError != null) {
-              AppLogger.e(
-                'DioService: 403 + App Check error detected. Triggering security lockdown.',
-                Exception(appCheckError),
+              AppLogger.w(
+                'DioService: 403 security response with App Check error (fail-open mode: lockdown avoided). Details: $appCheckError',
               );
-              try {
-                _lockdownController.add({
-                  'title': 'Device verification failed',
-                  'reason': appCheckError,
-                  'technicalDetails': appCheckError,
-                });
-              } on Object catch (e, st) {
-                AppLogger.e('DioService: Failed to emit lockdown event', e, st);
-              }
             }
           } on Object catch (e, st) {
             AppLogger.e('DioService: onError handler failed', e, st);
@@ -234,14 +224,16 @@ class DioService {
         const errorMsg =
             'App Check token is empty - verify Firebase activation';
         options.extra['appCheckError'] = errorMsg;
-        AppLogger.e('DioService: $errorMsg');
+        AppLogger.w('DioService: $errorMsg (continuing in fail-open mode)');
       }
     } on Object catch (e) {
       // Ensure futures are cleared on error to allow retries
       _tokenFetchInFlight = null;
       _limitedTokenFetchInFlight = null;
 
-      AppLogger.e('DioService: Security headers failed: $e');
+      AppLogger.w(
+        'DioService: App Check token fetch failed: $e (continuing in fail-open mode)',
+      );
       options.extra['appCheckError'] = e.toString();
       options.extra['appCheckTransient'] = _isTransientAppCheckFailure(e);
     }
